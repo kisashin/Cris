@@ -5,7 +5,7 @@ import bcrypt
 from Entity.usuario import Usuario
 from Data.usuario_repository import UsuarioRepository
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 class SessionState(rx.State):
     is_authenticated: bool = False

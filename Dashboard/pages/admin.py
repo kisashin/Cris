@@ -4,7 +4,7 @@ from Dashboard.components.navbar import navbar
 from Dashboard.components.sidebar import sidebar
 from ..states.admin_state import AdminState 
 
-@rx.page(route="/admin", title="Panel de Administración")
+@rx.page(route="/admin", title="Panel de Administración", on_load=AdminState.load_usuarios)
 def admin_page() -> rx.Component:
     return rx.cond(
         (AuthState.is_authenticated & (AuthState.role == "admin")),

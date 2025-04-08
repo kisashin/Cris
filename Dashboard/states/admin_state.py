@@ -25,5 +25,5 @@ class AdminState(rx.State):
     def guardar_cambios(self):
         """Guarda todos los cambios hechos a los usuarios en la base de datos."""
         repo = AdminRepository()
-        success = repo.actualizar_usuario(self.usuarios)
+        success = all(repo.actualizar_usuario(u) for u in self.usuarios)
         self.message = "Cambios guardados correctamente." if success else "Error al guardar cambios."
