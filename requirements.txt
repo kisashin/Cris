@@ -1,0 +1,5 @@
+Flask==2.2.2
+pyodbc==4.0.35
+bcrypt==3.2.2
+
+reflex==0.7.5
