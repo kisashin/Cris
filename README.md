@@ -1,41 +1,26 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.HomologaPolizaAlfa;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
-import javax.persistence.*;
-import java.time.LocalDateTime;
+import java.util.List;
 
-@Entity
-@Table(name = "homologaprod_alfa", schema = "dbo")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-public class HomologaPolizaAlfa {
+@Repository
+public interface HomologaPolizaAlfaRepository extends JpaRepository<HomologaPolizaAlfa, Integer> {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id", nullable = false, columnDefinition = "INT")
-    private Integer id;
-
-    @Column(name = "producto", columnDefinition = "INT")
-    private Integer producto;
-
-    @Column(name = "ramo", columnDefinition = "INT")
-    private Integer ramo;
-
-    @Column(name = "nro_poliza", length = 100, columnDefinition = "NVARCHAR(100)")
-    private String nroPoliza;
-
-    @Column(name = "aplicaVigencia", columnDefinition = "INT")
-    private Integer aplicaVigencia;
-
-    @Column(name = "fechaInicio", columnDefinition = "DATETIME")
-    private LocalDateTime fechaInicio;
-
-    @Column(name = "fechaFin", columnDefinition = "DATETIME")
-    private LocalDateTime fechaFin;
+    @Query(value = "SELECT Id, producto, ramo, nro_poliza, aplicaVigencia, fechaInicio, fechaFin FROM dbo.homologaprod_alfa WHERE producto = :producto", nativeQuery = true)
+    List<HomologaPolizaAlfa> findByProducto(@Param("producto") Integer producto);
 }
+
+@Column(name = "aplicaVigencia")
+private Integer aplicaVigencia;
+
+@Column(name = "fechaInicio")
+private LocalDateTime fechaInicio;
+
+@Column(name = "fechaFin")
+private LocalDateTime fechaFin;
