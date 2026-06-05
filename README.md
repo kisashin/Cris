@@ -1,32 +1,11 @@
-onSearch(): void {
-  if (this.productForm.valid) {
-    const producto = Number(this.productForm.value.product);
-    this.homologationPolicyAlfaSrv.buscarPorProducto(producto).subscribe({
-      next: (response) => {
-        if (response && response.bodyResponse) {
-          this.dataSource = response.bodyResponse.map((item: any) => ({
-            id: item.id,
-            productCode: item.producto,
-            ramoCode: item.ramo,
-            policyNumber: item.nroPoliza,
-            aplicaVigencia: item.aplicaVigencia,
-            startDate: item.fechaInicio,
-            endDate: item.fechaFin
-          }));
-        }
-      },
-      error: (error) => {
-        console.error('Error al buscar homologaciones:', error);
-      }
-    });
-  }
+private formatDate(date: any): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-const payload: any = {
-  producto: Number(formValue.productCode),
-  ramo: Number(formValue.ramoCode),
-  nroPoliza: formValue.policyNumber,
-  aplicaVigencia: formValue.appliesValidity.value === 'si' ? 1 : 0,
-  fechaInicio: formValue.startDate || null,
-  fechaFin: formValue.endDate || null
-};
+fechaInicio: this.formatDate(formValue.startDate),
+fechaFin: this.formatDate(formValue.endDate)
