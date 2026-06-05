@@ -8,34 +8,34 @@ import lombok.AllArgsConstructor;
 import javax.persistence.*;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "homologaprod_alfa", schema = "dbo")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "homologaprod_alfa", schema = "dbo")
 public class HomologaPolizaAlfa {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Id")
+    @Column(name = "Id", nullable = false, columnDefinition = "INT")
     private Integer id;
 
-    @Column(name = "producto")
+    @Column(name = "producto", columnDefinition = "INT")
     private Integer producto;
 
-    @Column(name = "ramo")
+    @Column(name = "ramo", columnDefinition = "INT")
     private Integer ramo;
 
-    @Column(name = "nro_poliza")
+    @Column(name = "nro_poliza", length = 100, columnDefinition = "NVARCHAR(100)")
     private String nroPoliza;
 
-    @Column(name = "\"aplicaVigencia\"")
+    @Column(name = "aplicaVigencia", columnDefinition = "INT")
     private Integer aplicaVigencia;
 
-    @Column(name = "\"fechaInicio\"")
+    @Column(name = "fechaInicio", columnDefinition = "DATETIME")
     private LocalDateTime fechaInicio;
 
-    @Column(name = "\"fechaFin\"")
+    @Column(name = "fechaFin", columnDefinition = "DATETIME")
     private LocalDateTime fechaFin;
 }
