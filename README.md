@@ -1,3 +1,28 @@
+Dónde va cada archivo:
+src/test/java/co/com/bnpparibas/cardif/closingclaims/
+
+  domain/entity/
+    HomologaPolizaAlfaTest.java          ← Entity (3 tests)
+
+  domain/dtos/homologa/
+    HomologaPolizaDTOsTest.java          ← Request y Response DTOs (6 tests)
+
+  domain/services/impl/
+    HomologaPolizaAlfaServiceImplTest.java ← Service (11 tests)
+
+  api/
+    HomologaPolizaAlfaControllerTest.java  ← Controller (8 tests)
+Total: 28 tests distribuidos así:
+
+Entity → getters, setters, campos nulos
+DTOs → constructores, builders, setters
+Service → happy path y errores para los 4 métodos con @Nested
+Controller → 200/201 esperados, propagación de excepciones
+
+Con eso deberías superar el 90% de cobertura en JaCoCo. Ejecuta mvn test y si algún test falla por diferencia en tipos o nombres de métodos, pégame el error y lo ajusto.
+
+
+
 HomologaPolizaAlfaControllerTest
 
 package co.com.bnpparibas.cardif.closingclaims.api;
