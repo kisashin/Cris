@@ -1,262 +1,293 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+import { Component, OnInit } from '@angular/core';
+import {
+  AbstractControl,
+  FormBuilder,
+  FormGroup,
+  ValidationErrors,
+  ValidatorFn,
+  Validators
+} from '@angular/forms';
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyRequestDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.HomologationPolicyAlfa;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
-import org.mapstruct.factory.Mappers;
+import { IMetaColumn } from '../../models/IMetaColumn.models';
+import { HomologationPolicy } from '../../models/HomologationPolicy.model';
+import { HomologationPolicyAlfaService } from '../../services/homologation-policy-alfa.service';
 
-import java.util.List;
+@Component({
+  selector: 'app-homologation-policy-alfa',
+  templateUrl: './homologation-policy-alfa.component.html',
+  styleUrl: './homologation-policy-alfa.component.scss',
+  standalone: false
+})
+export class HomologationPolicyAlfaComponent implements OnInit {
 
-@Mapper
-public interface HomologationPolicyAlfaMapper {
+  public productForm!: FormGroup;
+  public formHomologationFormPolicy!: FormGroup;
+  public showFormHomologationFormPolicy: boolean = false;
+  public editingId: number | null = null;
+  public errorMessage: string = '';
 
-    HomologationPolicyAlfaMapper INSTANCE =
-            Mappers.getMapper(HomologationPolicyAlfaMapper.class);
+  public displayedColumns: IMetaColumn[] = [
+    { title: 'Codigo Producto', field: 'productCode' },
+    { title: 'Codigo ramo', field: 'branchCode' },
+    { title: 'Número poliza', field: 'policyNumber' },
+    { title: 'Fecha Inicio', field: 'startDate' },
+    { title: 'Fecha final', field: 'endDate' },
+    {
+      title: 'Acciones',
+      field: 'actions',
+      actions: [
+        {
+          action: (row: HomologationPolicy, index: number) => {
+            this.editMode(row, index);
+          },
+          fasIcon: 'fal fa-edit',
+          tooltip: () => 'Editar',
+          isMenu: false,
+          actionEditDeleteCircle: true,
+          edit: true
+        },
+        {
+          action: (row: HomologationPolicy, index: number) => {
+            this.deleteMode(row, index);
+          },
+          fasIcon: 'fal fa-times-circle pointer',
+          tooltip: () => 'Eliminar',
+          isMenu: false,
+          actionEditDeleteCircle: true,
+          delete: true
+        }
+      ]
+    }
+  ];
 
-    /*
-     * Entity -> ResponseDTO
-     */
-    @Mapping(target = "productCode", source = "producto")
-    @Mapping(target = "branchCode", source = "ramo")
-    @Mapping(target = "policyNumber", source = "nroPoliza")
-    @Mapping(target = "appliesValidity", source = "aplicaVigencia")
-    @Mapping(target = "startDate", source = "fechaInicio")
-    @Mapping(target = "endDate", source = "fechaFin")
-    HomologationPolicyResponseDTO toResponseDTO(
-            HomologationPolicyAlfa entity
-    );
+  public dataSource: HomologationPolicy[] = [];
 
-    /*
-     * Lista de Entity -> Lista de ResponseDTO
-     */
-    List<HomologationPolicyResponseDTO> toResponseDTOList(
-            List<HomologationPolicyAlfa> entities
-    );
+  constructor(
+    private fb: FormBuilder,
+    private homologationPolicyAlfaSrv: HomologationPolicyAlfaService
+  ) { }
 
-    /*
-     * RequestDTO -> nueva Entity
-     */
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "producto", source = "productCode")
-    @Mapping(target = "ramo", source = "branchCode")
-    @Mapping(target = "nroPoliza", source = "policyNumber")
-    @Mapping(target = "aplicaVigencia", source = "appliesValidity")
-    @Mapping(target = "fechaInicio", source = "startDate")
-    @Mapping(target = "fechaFin", source = "endDate")
-    HomologationPolicyAlfa toEntity(
-            HomologationPolicyRequestDTO request
-    );
+  ngOnInit(): void {
+    this.productForm = this.fb.group({
+      product: ['', Validators.required]
+    });
 
-    /*
-     * Actualiza una Entity existente sin modificar el ID
-     */
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "producto", source = "productCode")
-    @Mapping(target = "ramo", source = "branchCode")
-    @Mapping(target = "nroPoliza", source = "policyNumber")
-    @Mapping(target = "aplicaVigencia", source = "appliesValidity")
-    @Mapping(target = "fechaInicio", source = "startDate")
-    @Mapping(target = "fechaFin", source = "endDate")
-    void updateEntity(
-            HomologationPolicyRequestDTO request,
-            @MappingTarget HomologationPolicyAlfa entity
-    );
-}
+    this.formHomologationFormPolicy = this.fb.group({
+      productCode: ['', Validators.required],
+      branchCode: ['', Validators.required],
+      policyNumber: ['', Validators.required],
+      appliesValidity: this.fb.group({
+        value: ['no', Validators.required]
+      }),
+      startDate: [''],
+      endDate: ['']
+    }, { validators: this.dateRangeValidator });
+  }
 
+  /** Validador que asegura que startDate <= endDate */
+  dateRangeValidator: ValidatorFn = (
+    group: AbstractControl
+  ): ValidationErrors | null => {
 
-SERVICE
+    const start = group.get('startDate')?.value;
+    const end = group.get('endDate')?.value;
 
-
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
-
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyRequestDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.HomologationPolicyAlfa;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.IHomologationPolicyAlfaService;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.HomologationPolicyAlfaMapper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.HomologationPolicyAlfaRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-
-@Service
-public class HomologationPolicyAlfaServiceImpl
-        implements IHomologationPolicyAlfaService {
-
-    private static final Logger logger =
-            LoggerFactory.getLogger(HomologationPolicyAlfaServiceImpl.class);
-
-    private final HomologationPolicyAlfaRepository homologationPolicyAlfaRepository;
-
-    public HomologationPolicyAlfaServiceImpl(
-            HomologationPolicyAlfaRepository homologationPolicyAlfaRepository) {
-
-        this.homologationPolicyAlfaRepository =
-                homologationPolicyAlfaRepository;
+    if (start && end && new Date(start) > new Date(end)) {
+      return { dateRangeInvalid: true };
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<HomologationPolicyResponseDTO> buscarPorProducto(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Integer producto) {
+    return null;
+  };
 
-        try {
-            List<HomologationPolicyAlfa> entities =
-                    homologationPolicyAlfaRepository.findByProducto(producto);
+  onSearch(): void {
+    if (this.productForm.valid) {
+      const productCode = Number(
+        this.productForm.value.product
+      );
 
-            return HomologationPolicyAlfaMapper.INSTANCE
-                    .toResponseDTOList(entities);
+      this.errorMessage = '';
 
-        } catch (Exception e) {
-            logger.error(
-                    "Error buscando homologaciones por producto={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    producto,
-                    correlationId,
-                    requestId,
-                    e
+      this.homologationPolicyAlfaSrv
+        .buscarPorProducto(productCode)
+        .subscribe({
+          next: (response) => {
+            if (response && response.bodyResponse) {
+              this.dataSource = response.bodyResponse.map(
+                (item: any) => ({
+                  id: item.id,
+                  productCode: item.productCode,
+                  branchCode: item.branchCode,
+                  policyNumber: item.policyNumber,
+                  appliesValidity: item.appliesValidity,
+                  startDate: item.startDate,
+                  endDate: item.endDate
+                })
+              );
+            }
+          },
+          error: (error) => {
+            console.error(
+              'Error al buscar homologaciones:',
+              error
             );
 
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error consultando homologaciones por producto",
-                    HttpStatus.INTERNAL_SERVER_ERROR
+            this.errorMessage =
+              'Error al buscar homologaciones';
+          }
+        });
+    }
+  }
+
+  onGuardar(): void {
+    if (this.formHomologationFormPolicy.valid) {
+      const formValue =
+        this.formHomologationFormPolicy.value;
+
+      const payload: HomologationPolicy = {
+        productCode: Number(
+          formValue.productCode
+        ),
+        branchCode: Number(
+          formValue.branchCode
+        ),
+        policyNumber:
+          formValue.policyNumber,
+        appliesValidity:
+          formValue.appliesValidity.value === 'si'
+            ? 1
+            : 0,
+        startDate: this.formatDate(
+          formValue.startDate
+        ),
+        endDate: this.formatDate(
+          formValue.endDate
+        )
+      };
+
+      if (this.editingId !== null) {
+        this.homologationPolicyAlfaSrv
+          .editar(this.editingId, payload)
+          .subscribe({
+            next: () => {
+              this.showFormHomologationFormPolicy =
+                false;
+
+              this.editingId = null;
+              this.onSearch();
+            },
+            error: (error) => {
+              console.error(
+                'Error al editar homologación:',
+                error
+              );
+            }
+          });
+      } else {
+        this.homologationPolicyAlfaSrv
+          .crear(payload)
+          .subscribe({
+            next: () => {
+              this.showFormHomologationFormPolicy =
+                false;
+
+              this.onSearch();
+            },
+            error: (error) => {
+              console.error(
+                'Error al crear homologación:',
+                error
+              );
+            }
+          });
+      }
+    }
+  }
+
+  editMode(
+    policy: HomologationPolicy,
+    index: number
+  ): void {
+
+    this.editingId =
+      policy.id ?? null;
+
+    this.showFormHomologationFormPolicy =
+      true;
+
+    this.formHomologationFormPolicy.patchValue({
+      productCode: policy.productCode,
+      branchCode: policy.branchCode,
+      policyNumber: policy.policyNumber,
+      appliesValidity: {
+        value:
+          policy.appliesValidity === 1
+            ? 'si'
+            : 'no'
+      },
+      startDate: policy.startDate,
+      endDate: policy.endDate
+    });
+  }
+
+  deleteMode(
+    row: HomologationPolicy,
+    index: number
+  ): void {
+
+    if (row.id) {
+      this.homologationPolicyAlfaSrv
+        .eliminar(row.id)
+        .subscribe({
+          next: () => {
+            this.onSearch();
+          },
+          error: (error) => {
+            console.error(
+              'Error al eliminar homologación:',
+              error
             );
-        }
+          }
+        });
+    }
+  }
+
+  nuevoRegistro(): void {
+    this.showFormHomologationFormPolicy =
+      true;
+
+    this.editingId = null;
+
+    this.formHomologationFormPolicy.reset({
+      productCode: '',
+      branchCode: '',
+      policyNumber: '',
+      appliesValidity: {
+        value: 'no'
+      },
+      startDate: '',
+      endDate: ''
+    });
+  }
+
+  private formatDate(
+    date: any
+  ): string | null {
+
+    if (!date) {
+      return null;
     }
 
-    @Override
-    @Transactional
-    public HomologationPolicyResponseDTO crear(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            HomologationPolicyRequestDTO request) {
+    const d = new Date(date);
+    const year = d.getFullYear();
 
-        try {
-            HomologationPolicyAlfa entity =
-                    HomologationPolicyAlfaMapper.INSTANCE.toEntity(request);
+    const month = String(
+      d.getMonth() + 1
+    ).padStart(2, '0');
 
-            HomologationPolicyAlfa savedEntity =
-                    homologationPolicyAlfaRepository.save(entity);
+    const day = String(
+      d.getDate()
+    ).padStart(2, '0');
 
-            return HomologationPolicyAlfaMapper.INSTANCE
-                    .toResponseDTO(savedEntity);
-
-        } catch (Exception e) {
-            logger.error(
-                    "Error creando homologacion. "
-                            + "CorrelationId={}, RequestId={}",
-                    correlationId,
-                    requestId,
-                    e
-            );
-
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error creando el registro de homologación",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
-    }
-
-    @Override
-    @Transactional
-    public HomologationPolicyResponseDTO editar(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Integer id,
-            HomologationPolicyRequestDTO request) {
-
-        HomologationPolicyAlfa entity =
-                homologationPolicyAlfaRepository.findById(id)
-                        .orElseThrow(() -> new BusinessException(
-                                null,
-                                "Registro no encontrado con id: " + id,
-                                HttpStatus.NOT_FOUND
-                        ));
-
-        try {
-            HomologationPolicyAlfaMapper.INSTANCE
-                    .updateEntity(request, entity);
-
-            HomologationPolicyAlfa updatedEntity =
-                    homologationPolicyAlfaRepository.save(entity);
-
-            return HomologationPolicyAlfaMapper.INSTANCE
-                    .toResponseDTO(updatedEntity);
-
-        } catch (BusinessException e) {
-            throw e;
-
-        } catch (Exception e) {
-            logger.error(
-                    "Error editando homologacion id={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    id,
-                    correlationId,
-                    requestId,
-                    e
-            );
-
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error editando el registro de homologación",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
-    }
-
-    @Override
-    @Transactional
-    public void eliminar(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Integer id) {
-
-        if (!homologationPolicyAlfaRepository.existsById(id)) {
-            throw new BusinessException(
-                    null,
-                    "Registro no encontrado con id: " + id,
-                    HttpStatus.NOT_FOUND
-            );
-        }
-
-        try {
-            homologationPolicyAlfaRepository.deleteById(id);
-
-        } catch (Exception e) {
-            logger.error(
-                    "Error eliminando homologacion id={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    id,
-                    correlationId,
-                    requestId,
-                    e
-            );
-
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error eliminando el registro de homologación",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
-    }
+    return `${year}-${month}-${day}`;
+  }
 }
