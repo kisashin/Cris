@@ -1,96 +1,47 @@
-import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { INewGeneralResponse } from '../models/new-general-response.interface';
-import { HomologationPolicy } from '../models/HomologationPolicy.model';
-import { environment } from 'src/environments/environment';
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation;
 
-@Injectable({
-  providedIn: 'root',
-})
-export class HomologationPolicyAlfaService {
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-  private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Positive;
+import javax.validation.constraints.Size;
+import java.time.LocalDate;
 
-  constructor(private http: HttpClient) { }
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class HomologationPolicyRequestDTO {
 
-  /**
-   * Busca registros de homologación por código de producto.
-   * Equivalente a CargarGridView1 del legacy.
-   *
-   * @param productCode Código de producto a buscar.
-   * @returns Observable con la lista de registros encontrados.
-   */
-  buscarPorProducto(productCode: number): Observable<INewGeneralResponse<HomologationPolicy[]>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
-    const params = new HttpParams().set('producto', productCode.toString());
+    @NotNull(message = "Product code is required")
+    @Positive(message = "Product code must be greater than zero")
+    private Integer productCode;
 
-    return this.http.get<INewGeneralResponse<HomologationPolicy[]>>(
-      `${this.baseUrl}/v1/homologacion-poliza-alfa`,
-      { headers, params }
-    );
-  }
+    @NotNull(message = "Branch code is required")
+    @Positive(message = "Branch code must be greater than zero")
+    private Integer branchCode;
 
-  /**
-   * Crea un nuevo registro de homologación.
-   * Equivalente a BtnGuardar_Click con id = 0 del legacy.
-   *
-   * @param data Datos del nuevo registro.
-   * @returns Observable con el registro creado.
-   */
-  crear(data: HomologationPolicy): Observable<INewGeneralResponse<HomologationPolicy>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+    @NotBlank(message = "Policy number is required")
+    @Size(max = 50, message = "Policy number must not exceed 50 characters")
+    private String policyNumber;
 
-    return this.http.post<INewGeneralResponse<HomologationPolicy>>(
-      `${this.baseUrl}/v1/homologacion-poliza-alfa`,
-      data,
-      { headers }
-    );
-  }
+    @NotNull(message = "Applies validity is required")
+    @Min(value = 0, message = "Applies validity must be 0 or 1")
+    @Max(value = 1, message = "Applies validity must be 0 or 1")
+    private Integer appliesValidity;
 
-  /**
-   * Edita un registro existente de homologación.
-   * Equivalente a BtnGuardar_Click con id != 0 del legacy.
-   *
-   * @param id Identificador del registro a editar.
-   * @param data Datos actualizados.
-   * @returns Observable con el registro actualizado.
-   */
-  editar(id: number, data: HomologationPolicy): Observable<INewGeneralResponse<HomologationPolicy>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+    @NotNull(message = "Start date is required")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate startDate;
 
-    return this.http.put<INewGeneralResponse<HomologationPolicy>>(
-      `${this.baseUrl}/v1/homologacion-poliza-alfa/${id}`,
-      data,
-      { headers }
-    );
-  }
-
-  /**
-   * Elimina un registro de homologación por su id.
-   * Equivalente a btnEliminar_Click del legacy.
-   *
-   * @param id Identificador del registro a eliminar.
-   * @returns Observable con la respuesta del servidor.
-   */
-  eliminar(id: number): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
-
-    return this.http.delete<INewGeneralResponse<string>>(
-      `${this.baseUrl}/v1/homologacion-poliza-alfa/${id}`,
-      { headers }
-    );
-  }
+    @NotNull(message = "End date is required")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate endDate;
 }
