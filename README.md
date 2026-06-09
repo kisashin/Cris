@@ -1,206 +1,185 @@
-```java
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+package co.com.bnpparibas.cardif.closingclaims.api;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.HomologationPolicyAlfa;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
 import co.com.bnpparibas.cardif.closingclaims.domain.services.IHomologationPolicyAlfaService;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.HomologationPolicyAlfaMapper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.HomologationPolicyAlfaRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 
-@Service
-public class HomologationPolicyAlfaServiceImpl
-        implements IHomologationPolicyAlfaService {
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-    private static final Logger logger =
-            LoggerFactory.getLogger(HomologationPolicyAlfaServiceImpl.class);
+@ExtendWith(MockitoExtension.class)
+class HomologationPolicyAlfaControllerTest {
 
-    private final HomologationPolicyAlfaRepository homologationPolicyAlfaRepository;
+    @Mock
+    private IHomologationPolicyAlfaService service;
 
-    public HomologationPolicyAlfaServiceImpl(
-            HomologationPolicyAlfaRepository homologationPolicyAlfaRepository) {
+    @InjectMocks
+    private HomologationPolicyAlfaController controller;
 
-        this.homologationPolicyAlfaRepository =
-                homologationPolicyAlfaRepository;
+    private static final String P_HEADER = "pHeader";
+    private static final String CORRELATION_ID = "corr-123";
+    private static final String REQUEST_ID = "req-456";
+
+    private HomologationPolicyResponseDTO buildResponse() {
+        return HomologationPolicyResponseDTO.builder()
+                .id(1)
+                .productCode(749)
+                .branchCode(31)
+                .policyNumber("0000490")
+                .appliesValidity(0)
+                .startDate(LocalDate.of(2024, 1, 1))
+                .endDate(LocalDate.of(2024, 12, 31))
+                .build();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<HomologationPolicyResponseDTO> findByProductCode(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Integer productCode) {
-
-        try {
-            List<HomologationPolicyAlfa> entities =
-                    homologationPolicyAlfaRepository.findByProducto(productCode);
-
-            return HomologationPolicyAlfaMapper.INSTANCE
-                    .toResponseDTOList(entities);
-
-        } catch (Exception e) {
-            logger.error(
-                    "Error finding homologations by productCode={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    productCode,
-                    correlationId,
-                    requestId,
-                    e
-            );
-
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error finding homologations by product code",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
+    private HomologationPolicyRequestDTO buildRequest() {
+        HomologationPolicyRequestDTO request = new HomologationPolicyRequestDTO();
+        request.setProductCode(749);
+        request.setBranchCode(31);
+        request.setPolicyNumber("0000490");
+        request.setAppliesValidity(0);
+        request.setStartDate(LocalDate.of(2024, 1, 1));
+        request.setEndDate(LocalDate.of(2024, 12, 31));
+        return request;
     }
 
-    @Override
-    @Transactional
-    public HomologationPolicyResponseDTO create(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            HomologationPolicyRequestDTO request) {
+    @Test
+    @DisplayName("findByProductCode returns 200 with records")
+    void findByProductCode_shouldReturn200WithList() {
+        List<HomologationPolicyResponseDTO> list =
+                Collections.singletonList(buildResponse());
 
-        validateDateRange(request);
+        when(service.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749))
+                .thenReturn(list);
 
-        try {
-            HomologationPolicyAlfa entity =
-                    HomologationPolicyAlfaMapper.INSTANCE.toEntity(request);
+        ResponseEntity<ResponseModel<List<HomologationPolicyResponseDTO>>> response =
+                controller.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749);
 
-            HomologationPolicyAlfa savedEntity =
-                    homologationPolicyAlfaRepository.save(entity);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1, response.getBody().getBodyResponse().size());
+        assertEquals(CORRELATION_ID, response.getBody().getCorrelationId());
 
-            return HomologationPolicyAlfaMapper.INSTANCE
-                    .toResponseDTO(savedEntity);
-
-        } catch (Exception e) {
-            logger.error(
-                    "Error creating homologation. "
-                            + "CorrelationId={}, RequestId={}",
-                    correlationId,
-                    requestId,
-                    e
-            );
-
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error creating homologation record",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
+        verify(service, times(1))
+                .findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749);
     }
 
-    @Override
-    @Transactional
-    public HomologationPolicyResponseDTO update(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Integer id,
-            HomologationPolicyRequestDTO request) {
+    @Test
+    @DisplayName("findByProductCode returns an empty list when no records exist")
+    void findByProductCode_shouldReturnEmptyList() {
+        when(service.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 999))
+                .thenReturn(Collections.emptyList());
 
-        validateDateRange(request);
+        ResponseEntity<ResponseModel<List<HomologationPolicyResponseDTO>>> response =
+                controller.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 999);
 
-        HomologationPolicyAlfa entity =
-                homologationPolicyAlfaRepository.findById(id)
-                        .orElseThrow(() -> new BusinessException(
-                                null,
-                                "Record not found with id: " + id,
-                                HttpStatus.NOT_FOUND
-                        ));
-
-        try {
-            HomologationPolicyAlfaMapper.INSTANCE
-                    .updateEntity(request, entity);
-
-            HomologationPolicyAlfa updatedEntity =
-                    homologationPolicyAlfaRepository.save(entity);
-
-            return HomologationPolicyAlfaMapper.INSTANCE
-                    .toResponseDTO(updatedEntity);
-
-        } catch (BusinessException e) {
-            throw e;
-
-        } catch (Exception e) {
-            logger.error(
-                    "Error updating homologation id={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    id,
-                    correlationId,
-                    requestId,
-                    e
-            );
-
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error updating homologation record",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().getBodyResponse().isEmpty());
     }
 
-    @Override
-    @Transactional
-    public void delete(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Integer id) {
+    @Test
+    @DisplayName("create returns 201 with the created record")
+    void create_shouldReturn201WithCreatedRecord() {
+        HomologationPolicyRequestDTO request = buildRequest();
+        HomologationPolicyResponseDTO created = buildResponse();
 
-        if (!homologationPolicyAlfaRepository.existsById(id)) {
-            throw new BusinessException(
-                    null,
-                    "Record not found with id: " + id,
-                    HttpStatus.NOT_FOUND
-            );
-        }
+        when(service.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request))
+                .thenReturn(created);
 
-        try {
-            homologationPolicyAlfaRepository.deleteById(id);
+        ResponseEntity<ResponseModel<HomologationPolicyResponseDTO>> response =
+                controller.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request);
 
-        } catch (Exception e) {
-            logger.error(
-                    "Error deleting homologation id={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    id,
-                    correlationId,
-                    requestId,
-                    e
-            );
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(749, response.getBody().getBodyResponse().getProductCode());
 
-            throw new BusinessException(
-                    e,
-                    null,
-                    "Error deleting homologation record",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
+        verify(service, times(1))
+                .create(P_HEADER, CORRELATION_ID, REQUEST_ID, request);
     }
 
-    private void validateDateRange(HomologationPolicyRequestDTO request) {
-        if (request.getStartDate().isAfter(request.getEndDate())) {
-            throw new BusinessException(
-                    null,
-                    "Start date cannot be greater than end date",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
+    @Test
+    @DisplayName("create propagates service exception")
+    void create_shouldPropagateServiceException() {
+        HomologationPolicyRequestDTO request = buildRequest();
+
+        when(service.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request))
+                .thenThrow(new RuntimeException("Error creating record"));
+
+        assertThrows(RuntimeException.class,
+                () -> controller.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request));
+    }
+
+    @Test
+    @DisplayName("update returns 200 with the updated record")
+    void update_shouldReturn200WithUpdatedRecord() {
+        HomologationPolicyRequestDTO request = buildRequest();
+        HomologationPolicyResponseDTO updated = buildResponse();
+
+        when(service.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 1, request))
+                .thenReturn(updated);
+
+        ResponseEntity<ResponseModel<HomologationPolicyResponseDTO>> response =
+                controller.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 1, request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1, response.getBody().getBodyResponse().getId());
+
+        verify(service, times(1))
+                .update(P_HEADER, CORRELATION_ID, REQUEST_ID, 1, request);
+    }
+
+    @Test
+    @DisplayName("update propagates service exception")
+    void update_shouldPropagateServiceException() {
+        HomologationPolicyRequestDTO request = buildRequest();
+
+        when(service.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 99, request))
+                .thenThrow(new RuntimeException("Record not found"));
+
+        assertThrows(RuntimeException.class,
+                () -> controller.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 99, request));
+    }
+
+    @Test
+    @DisplayName("delete returns 200 with confirmation message")
+    void delete_shouldReturn200WithConfirmationMessage() {
+        doNothing().when(service)
+                .delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 1);
+
+        ResponseEntity<ResponseModel<String>> response =
+                controller.delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 1);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Record deleted successfully", response.getBody().getBodyResponse());
+
+        verify(service, times(1))
+                .delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 1);
+    }
+
+    @Test
+    @DisplayName("delete propagates service exception")
+    void delete_shouldPropagateServiceException() {
+        doThrow(new RuntimeException("Record not found"))
+                .when(service)
+                .delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 99);
+
+        assertThrows(RuntimeException.class,
+                () -> controller.delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 99));
     }
 }
-```
