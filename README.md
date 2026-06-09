@@ -1,48 +1,54 @@
-package co.com.bnpparibas.cardif.closingclaims.api;
+package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.IHomologationPolicyAlfaService;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.HomologationPolicyAlfa;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.HomologationPolicyAlfaRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class HomologationPolicyAlfaControllerTest {
+class HomologationPolicyAlfaServiceImplTest {
 
     @Mock
-    private IHomologationPolicyAlfaService service;
+    private HomologationPolicyAlfaRepository repository;
 
     @InjectMocks
-    private HomologationPolicyAlfaController controller;
+    private HomologationPolicyAlfaServiceImpl service;
 
     private static final String P_HEADER = "pHeader";
     private static final String CORRELATION_ID = "corr-123";
     private static final String REQUEST_ID = "req-456";
 
-    private HomologationPolicyResponseDTO buildResponse() {
-        return HomologationPolicyResponseDTO.builder()
-                .id(1)
-                .productCode(749)
-                .branchCode(31)
-                .policyNumber("0000490")
-                .appliesValidity(0)
-                .startDate(LocalDate.of(2024, 1, 1))
-                .endDate(LocalDate.of(2024, 12, 31))
-                .build();
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
+
+    private HomologationPolicyAlfa buildEntity() {
+        HomologationPolicyAlfa entity = new HomologationPolicyAlfa();
+        entity.setId(1);
+        entity.setProducto(749);
+        entity.setRamo(31);
+        entity.setNroPoliza("0000490");
+        entity.setAplicaVigencia(0);
+        entity.setFechaInicio(LocalDate.of(2024, 1, 1));
+        entity.setFechaFin(LocalDate.of(2024, 12, 31));
+        return entity;
     }
 
     private HomologationPolicyRequestDTO buildRequest() {
@@ -56,130 +62,280 @@ class HomologationPolicyAlfaControllerTest {
         return request;
     }
 
-    @Test
-    @DisplayName("findByProductCode returns 200 with records")
-    void findByProductCode_shouldReturn200WithList() {
-        List<HomologationPolicyResponseDTO> list =
-                Collections.singletonList(buildResponse());
+    @Nested
+    @DisplayName("findByProductCode")
+    class FindByProductCode {
 
-        when(service.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749))
-                .thenReturn(list);
+        @Test
+        @DisplayName("returns mapped records")
+        void shouldReturnMappedList() {
+            when(repository.findByProducto(749))
+                    .thenReturn(Collections.singletonList(buildEntity()));
 
-        ResponseEntity<ResponseModel<List<HomologationPolicyResponseDTO>>> response =
-                controller.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749);
+            List<HomologationPolicyResponseDTO> result =
+                    service.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749);
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getBodyResponse().size());
-        assertEquals(CORRELATION_ID, response.getBody().getCorrelationId());
+            assertEquals(1, result.size());
+            assertEquals(749, result.get(0).getProductCode());
+            assertEquals("0000490", result.get(0).getPolicyNumber());
+            verify(repository, times(1)).findByProducto(749);
+        }
 
-        verify(service, times(1))
-                .findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 749);
+        @Test
+        @DisplayName("returns empty list when no records exist")
+        void shouldReturnEmptyList() {
+            when(repository.findByProducto(999))
+                    .thenReturn(Collections.emptyList());
+
+            List<HomologationPolicyResponseDTO> result =
+                    service.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 999);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("throws BusinessException when repository fails")
+        void shouldThrowBusinessExceptionOnRepositoryError() {
+            when(repository.findByProducto(any()))
+                    .thenThrow(new RuntimeException("DB error"));
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.findByProductCode(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            749
+                    )
+            );
+
+            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getHttpStatus());
+        }
     }
 
-    @Test
-    @DisplayName("findByProductCode returns an empty list when no records exist")
-    void findByProductCode_shouldReturnEmptyList() {
-        when(service.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 999))
-                .thenReturn(Collections.emptyList());
+    @Nested
+    @DisplayName("create")
+    class Create {
 
-        ResponseEntity<ResponseModel<List<HomologationPolicyResponseDTO>>> response =
-                controller.findByProductCode(P_HEADER, CORRELATION_ID, REQUEST_ID, 999);
+        @Test
+        @DisplayName("saves and returns created record")
+        void shouldSaveAndReturnDTO() {
+            HomologationPolicyAlfa savedEntity = buildEntity();
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().getBodyResponse().isEmpty());
+            when(repository.save(any(HomologationPolicyAlfa.class)))
+                    .thenReturn(savedEntity);
+
+            HomologationPolicyResponseDTO result =
+                    service.create(P_HEADER, CORRELATION_ID, REQUEST_ID, buildRequest());
+
+            assertNotNull(result);
+            assertEquals(749, result.getProductCode());
+            assertEquals(1, result.getId());
+            verify(repository, times(1))
+                    .save(any(HomologationPolicyAlfa.class));
+        }
+
+        @Test
+        @DisplayName("throws BusinessException when repository fails")
+        void shouldThrowBusinessExceptionOnRepositoryError() {
+            when(repository.save(any()))
+                    .thenThrow(new RuntimeException("DB error"));
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.create(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            buildRequest()
+                    )
+            );
+
+            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getHttpStatus());
+        }
+
+        @Test
+        @DisplayName("throws BAD_REQUEST when start date is after end date")
+        void shouldThrowBadRequestWhenDateRangeIsInvalid() {
+            HomologationPolicyRequestDTO request = buildRequest();
+            request.setStartDate(LocalDate.of(2024, 12, 31));
+            request.setEndDate(LocalDate.of(2024, 1, 1));
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.create(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            request
+                    )
+            );
+
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+            verify(repository, never()).save(any());
+        }
     }
 
-    @Test
-    @DisplayName("create returns 201 with the created record")
-    void create_shouldReturn201WithCreatedRecord() {
-        HomologationPolicyRequestDTO request = buildRequest();
-        HomologationPolicyResponseDTO created = buildResponse();
+    @Nested
+    @DisplayName("update")
+    class Update {
 
-        when(service.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request))
-                .thenReturn(created);
+        @Test
+        @DisplayName("updates and returns edited record")
+        void shouldUpdateAndReturnDTO() {
+            HomologationPolicyAlfa existingEntity = buildEntity();
 
-        ResponseEntity<ResponseModel<HomologationPolicyResponseDTO>> response =
-                controller.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request);
+            when(repository.findById(1))
+                    .thenReturn(Optional.of(existingEntity));
 
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(749, response.getBody().getBodyResponse().getProductCode());
+            when(repository.save(any(HomologationPolicyAlfa.class)))
+                    .thenReturn(existingEntity);
 
-        verify(service, times(1))
-                .create(P_HEADER, CORRELATION_ID, REQUEST_ID, request);
+            HomologationPolicyResponseDTO result =
+                    service.update(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            1,
+                            buildRequest()
+                    );
+
+            assertNotNull(result);
+            assertEquals(749, result.getProductCode());
+            verify(repository, times(1)).findById(1);
+            verify(repository, times(1))
+                    .save(any(HomologationPolicyAlfa.class));
+        }
+
+        @Test
+        @DisplayName("throws NOT_FOUND when id does not exist")
+        void shouldThrowNotFoundWhenIdDoesNotExist() {
+            when(repository.findById(99))
+                    .thenReturn(Optional.empty());
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.update(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            99,
+                            buildRequest()
+                    )
+            );
+
+            assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+        }
+
+        @Test
+        @DisplayName("throws BusinessException when repository fails on save")
+        void shouldThrowBusinessExceptionOnSaveError() {
+            when(repository.findById(1))
+                    .thenReturn(Optional.of(buildEntity()));
+
+            when(repository.save(any()))
+                    .thenThrow(new RuntimeException("DB error"));
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.update(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            1,
+                            buildRequest()
+                    )
+            );
+
+            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getHttpStatus());
+        }
+
+        @Test
+        @DisplayName("throws BAD_REQUEST when start date is after end date")
+        void shouldThrowBadRequestWhenDateRangeIsInvalid() {
+            HomologationPolicyRequestDTO request = buildRequest();
+            request.setStartDate(LocalDate.of(2024, 12, 31));
+            request.setEndDate(LocalDate.of(2024, 1, 1));
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.update(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            1,
+                            request
+                    )
+            );
+
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+            verify(repository, never()).findById(any());
+            verify(repository, never()).save(any());
+        }
     }
 
-    @Test
-    @DisplayName("create propagates service exception")
-    void create_shouldPropagateServiceException() {
-        HomologationPolicyRequestDTO request = buildRequest();
+    @Nested
+    @DisplayName("delete")
+    class Delete {
 
-        when(service.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request))
-                .thenThrow(new RuntimeException("Error creating record"));
+        @Test
+        @DisplayName("deletes record when id exists")
+        void shouldDeleteSuccessfully() {
+            when(repository.existsById(1)).thenReturn(true);
+            doNothing().when(repository).deleteById(1);
 
-        assertThrows(RuntimeException.class,
-                () -> controller.create(P_HEADER, CORRELATION_ID, REQUEST_ID, request));
-    }
+            assertDoesNotThrow(
+                    () -> service.delete(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            1
+                    )
+            );
 
-    @Test
-    @DisplayName("update returns 200 with the updated record")
-    void update_shouldReturn200WithUpdatedRecord() {
-        HomologationPolicyRequestDTO request = buildRequest();
-        HomologationPolicyResponseDTO updated = buildResponse();
+            verify(repository, times(1)).existsById(1);
+            verify(repository, times(1)).deleteById(1);
+        }
 
-        when(service.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 1, request))
-                .thenReturn(updated);
+        @Test
+        @DisplayName("throws NOT_FOUND when id does not exist")
+        void shouldThrowNotFoundWhenIdDoesNotExist() {
+            when(repository.existsById(99)).thenReturn(false);
 
-        ResponseEntity<ResponseModel<HomologationPolicyResponseDTO>> response =
-                controller.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 1, request);
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.delete(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            99
+                    )
+            );
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getBodyResponse().getId());
+            assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+            verify(repository, never()).deleteById(any());
+        }
 
-        verify(service, times(1))
-                .update(P_HEADER, CORRELATION_ID, REQUEST_ID, 1, request);
-    }
+        @Test
+        @DisplayName("throws BusinessException when repository fails on delete")
+        void shouldThrowBusinessExceptionOnDeleteError() {
+            when(repository.existsById(1)).thenReturn(true);
 
-    @Test
-    @DisplayName("update propagates service exception")
-    void update_shouldPropagateServiceException() {
-        HomologationPolicyRequestDTO request = buildRequest();
+            doThrow(new RuntimeException("DB error"))
+                    .when(repository)
+                    .deleteById(1);
 
-        when(service.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 99, request))
-                .thenThrow(new RuntimeException("Record not found"));
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> service.delete(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID,
+                            1
+                    )
+            );
 
-        assertThrows(RuntimeException.class,
-                () -> controller.update(P_HEADER, CORRELATION_ID, REQUEST_ID, 99, request));
-    }
-
-    @Test
-    @DisplayName("delete returns 200 with confirmation message")
-    void delete_shouldReturn200WithConfirmationMessage() {
-        doNothing().when(service)
-                .delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 1);
-
-        ResponseEntity<ResponseModel<String>> response =
-                controller.delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 1);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Record deleted successfully", response.getBody().getBodyResponse());
-
-        verify(service, times(1))
-                .delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 1);
-    }
-
-    @Test
-    @DisplayName("delete propagates service exception")
-    void delete_shouldPropagateServiceException() {
-        doThrow(new RuntimeException("Record not found"))
-                .when(service)
-                .delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 99);
-
-        assertThrows(RuntimeException.class,
-                () -> controller.delete(P_HEADER, CORRELATION_ID, REQUEST_ID, 99));
+            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getHttpStatus());
+        }
     }
 }
