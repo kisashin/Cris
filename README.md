@@ -1,47 +1,176 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation;
+```java
+package co.com.bnpparibas.cardif.closingclaims.api;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyRequestDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyResponseDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseHeader;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
+import co.com.bnpparibas.cardif.closingclaims.domain.services.IHomologationPolicyAlfaService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Positive;
-import javax.validation.constraints.Size;
-import java.time.LocalDate;
+import javax.validation.Valid;
+import java.util.List;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-public class HomologationPolicyRequestDTO {
+@RestController
+@RequestMapping("/v1")
+@Tag(name = "Homologación póliza Alfa")
+@CrossOrigin("*")
+public class HomologationPolicyAlfaController {
 
-    @NotNull(message = "Product code is required")
-    @Positive(message = "Product code must be greater than zero")
-    private Integer productCode;
+    private final IHomologationPolicyAlfaService homologationPolicyAlfaService;
 
-    @NotNull(message = "Branch code is required")
-    @Positive(message = "Branch code must be greater than zero")
-    private Integer branchCode;
+    public HomologationPolicyAlfaController(
+            IHomologationPolicyAlfaService homologationPolicyAlfaService) {
+        this.homologationPolicyAlfaService = homologationPolicyAlfaService;
+    }
 
-    @NotBlank(message = "Policy number is required")
-    @Size(max = 50, message = "Policy number must not exceed 50 characters")
-    private String policyNumber;
+    /**
+     * Finds policy homologation records by product code.
+     *
+     * @param pHeader       optional security header.
+     * @param correlationId correlation identifier.
+     * @param requestId     request identifier.
+     * @param productCode   product code to search.
+     * @return response containing the matching records.
+     */
+    @GetMapping("/homologacion-poliza-alfa")
+    public ResponseEntity<ResponseModel<List<HomologationPolicyResponseDTO>>> findByProductCode(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @RequestParam(value = "producto") final Integer productCode) {
 
-    @NotNull(message = "Applies validity is required")
-    @Min(value = 0, message = "Applies validity must be 0 or 1")
-    @Max(value = 1, message = "Applies validity must be 0 or 1")
-    private Integer appliesValidity;
+        List<HomologationPolicyResponseDTO> result =
+                homologationPolicyAlfaService.findByProductCode(
+                        pHeader,
+                        correlationId,
+                        requestId,
+                        productCode
+                );
 
-    @NotNull(message = "Start date is required")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate startDate;
+        ResponseModel<List<HomologationPolicyResponseDTO>> response =
+                new ResponseModel<>(
+                        correlationId,
+                        ResponseHeader.builder()
+                                .returnCode(HttpStatus.OK.value())
+                                .build(),
+                        result
+                );
 
-    @NotNull(message = "End date is required")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate endDate;
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
+     * Creates a new policy homologation record.
+     *
+     * @param pHeader       optional security header.
+     * @param correlationId correlation identifier.
+     * @param requestId     request identifier.
+     * @param request       data of the record to create.
+     * @return response containing the created record.
+     */
+    @PostMapping("/homologacion-poliza-alfa")
+    public ResponseEntity<ResponseModel<HomologationPolicyResponseDTO>> create(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @Valid @RequestBody final HomologationPolicyRequestDTO request) {
+
+        HomologationPolicyResponseDTO created =
+                homologationPolicyAlfaService.create(
+                        pHeader,
+                        correlationId,
+                        requestId,
+                        request
+                );
+
+        ResponseModel<HomologationPolicyResponseDTO> response =
+                new ResponseModel<>(
+                        correlationId,
+                        ResponseHeader.builder()
+                                .returnCode(HttpStatus.CREATED.value())
+                                .build(),
+                        created
+                );
+
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    /**
+     * Updates an existing policy homologation record.
+     *
+     * @param pHeader       optional security header.
+     * @param correlationId correlation identifier.
+     * @param requestId     request identifier.
+     * @param id            record identifier.
+     * @param request       updated record data.
+     * @return response containing the updated record.
+     */
+    @PutMapping("/homologacion-poliza-alfa/{id}")
+    public ResponseEntity<ResponseModel<HomologationPolicyResponseDTO>> update(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @PathVariable final Integer id,
+            @Valid @RequestBody final HomologationPolicyRequestDTO request) {
+
+        HomologationPolicyResponseDTO updated =
+                homologationPolicyAlfaService.update(
+                        pHeader,
+                        correlationId,
+                        requestId,
+                        id,
+                        request
+                );
+
+        ResponseModel<HomologationPolicyResponseDTO> response =
+                new ResponseModel<>(
+                        correlationId,
+                        ResponseHeader.builder()
+                                .returnCode(HttpStatus.OK.value())
+                                .build(),
+                        updated
+                );
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
+     * Deletes a policy homologation record by its identifier.
+     *
+     * @param pHeader       optional security header.
+     * @param correlationId correlation identifier.
+     * @param requestId     request identifier.
+     * @param id            record identifier.
+     * @return response containing the deletion confirmation.
+     */
+    @DeleteMapping("/homologacion-poliza-alfa/{id}")
+    public ResponseEntity<ResponseModel<String>> delete(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @PathVariable final Integer id) {
+
+        homologationPolicyAlfaService.delete(
+                pHeader,
+                correlationId,
+                requestId,
+                id
+        );
+
+        ResponseModel<String> response =
+                new ResponseModel<>(
+                        correlationId,
+                        ResponseHeader.builder()
+                                .returnCode(HttpStatus.OK.value())
+                                .build(),
+                        "Record deleted successfully"
+                );
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
 }
+```
