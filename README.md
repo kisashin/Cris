@@ -1,293 +1,105 @@
-import { Component, OnInit } from '@angular/core';
-import {
-  AbstractControl,
-  FormBuilder,
-  FormGroup,
-  ValidationErrors,
-  ValidatorFn,
-  Validators
-} from '@angular/forms';
+<div>
+    <div class="container-title">
+        <h1 class="title">HOMOLOGACIÓN POLIZA ALFA</h1>
+    </div>
 
-import { IMetaColumn } from '../../models/IMetaColumn.models';
-import { HomologationPolicy } from '../../models/HomologationPolicy.model';
-import { HomologationPolicyAlfaService } from '../../services/homologation-policy-alfa.service';
+    <!-- Formulario de búsqueda -->
+    <form class="product-search-form" [formGroup]="productForm" (ngSubmit)="onSearch()">
+        <div class="form-wrapper">
+            <mat-form-field appearance="fill" floatLabel="always" class="product-field">
+                <mat-label>Producto</mat-label>
+                <input matInput id="product-input" type="text" formControlName="product"
+                    placeholder="Ingrese producto" autocomplete="off" />
+                <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
 
-@Component({
-  selector: 'app-homologation-policy-alfa',
-  templateUrl: './homologation-policy-alfa.component.html',
-  styleUrl: './homologation-policy-alfa.component.scss',
-  standalone: false
-})
-export class HomologationPolicyAlfaComponent implements OnInit {
+            <button mat-raised-button color="primary" type="submit" [disabled]="productForm.invalid"
+                class="search-button">
+                <mat-icon>search</mat-icon>
+                Buscar
+            </button>
+        </div>
+    </form>
 
-  public productForm!: FormGroup;
-  public formHomologationFormPolicy!: FormGroup;
-  public showFormHomologationFormPolicy: boolean = false;
-  public editingId: number | null = null;
-  public errorMessage: string = '';
+    <hr>
 
-  public displayedColumns: IMetaColumn[] = [
-    { title: 'Codigo Producto', field: 'productCode' },
-    { title: 'Codigo ramo', field: 'branchCode' },
-    { title: 'Número poliza', field: 'policyNumber' },
-    { title: 'Fecha Inicio', field: 'startDate' },
-    { title: 'Fecha final', field: 'endDate' },
-    {
-      title: 'Acciones',
-      field: 'actions',
-      actions: [
-        {
-          action: (row: HomologationPolicy, index: number) => {
-            this.editMode(row, index);
-          },
-          fasIcon: 'fal fa-edit',
-          tooltip: () => 'Editar',
-          isMenu: false,
-          actionEditDeleteCircle: true,
-          edit: true
-        },
-        {
-          action: (row: HomologationPolicy, index: number) => {
-            this.deleteMode(row, index);
-          },
-          fasIcon: 'fal fa-times-circle pointer',
-          tooltip: () => 'Eliminar',
-          isMenu: false,
-          actionEditDeleteCircle: true,
-          delete: true
-        }
-      ]
-    }
-  ];
+    <div class="container-btn-new-record">
+        <button mat-raised-button color="primary"
+            (click)="showFormHomologationFormPolicy = !showFormHomologationFormPolicy; editingId = null; formHomologationFormPolicy.reset({ appliesValidity: { value: 'no' } })">
+            Nuevo registro
+        </button>
+    </div>
 
-  public dataSource: HomologationPolicy[] = [];
+    <div class="container-table">
+        <app-report-table [dataSource]="this.dataSource"
+            [displayedColumns]="this.displayedColumns"></app-report-table>
+    </div>
 
-  constructor(
-    private fb: FormBuilder,
-    private homologationPolicyAlfaSrv: HomologationPolicyAlfaService
-  ) { }
+    <!-- Formulario de creación / edición -->
+    @if (showFormHomologationFormPolicy) {
+    <form class="product-search-form" [formGroup]="formHomologationFormPolicy" (ngSubmit)="onGuardar()">
+        <div class="form-wrapper">
 
-  ngOnInit(): void {
-    this.productForm = this.fb.group({
-      product: ['', Validators.required]
-    });
+            <!-- Código producto -->
+            <mat-form-field appearance="fill" class="product-field">
+                <mat-label>Código producto</mat-label>
+                <input matInput type="text" formControlName="productCode" placeholder="Ingrese código producto" />
+            </mat-form-field>
 
-    this.formHomologationFormPolicy = this.fb.group({
-      productCode: ['', Validators.required],
-      branchCode: ['', Validators.required],
-      policyNumber: ['', Validators.required],
-      appliesValidity: this.fb.group({
-        value: ['no', Validators.required]
-      }),
-      startDate: [''],
-      endDate: ['']
-    }, { validators: this.dateRangeValidator });
-  }
+            <!-- Código ramo -->
+            <mat-form-field appearance="fill" class="product-field">
+                <mat-label>Código ramo</mat-label>
+                <input matInput type="text" formControlName="branchCode" placeholder="Ingrese código ramo" />
+            </mat-form-field>
 
-  /** Validador que asegura que startDate <= endDate */
-  dateRangeValidator: ValidatorFn = (
-    group: AbstractControl
-  ): ValidationErrors | null => {
+            <!-- Número de póliza -->
+            <mat-form-field appearance="fill" class="product-field">
+                <mat-label>Número de póliza</mat-label>
+                <input matInput type="text" formControlName="policyNumber"
+                    placeholder="Ingrese número de póliza" />
+            </mat-form-field>
 
-    const start = group.get('startDate')?.value;
-    const end = group.get('endDate')?.value;
+            <!-- Aplica vigencia -->
+            <div class="vigencia-group" formGroupName="appliesValidity">
+                <label class="vigencia-label">Aplica vigencia:</label>
+                <mat-radio-group formControlName="value">
+                    <mat-radio-button value="no">No</mat-radio-button>
+                    <mat-radio-button value="si">Sí</mat-radio-button>
+                </mat-radio-group>
+            </div>
 
-    if (start && end && new Date(start) > new Date(end)) {
-      return { dateRangeInvalid: true };
-    }
+            <!-- Fecha inicial -->
+            <mat-form-field appearance="fill" class="product-field">
+                <mat-label>Fecha inicial</mat-label>
+                <input matInput [matDatepicker]="pickerStart" formControlName="startDate"
+                    placeholder="dd/MM/yyyy" />
+                <mat-datepicker-toggle matSuffix [for]="pickerStart"></mat-datepicker-toggle>
+                <mat-datepicker #pickerStart></mat-datepicker>
+            </mat-form-field>
 
-    return null;
-  };
+            <!-- Fecha final -->
+            <mat-form-field appearance="fill" class="product-field">
+                <mat-label>Fecha final</mat-label>
+                <input matInput [matDatepicker]="pickerEnd" formControlName="endDate"
+                    placeholder="dd/MM/yyyy" />
+                <mat-datepicker-toggle matSuffix [for]="pickerEnd"></mat-datepicker-toggle>
+                <mat-datepicker #pickerEnd></mat-datepicker>
+            </mat-form-field>
 
-  onSearch(): void {
-    if (this.productForm.valid) {
-      const productCode = Number(
-        this.productForm.value.product
-      );
-
-      this.errorMessage = '';
-
-      this.homologationPolicyAlfaSrv
-        .buscarPorProducto(productCode)
-        .subscribe({
-          next: (response) => {
-            if (response && response.bodyResponse) {
-              this.dataSource = response.bodyResponse.map(
-                (item: any) => ({
-                  id: item.id,
-                  productCode: item.productCode,
-                  branchCode: item.branchCode,
-                  policyNumber: item.policyNumber,
-                  appliesValidity: item.appliesValidity,
-                  startDate: item.startDate,
-                  endDate: item.endDate
-                })
-              );
+            @if (formHomologationFormPolicy.errors?.['dateRangeInvalid'] &&
+            (formHomologationFormPolicy.get('startDate')?.touched ||
+            formHomologationFormPolicy.get('endDate')?.touched)) {
+            <div class="error-message">
+                La fecha inicial no puede ser mayor que la fecha final.
+            </div>
             }
-          },
-          error: (error) => {
-            console.error(
-              'Error al buscar homologaciones:',
-              error
-            );
 
-            this.errorMessage =
-              'Error al buscar homologaciones';
-          }
-        });
+            <!-- Botón guardar -->
+            <button mat-raised-button color="primary" type="submit"
+                [disabled]="formHomologationFormPolicy.invalid" class="search-button">
+                Guardar
+            </button>
+        </div>
+    </form>
     }
-  }
-
-  onGuardar(): void {
-    if (this.formHomologationFormPolicy.valid) {
-      const formValue =
-        this.formHomologationFormPolicy.value;
-
-      const payload: HomologationPolicy = {
-        productCode: Number(
-          formValue.productCode
-        ),
-        branchCode: Number(
-          formValue.branchCode
-        ),
-        policyNumber:
-          formValue.policyNumber,
-        appliesValidity:
-          formValue.appliesValidity.value === 'si'
-            ? 1
-            : 0,
-        startDate: this.formatDate(
-          formValue.startDate
-        ),
-        endDate: this.formatDate(
-          formValue.endDate
-        )
-      };
-
-      if (this.editingId !== null) {
-        this.homologationPolicyAlfaSrv
-          .editar(this.editingId, payload)
-          .subscribe({
-            next: () => {
-              this.showFormHomologationFormPolicy =
-                false;
-
-              this.editingId = null;
-              this.onSearch();
-            },
-            error: (error) => {
-              console.error(
-                'Error al editar homologación:',
-                error
-              );
-            }
-          });
-      } else {
-        this.homologationPolicyAlfaSrv
-          .crear(payload)
-          .subscribe({
-            next: () => {
-              this.showFormHomologationFormPolicy =
-                false;
-
-              this.onSearch();
-            },
-            error: (error) => {
-              console.error(
-                'Error al crear homologación:',
-                error
-              );
-            }
-          });
-      }
-    }
-  }
-
-  editMode(
-    policy: HomologationPolicy,
-    index: number
-  ): void {
-
-    this.editingId =
-      policy.id ?? null;
-
-    this.showFormHomologationFormPolicy =
-      true;
-
-    this.formHomologationFormPolicy.patchValue({
-      productCode: policy.productCode,
-      branchCode: policy.branchCode,
-      policyNumber: policy.policyNumber,
-      appliesValidity: {
-        value:
-          policy.appliesValidity === 1
-            ? 'si'
-            : 'no'
-      },
-      startDate: policy.startDate,
-      endDate: policy.endDate
-    });
-  }
-
-  deleteMode(
-    row: HomologationPolicy,
-    index: number
-  ): void {
-
-    if (row.id) {
-      this.homologationPolicyAlfaSrv
-        .eliminar(row.id)
-        .subscribe({
-          next: () => {
-            this.onSearch();
-          },
-          error: (error) => {
-            console.error(
-              'Error al eliminar homologación:',
-              error
-            );
-          }
-        });
-    }
-  }
-
-  nuevoRegistro(): void {
-    this.showFormHomologationFormPolicy =
-      true;
-
-    this.editingId = null;
-
-    this.formHomologationFormPolicy.reset({
-      productCode: '',
-      branchCode: '',
-      policyNumber: '',
-      appliesValidity: {
-        value: 'no'
-      },
-      startDate: '',
-      endDate: ''
-    });
-  }
-
-  private formatDate(
-    date: any
-  ): string | null {
-
-    if (!date) {
-      return null;
-    }
-
-    const d = new Date(date);
-    const year = d.getFullYear();
-
-    const month = String(
-      d.getMonth() + 1
-    ).padStart(2, '0');
-
-    const day = String(
-      d.getDate()
-    ).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
-  }
-}
+</div>
