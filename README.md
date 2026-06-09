@@ -1,4 +1,3 @@
-```java
 package co.com.bnpparibas.cardif.closingclaims.api;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyRequestDTO;
@@ -173,4 +172,3 @@ public class HomologationPolicyAlfaController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
-```
