@@ -112,3 +112,30 @@ public class HomologationPolicyAlfaServiceImpl implements IHomologationPolicyAlf
         return entity;
     }
 }
+
+
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.homologation.HomologationPolicyResponseDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.HomologationPolicyAlfa;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.factory.Mappers;
+
+import java.util.List;
+
+@Mapper
+public interface HomologationPolicyAlfaMapper {
+
+    HomologationPolicyAlfaMapper INSTANCE = Mappers.getMapper(HomologationPolicyAlfaMapper.class);
+
+    @Mapping(target = "productCode", source = "producto")
+    @Mapping(target = "branchCode", source = "ramo")
+    @Mapping(target = "policyNumber", source = "nroPoliza")
+    @Mapping(target = "appliesValidity", source = "aplicaVigencia")
+    @Mapping(target = "startDate", source = "fechaInicio")
+    @Mapping(target = "endDate", source = "fechaFin")
+    HomologationPolicyResponseDTO toResponseDTO(HomologationPolicyAlfa entity);
+
+    List<HomologationPolicyResponseDTO> toResponseDTOList(List<HomologationPolicyAlfa> entities);
+}
