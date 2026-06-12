@@ -1,27 +1,25 @@
-EXEC sp_help 'dbo.reportecontable_peru';
-
 SELECT
-    COLUMN_NAME,
-    DATA_TYPE,
-    CHARACTER_MAXIMUM_LENGTH,
-    NUMERIC_PRECISION,
-    NUMERIC_SCALE,
-    IS_NULLABLE,
-    ORDINAL_POSITION
+    COLUMN_NAME AS columnName,
+    DATA_TYPE AS dataType,
+    CHARACTER_MAXIMUM_LENGTH AS maxLength,
+    NUMERIC_PRECISION AS numericPrecision,
+    NUMERIC_SCALE AS numericScale,
+    IS_NULLABLE AS isNullable,
+    ORDINAL_POSITION AS columnPosition
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = 'dbo'
   AND TABLE_NAME = 'reportecontable_peru'
 ORDER BY ORDINAL_POSITION;
 
-EXEC sp_helptext 'dbo.SP_ReporteContablePeru';
 
-SELECT OBJECT_DEFINITION(
-    OBJECT_ID('dbo.SP_ReporteContablePeru')
-);
-
-
-SELECT COUNT(*) AS TotalRecords
-FROM dbo.reportecontable_peru;
-
-SELECT TOP 5 *
-FROM dbo.reportecontable_peru;
+SELECT
+    tc.CONSTRAINT_NAME AS constraintName,
+    kcu.COLUMN_NAME AS columnName
+FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+    ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+    AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+    AND tc.TABLE_NAME = kcu.TABLE_NAME
+WHERE tc.TABLE_SCHEMA = 'dbo'
+  AND tc.TABLE_NAME = 'reportecontable_peru'
+  AND tc.CONSTRAINT_TYPE = 'PRIMARY KEY';
