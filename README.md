@@ -1,60 +1,50 @@
-PeruAccountingReportResponseDTO
+src/main/java/co/com/bnpparibas/cardif/closingclaims/domain/services/IPeruAccountingReportService.java
 
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.peruaccountingreport;
-
-import com.fasterxml.jackson.annotation.JsonFormat;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
-/**
- * Respuesta con la información de generación del reporte contable de Perú.
- */
-@Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class PeruAccountingReportResponseDTO implements Serializable {
-
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Fecha de la última generación del reporte.
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime reportDate;
-}
-
-src/main/java/co/com/bnpparibas/cardif/closingclaims/domain/util/helpers/PeruAccountingReportMapper.java
-
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+package co.com.bnpparibas.cardif.closingclaims.domain.services;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.peruaccountingreport.PeruAccountingReportResponseDTO;
-import org.mapstruct.Mapper;
-
-import java.time.LocalDateTime;
 
 /**
- * Mapper para las respuestas del reporte contable de Perú.
+ * Servicio para gestionar el reporte contable de Perú.
  */
-@Mapper(componentModel = "spring")
-public interface PeruAccountingReportMapper {
+public interface IPeruAccountingReportService {
 
     /**
-     * Convierte la fecha de generación en el DTO de respuesta.
+     * Consulta la fecha de la última generación del reporte.
      *
-     * @param reportDate fecha de la última generación.
-     * @return DTO con la fecha del reporte.
+     * @param pHeader encabezado de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId identificador de la solicitud.
+     * @return fecha de la última generación.
      */
-    default PeruAccountingReportResponseDTO toResponseDTO(LocalDateTime reportDate) {
-        return PeruAccountingReportResponseDTO.builder()
-                .reportDate(reportDate)
-                .build();
-    }
+    PeruAccountingReportResponseDTO getLatestReportDate(
+            String pHeader,
+            String correlationId,
+            String requestId);
+
+    /**
+     * Genera la información del reporte contable.
+     *
+     * @param pHeader encabezado de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId identificador de la solicitud.
+     * @return mensaje con el resultado del proceso.
+     */
+    String generateReport(
+            String pHeader,
+            String correlationId,
+            String requestId);
+
+    /**
+     * Genera el archivo Excel del reporte contable.
+     *
+     * @param pHeader encabezado de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId identificador de la solicitud.
+     * @return contenido del archivo Excel.
+     */
+    byte[] downloadReport(
+            String pHeader,
+            String correlationId,
+            String requestId);
 }
