@@ -1,11 +1,43 @@
-SELECT
-    tc.CONSTRAINT_NAME AS constraintName,
-    kcu.COLUMN_NAME AS columnName
-FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-    ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-    AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
-    AND tc.TABLE_NAME = kcu.TABLE_NAME
-WHERE tc.TABLE_SCHEMA = 'dbo'
-  AND tc.TABLE_NAME = 'Datos_reporte_ext'
-  AND tc.CONSTRAINT_TYPE = 'PRIMARY KEY';
+package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
+/**
+ * Identificador compuesto lógico del reporte contable de Perú.
+ *
+ * <p>La combinación del número de siniestro y la fecha del movimiento
+ * identifica de forma única cada registro.</p>
+ */
+@Embeddable
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode
+public class PeruAccountingReportId implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * Número del siniestro.
+     */
+    @Column(name = "NumeroSiniestro")
+    private String claimNumber;
+
+    /**
+     * Fecha del movimiento.
+     */
+    @Column(name = "Fechamovimiento2")
+    private LocalDateTime movementDate;
+}
