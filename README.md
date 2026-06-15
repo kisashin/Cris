@@ -1,156 +1,116 @@
-src/test/java/co/com/bnpparibas/cardif/closingclaims/api/PeruAccountingReportControllerTest.java
+src/test/java/co/com/bnpparibas/cardif/closingclaims/domain/util/helpers/PeruAccountingReportExcelHelperTest.java
 
-package co.com.bnpparibas.cardif.closingclaims.api;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.peruaccountingreport.PeruAccountingReportResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.IPeruAccountingReportService;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.PeruAccountingReport;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.PeruAccountingReportId;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@ExtendWith(MockitoExtension.class)
-class PeruAccountingReportControllerTest {
+class PeruAccountingReportExcelHelperTest {
 
-    private static final String P_HEADER = "test";
-    private static final String CORRELATION_ID = "correlation-id";
-    private static final String REQUEST_ID = "request-id";
+    private final PeruAccountingReportExcelHelper helper =
+            new PeruAccountingReportExcelHelper();
 
-    @Mock
-    private IPeruAccountingReportService service;
+    @Test
+    @DisplayName("Should generate Excel with headers and report data")
+    void shouldGenerateExcelWithHeadersAndReportData()
+            throws IOException {
 
-    @InjectMocks
-    private PeruAccountingReportController controller;
+        LocalDateTime movementDate =
+                LocalDateTime.of(2026, 6, 15, 10, 30);
 
-    @Nested
-    @DisplayName("Get latest report date")
-    class GetLatestReportDate {
+        LocalDateTime reportDate =
+                LocalDateTime.of(2026, 6, 15, 11, 0);
 
-        @Test
-        @DisplayName("Should return latest report date successfully")
-        void shouldReturnLatestReportDateSuccessfully() {
-            PeruAccountingReportResponseDTO responseDTO =
-                    PeruAccountingReportResponseDTO.builder()
-                            .reportDate(LocalDateTime.of(
-                                    2026,
-                                    6,
-                                    15,
-                                    1,
-                                    56,
-                                    44))
-                            .build();
+        PeruAccountingReport report =
+                PeruAccountingReport.builder()
+                        .id(PeruAccountingReportId.builder()
+                                .claimNumber("SIN-001")
+                                .movementDate(movementDate)
+                                .build())
+                        .noticeDate("15/06/2026")
+                        .productCode(123.0)
+                        .reportDate(reportDate)
+                        .scoringObjectionReason("Test reason")
+                        .build();
 
-            when(service.getLatestReportDate(
-                    P_HEADER,
-                    CORRELATION_ID,
-                    REQUEST_ID))
-                    .thenReturn(responseDTO);
+        byte[] file = helper.generateExcel(
+                Collections.singletonList(report));
 
-            ResponseEntity<?> response =
-                    controller.getLatestReportDate(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID);
+        assertNotNull(file);
+        assertTrue(file.length > 0);
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNotNull(response.getBody());
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(file))) {
 
-            verify(service).getLatestReportDate(
-                    P_HEADER,
-                    CORRELATION_ID,
-                    REQUEST_ID);
+            Sheet sheet = workbook.getSheet("Reporte Contable Peru");
+
+            assertNotNull(sheet);
+            assertEquals(1, sheet.getLastRowNum());
+
+            Row headerRow = sheet.getRow(0);
+            Row dataRow = sheet.getRow(1);
+
+            assertEquals(120, headerRow.getPhysicalNumberOfCells());
+            assertEquals("FechaAviso",
+                    headerRow.getCell(0).getStringCellValue());
+            assertEquals("NumeroSiniestro",
+                    headerRow.getCell(4).getStringCellValue());
+            assertEquals("Fechamovimiento2",
+                    headerRow.getCell(108).getStringCellValue());
+            assertEquals("Causalobjecion_scoring",
+                    headerRow.getCell(119).getStringCellValue());
+
+            assertEquals("15/06/2026",
+                    dataRow.getCell(0).getStringCellValue());
+            assertEquals("SIN-001",
+                    dataRow.getCell(4).getStringCellValue());
+            assertEquals(123.0,
+                    dataRow.getCell(9).getNumericCellValue());
+            assertTrue(DateUtil.isCellDateFormatted(
+                    dataRow.getCell(106)));
+            assertTrue(DateUtil.isCellDateFormatted(
+                    dataRow.getCell(108)));
+            assertEquals("Test reason",
+                    dataRow.getCell(119).getStringCellValue());
         }
     }
 
-    @Nested
-    @DisplayName("Generate report")
-    class GenerateReport {
+    @Test
+    @DisplayName("Should generate Excel with only headers when report list is empty")
+    void shouldGenerateExcelWithOnlyHeadersWhenListIsEmpty()
+            throws IOException {
 
-        @Test
-        @DisplayName("Should generate report successfully")
-        void shouldGenerateReportSuccessfully() {
-            String expectedMessage =
-                    "Información del reporte contable generada correctamente.";
+        byte[] file = helper.generateExcel(
+                Collections.emptyList());
 
-            when(service.generateReport(
-                    P_HEADER,
-                    CORRELATION_ID,
-                    REQUEST_ID))
-                    .thenReturn(expectedMessage);
+        assertNotNull(file);
+        assertTrue(file.length > 0);
 
-            ResponseEntity<?> response =
-                    controller.generateReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID);
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(file))) {
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNotNull(response.getBody());
+            Sheet sheet = workbook.getSheet("Reporte Contable Peru");
 
-            verify(service).generateReport(
-                    P_HEADER,
-                    CORRELATION_ID,
-                    REQUEST_ID);
-        }
-    }
-
-    @Nested
-    @DisplayName("Download report")
-    class DownloadReport {
-
-        @Test
-        @DisplayName("Should download Excel report successfully")
-        void shouldDownloadExcelReportSuccessfully() {
-            byte[] expectedFile = new byte[]{1, 2, 3, 4};
-
-            when(service.downloadReport(
-                    P_HEADER,
-                    CORRELATION_ID,
-                    REQUEST_ID))
-                    .thenReturn(expectedFile);
-
-            ResponseEntity<byte[]> response =
-                    controller.downloadReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertArrayEquals(expectedFile, response.getBody());
-
+            assertNotNull(sheet);
+            assertEquals(0, sheet.getLastRowNum());
             assertEquals(
-                    "attachment; filename=\"ReporteContablePeru.xlsx\"",
-                    response.getHeaders()
-                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-
-            assertEquals(
-                    expectedFile.length,
-                    response.getHeaders().getContentLength());
-
-            assertEquals(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    response.getHeaders()
-                            .getContentType()
-                            .toString());
-
-            verify(service).downloadReport(
-                    P_HEADER,
-                    CORRELATION_ID,
-                    REQUEST_ID);
+                    120,
+                    sheet.getRow(0).getPhysicalNumberOfCells());
         }
     }
 }
