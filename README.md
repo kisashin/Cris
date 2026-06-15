@@ -1,3 +1,12 @@
-_p: test
-correlation_id: 11111111-1111-1111-1111-111111111111
-request_id: 22222222-2222-2222-2222-222222222222
+SELECT @@SERVERNAME AS serverName, DB_NAME() AS databaseName;
+
+SELECT COUNT(*) AS sourceRecords
+FROM dbo.Datos_reporte_ext;
+
+SELECT COUNT(*) AS generatedRecords
+FROM dbo.reportecontable_peru;
+
+SELECT COUNT(*) AS procedureResult
+FROM dbo.Datos_reporte_ext d
+LEFT JOIN dbo.Ramos_ext r
+    ON r.codigoProdCardif = d.Codproducto;
