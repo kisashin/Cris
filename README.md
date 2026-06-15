@@ -1,116 +1,42 @@
-src/test/java/co/com/bnpparibas/cardif/closingclaims/domain/util/helpers/PeruAccountingReportExcelHelperTest.java
+src/test/java/co/com/bnpparibas/cardif/closingclaims/domain/util/helpers/PeruAccountingReportMapperTest.java
 
 package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.PeruAccountingReport;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.PeruAccountingReportId;
-import org.apache.poi.ss.usermodel.DateUtil;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.peruaccountingreport.PeruAccountingReportResponseDTO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class PeruAccountingReportExcelHelperTest {
+class PeruAccountingReportMapperTest {
 
-    private final PeruAccountingReportExcelHelper helper =
-            new PeruAccountingReportExcelHelper();
+    private final PeruAccountingReportMapper mapper =
+            Mappers.getMapper(PeruAccountingReportMapper.class);
 
     @Test
-    @DisplayName("Should generate Excel with headers and report data")
-    void shouldGenerateExcelWithHeadersAndReportData()
-            throws IOException {
-
-        LocalDateTime movementDate =
+    @DisplayName("Should map report date to response DTO")
+    void shouldMapReportDateToResponseDTO() {
+        LocalDateTime reportDate =
                 LocalDateTime.of(2026, 6, 15, 10, 30);
 
-        LocalDateTime reportDate =
-                LocalDateTime.of(2026, 6, 15, 11, 0);
+        PeruAccountingReportResponseDTO result =
+                mapper.toResponseDTO(reportDate);
 
-        PeruAccountingReport report =
-                PeruAccountingReport.builder()
-                        .id(PeruAccountingReportId.builder()
-                                .claimNumber("SIN-001")
-                                .movementDate(movementDate)
-                                .build())
-                        .noticeDate("15/06/2026")
-                        .productCode(123.0)
-                        .reportDate(reportDate)
-                        .scoringObjectionReason("Test reason")
-                        .build();
-
-        byte[] file = helper.generateExcel(
-                Collections.singletonList(report));
-
-        assertNotNull(file);
-        assertTrue(file.length > 0);
-
-        try (XSSFWorkbook workbook = new XSSFWorkbook(
-                new ByteArrayInputStream(file))) {
-
-            Sheet sheet = workbook.getSheet("Reporte Contable Peru");
-
-            assertNotNull(sheet);
-            assertEquals(1, sheet.getLastRowNum());
-
-            Row headerRow = sheet.getRow(0);
-            Row dataRow = sheet.getRow(1);
-
-            assertEquals(120, headerRow.getPhysicalNumberOfCells());
-            assertEquals("FechaAviso",
-                    headerRow.getCell(0).getStringCellValue());
-            assertEquals("NumeroSiniestro",
-                    headerRow.getCell(4).getStringCellValue());
-            assertEquals("Fechamovimiento2",
-                    headerRow.getCell(108).getStringCellValue());
-            assertEquals("Causalobjecion_scoring",
-                    headerRow.getCell(119).getStringCellValue());
-
-            assertEquals("15/06/2026",
-                    dataRow.getCell(0).getStringCellValue());
-            assertEquals("SIN-001",
-                    dataRow.getCell(4).getStringCellValue());
-            assertEquals(123.0,
-                    dataRow.getCell(9).getNumericCellValue());
-            assertTrue(DateUtil.isCellDateFormatted(
-                    dataRow.getCell(106)));
-            assertTrue(DateUtil.isCellDateFormatted(
-                    dataRow.getCell(108)));
-            assertEquals("Test reason",
-                    dataRow.getCell(119).getStringCellValue());
-        }
+        assertNotNull(result);
+        assertEquals(reportDate, result.getReportDate());
     }
 
     @Test
-    @DisplayName("Should generate Excel with only headers when report list is empty")
-    void shouldGenerateExcelWithOnlyHeadersWhenListIsEmpty()
-            throws IOException {
+    @DisplayName("Should create response DTO with null report date")
+    void shouldCreateResponseDTOWithNullReportDate() {
+        PeruAccountingReportResponseDTO result =
+                mapper.toResponseDTO(null);
 
-        byte[] file = helper.generateExcel(
-                Collections.emptyList());
-
-        assertNotNull(file);
-        assertTrue(file.length > 0);
-
-        try (XSSFWorkbook workbook = new XSSFWorkbook(
-                new ByteArrayInputStream(file))) {
-
-            Sheet sheet = workbook.getSheet("Reporte Contable Peru");
-
-            assertNotNull(sheet);
-            assertEquals(0, sheet.getLastRowNum());
-            assertEquals(
-                    120,
-                    sheet.getRow(0).getPhysicalNumberOfCells());
-        }
+        assertNotNull(result);
+        assertEquals(null, result.getReportDate());
     }
 }
