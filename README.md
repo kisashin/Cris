@@ -1,77 +1,11 @@
 SELECT
-    'NumeroSiniestro + Fechamovimiento2' AS candidateKey,
-    (
-        SELECT COUNT(*)
-        FROM dbo.reportecontable_peru
-        WHERE NumeroSiniestro IS NULL
-           OR Fechamovimiento2 IS NULL
-    ) AS rowsWithNulls,
-    (
-        SELECT COUNT(*)
-        FROM (
-            SELECT NumeroSiniestro, Fechamovimiento2
-            FROM dbo.reportecontable_peru
-            GROUP BY NumeroSiniestro, Fechamovimiento2
-            HAVING COUNT(*) > 1
-        ) duplicates
-    ) AS duplicateGroups
-
-UNION ALL
-
-SELECT
-    'NumeroSiniestro + CoberturaAfectada',
-    (
-        SELECT COUNT(*)
-        FROM dbo.reportecontable_peru
-        WHERE NumeroSiniestro IS NULL
-           OR CoberturaAfectada IS NULL
-    ),
-    (
-        SELECT COUNT(*)
-        FROM (
-            SELECT NumeroSiniestro, CoberturaAfectada
-            FROM dbo.reportecontable_peru
-            GROUP BY NumeroSiniestro, CoberturaAfectada
-            HAVING COUNT(*) > 1
-        ) duplicates
-    )
-
-UNION ALL
-
-SELECT
-    'NumeroSiniestro + Certificado',
-    (
-        SELECT COUNT(*)
-        FROM dbo.reportecontable_peru
-        WHERE NumeroSiniestro IS NULL
-           OR Certificado IS NULL
-    ),
-    (
-        SELECT COUNT(*)
-        FROM (
-            SELECT NumeroSiniestro, Certificado
-            FROM dbo.reportecontable_peru
-            GROUP BY NumeroSiniestro, Certificado
-            HAVING COUNT(*) > 1
-        ) duplicates
-    )
-
-UNION ALL
-
-SELECT
-    'NumeroSiniestro + FechaRegTransaccion',
-    (
-        SELECT COUNT(*)
-        FROM dbo.reportecontable_peru
-        WHERE NumeroSiniestro IS NULL
-           OR FechaRegTransaccion IS NULL
-    ),
-    (
-        SELECT COUNT(*)
-        FROM (
-            SELECT NumeroSiniestro, FechaRegTransaccion
-            FROM dbo.reportecontable_peru
-            GROUP BY NumeroSiniestro, FechaRegTransaccion
-            HAVING COUNT(*) > 1
-        ) duplicates
-    );
+    tc.CONSTRAINT_NAME AS constraintName,
+    kcu.COLUMN_NAME AS columnName
+FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+    ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+    AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+    AND tc.TABLE_NAME = kcu.TABLE_NAME
+WHERE tc.TABLE_SCHEMA = 'dbo'
+  AND tc.TABLE_NAME = 'Datos_reporte_ext'
+  AND tc.CONSTRAINT_TYPE = 'PRIMARY KEY';
