@@ -1,13 +1,9 @@
-src/test/java/co/com/bnpparibas/cardif/closingclaims/domain/services/impl/PeruAccountingReportServiceImplTest.java
+src/test/java/co/com/bnpparibas/cardif/closingclaims/api/PeruAccountingReportControllerTest.java
 
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+package co.com.bnpparibas.cardif.closingclaims.api;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.peruaccountingreport.PeruAccountingReportResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.PeruAccountingReport;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.PeruAccountingReportExcelHelper;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.PeruAccountingReportMapper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.PeruAccountingReportRepository;
+import co.com.bnpparibas.cardif.closingclaims.domain.services.IPeruAccountingReportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -15,107 +11,68 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class PeruAccountingReportServiceImplTest {
+class PeruAccountingReportControllerTest {
 
     private static final String P_HEADER = "test";
     private static final String CORRELATION_ID = "correlation-id";
     private static final String REQUEST_ID = "request-id";
 
     @Mock
-    private PeruAccountingReportRepository repository;
-
-    @Mock
-    private PeruAccountingReportMapper mapper;
-
-    @Mock
-    private PeruAccountingReportExcelHelper excelHelper;
+    private IPeruAccountingReportService service;
 
     @InjectMocks
-    private PeruAccountingReportServiceImpl service;
+    private PeruAccountingReportController controller;
 
     @Nested
     @DisplayName("Get latest report date")
     class GetLatestReportDate {
 
         @Test
-        @DisplayName("Should return latest report date")
-        void shouldReturnLatestReportDate() {
-            LocalDateTime reportDate =
-                    LocalDateTime.of(2026, 6, 15, 1, 56, 44);
-
-            PeruAccountingReportResponseDTO expectedResponse =
+        @DisplayName("Should return latest report date successfully")
+        void shouldReturnLatestReportDateSuccessfully() {
+            PeruAccountingReportResponseDTO responseDTO =
                     PeruAccountingReportResponseDTO.builder()
-                            .reportDate(reportDate)
+                            .reportDate(LocalDateTime.of(
+                                    2026,
+                                    6,
+                                    15,
+                                    1,
+                                    56,
+                                    44))
                             .build();
 
-            when(repository.findLatestReportDate())
-                    .thenReturn(reportDate);
+            when(service.getLatestReportDate(
+                    P_HEADER,
+                    CORRELATION_ID,
+                    REQUEST_ID))
+                    .thenReturn(responseDTO);
 
-            when(mapper.toResponseDTO(reportDate))
-                    .thenReturn(expectedResponse);
-
-            PeruAccountingReportResponseDTO result =
-                    service.getLatestReportDate(
+            ResponseEntity<?> response =
+                    controller.getLatestReportDate(
                             P_HEADER,
                             CORRELATION_ID,
                             REQUEST_ID);
 
-            assertSame(expectedResponse, result);
-            verify(repository).findLatestReportDate();
-            verify(mapper).toResponseDTO(reportDate);
-        }
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertNotNull(response.getBody());
 
-        @Test
-        @DisplayName("Should throw BusinessException when report date does not exist")
-        void shouldThrowExceptionWhenReportDateDoesNotExist() {
-            when(repository.findLatestReportDate())
-                    .thenReturn(null);
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.getLatestReportDate(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).findLatestReportDate();
-            verifyNoInteractions(mapper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when database query fails")
-        void shouldThrowExceptionWhenDatabaseQueryFails() {
-            when(repository.findLatestReportDate())
-                    .thenThrow(new DataAccessResourceFailureException(
-                            "Database error"));
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.getLatestReportDate(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).findLatestReportDate();
-            verifyNoInteractions(mapper);
+            verify(service).getLatestReportDate(
+                    P_HEADER,
+                    CORRELATION_ID,
+                    REQUEST_ID);
         }
     }
 
@@ -126,38 +83,28 @@ class PeruAccountingReportServiceImplTest {
         @Test
         @DisplayName("Should generate report successfully")
         void shouldGenerateReportSuccessfully() {
-            doNothing()
-                    .when(repository)
-                    .generateReport();
+            String expectedMessage =
+                    "Información del reporte contable generada correctamente.";
 
-            String result = service.generateReport(
+            when(service.generateReport(
+                    P_HEADER,
+                    CORRELATION_ID,
+                    REQUEST_ID))
+                    .thenReturn(expectedMessage);
+
+            ResponseEntity<?> response =
+                    controller.generateReport(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID);
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertNotNull(response.getBody());
+
+            verify(service).generateReport(
                     P_HEADER,
                     CORRELATION_ID,
                     REQUEST_ID);
-
-            assertEquals(
-                    "Información del reporte contable generada correctamente.",
-                    result);
-
-            verify(repository).generateReport();
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when report generation fails")
-        void shouldThrowExceptionWhenReportGenerationFails() {
-            doThrow(new DataAccessResourceFailureException(
-                    "Stored procedure error"))
-                    .when(repository)
-                    .generateReport();
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.generateReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).generateReport();
         }
     }
 
@@ -166,110 +113,44 @@ class PeruAccountingReportServiceImplTest {
     class DownloadReport {
 
         @Test
-        @DisplayName("Should generate Excel successfully")
-        void shouldGenerateExcelSuccessfully() throws IOException {
-            PeruAccountingReport report =
-                    PeruAccountingReport.builder().build();
+        @DisplayName("Should download Excel report successfully")
+        void shouldDownloadExcelReportSuccessfully() {
+            byte[] expectedFile = new byte[]{1, 2, 3, 4};
 
-            List<PeruAccountingReport> reports =
-                    Collections.singletonList(report);
-
-            byte[] expectedFile = new byte[]{1, 2, 3};
-
-            when(repository.findAllForExport())
-                    .thenReturn(reports);
-
-            when(excelHelper.generateExcel(reports))
+            when(service.downloadReport(
+                    P_HEADER,
+                    CORRELATION_ID,
+                    REQUEST_ID))
                     .thenReturn(expectedFile);
 
-            byte[] result = service.downloadReport(
+            ResponseEntity<byte[]> response =
+                    controller.downloadReport(
+                            P_HEADER,
+                            CORRELATION_ID,
+                            REQUEST_ID);
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertArrayEquals(expectedFile, response.getBody());
+
+            assertEquals(
+                    "attachment; filename=\"ReporteContablePeru.xlsx\"",
+                    response.getHeaders()
+                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
+
+            assertEquals(
+                    expectedFile.length,
+                    response.getHeaders().getContentLength());
+
+            assertEquals(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    response.getHeaders()
+                            .getContentType()
+                            .toString());
+
+            verify(service).downloadReport(
                     P_HEADER,
                     CORRELATION_ID,
                     REQUEST_ID);
-
-            assertArrayEquals(expectedFile, result);
-            verify(repository).findAllForExport();
-            verify(excelHelper).generateExcel(reports);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when report list is empty")
-        void shouldThrowExceptionWhenReportListIsEmpty() {
-            when(repository.findAllForExport())
-                    .thenReturn(Collections.emptyList());
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verifyNoInteractions(excelHelper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when report list is null")
-        void shouldThrowExceptionWhenReportListIsNull() {
-            when(repository.findAllForExport())
-                    .thenReturn(null);
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verifyNoInteractions(excelHelper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when database query fails")
-        void shouldThrowExceptionWhenDatabaseQueryFails() {
-            when(repository.findAllForExport())
-                    .thenThrow(new DataAccessResourceFailureException(
-                            "Database error"));
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verifyNoInteractions(excelHelper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when Excel generation fails")
-        void shouldThrowExceptionWhenExcelGenerationFails()
-                throws IOException {
-
-            PeruAccountingReport report =
-                    PeruAccountingReport.builder().build();
-
-            List<PeruAccountingReport> reports =
-                    Collections.singletonList(report);
-
-            when(repository.findAllForExport())
-                    .thenReturn(reports);
-
-            when(excelHelper.generateExcel(reports))
-                    .thenThrow(new IOException("Excel error"));
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadReport(
-                            P_HEADER,
-                            CORRELATION_ID,
-                            REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verify(excelHelper).generateExcel(reports);
         }
     }
 }
