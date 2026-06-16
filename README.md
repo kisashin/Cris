@@ -10,8 +10,9 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.Collections;
 
@@ -46,27 +47,32 @@ class PeruAccountingReportExcelHelperTest {
         assertNotNull(file);
         assertTrue(file.length > 0);
 
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file))) {
+        File tempFile = File.createTempFile("test-excel", ".xlsx");
+        try {
+            Files.write(tempFile.toPath(), file);
+            try (Workbook workbook = WorkbookFactory.create(tempFile)) {
+                Sheet sheet = workbook.getSheet("Reporte Contable Peru");
+                assertNotNull(sheet);
+                assertEquals(1, sheet.getLastRowNum());
 
-            Sheet sheet = workbook.getSheet("Reporte Contable Peru");
-            assertNotNull(sheet);
-            assertEquals(1, sheet.getLastRowNum());
+                Row headerRow = sheet.getRow(0);
+                Row dataRow = sheet.getRow(1);
 
-            Row headerRow = sheet.getRow(0);
-            Row dataRow = sheet.getRow(1);
+                assertEquals(120, headerRow.getPhysicalNumberOfCells());
+                assertEquals("FechaAviso", headerRow.getCell(0).getStringCellValue());
+                assertEquals("NumeroSiniestro", headerRow.getCell(4).getStringCellValue());
+                assertEquals("Fechamovimiento2", headerRow.getCell(108).getStringCellValue());
+                assertEquals("Causalobjecion_scoring", headerRow.getCell(119).getStringCellValue());
 
-            assertEquals(120, headerRow.getPhysicalNumberOfCells());
-            assertEquals("FechaAviso", headerRow.getCell(0).getStringCellValue());
-            assertEquals("NumeroSiniestro", headerRow.getCell(4).getStringCellValue());
-            assertEquals("Fechamovimiento2", headerRow.getCell(108).getStringCellValue());
-            assertEquals("Causalobjecion_scoring", headerRow.getCell(119).getStringCellValue());
-
-            assertEquals("15/06/2026", dataRow.getCell(0).getStringCellValue());
-            assertEquals("SIN-001", dataRow.getCell(4).getStringCellValue());
-            assertEquals(123.0, dataRow.getCell(9).getNumericCellValue());
-            assertTrue(DateUtil.isCellDateFormatted(dataRow.getCell(106)));
-            assertTrue(DateUtil.isCellDateFormatted(dataRow.getCell(108)));
-            assertEquals("Test reason", dataRow.getCell(119).getStringCellValue());
+                assertEquals("15/06/2026", dataRow.getCell(0).getStringCellValue());
+                assertEquals("SIN-001", dataRow.getCell(4).getStringCellValue());
+                assertEquals(123.0, dataRow.getCell(9).getNumericCellValue());
+                assertTrue(DateUtil.isCellDateFormatted(dataRow.getCell(106)));
+                assertTrue(DateUtil.isCellDateFormatted(dataRow.getCell(108)));
+                assertEquals("Test reason", dataRow.getCell(119).getStringCellValue());
+            }
+        } finally {
+            tempFile.delete();
         }
     }
 
@@ -79,12 +85,17 @@ class PeruAccountingReportExcelHelperTest {
         assertNotNull(file);
         assertTrue(file.length > 0);
 
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file))) {
-
-            Sheet sheet = workbook.getSheet("Reporte Contable Peru");
-            assertNotNull(sheet);
-            assertEquals(0, sheet.getLastRowNum());
-            assertEquals(120, sheet.getRow(0).getPhysicalNumberOfCells());
+        File tempFile = File.createTempFile("test-excel", ".xlsx");
+        try {
+            Files.write(tempFile.toPath(), file);
+            try (Workbook workbook = WorkbookFactory.create(tempFile)) {
+                Sheet sheet = workbook.getSheet("Reporte Contable Peru");
+                assertNotNull(sheet);
+                assertEquals(0, sheet.getLastRowNum());
+                assertEquals(120, sheet.getRow(0).getPhysicalNumberOfCells());
+            }
+        } finally {
+            tempFile.delete();
         }
     }
 }
