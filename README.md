@@ -1,21 +1,33 @@
-<plugin>
-    <groupId>org.apache.maven.plugins</groupId>
-    <artifactId>maven-compiler-plugin</artifactId>
-    <version>3.8.1</version>
-    <configuration>
-        <source>8</source>
-        <target>8</target>
-        <annotationProcessorPaths>
-            <path>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok</artifactId>
-                <version>${lombok.version}</version>
-            </path>
-            <path>
-                <groupId>org.mapstruct</groupId>
-                <artifactId>mapstruct-processor</artifactId>
-                <version>1.5.2.Final</version>
-            </path>
-        </annotationProcessorPaths>
-    </configuration>
-</plugin>
+@Test
+@DisplayName("Should generate Excel with headers and report data")
+void shouldGenerateExcelWithHeadersAndReportData() throws IOException {
+
+    System.out.println("=== INICIO TEST ===");
+    System.out.println("java.io.tmpdir: " + System.getProperty("java.io.tmpdir"));
+
+    LocalDateTime movementDate = LocalDateTime.of(2026, 6, 15, 10, 30);
+    LocalDateTime reportDate = LocalDateTime.of(2026, 6, 15, 11, 0);
+
+    System.out.println("=== CONSTRUYENDO REPORT ===");
+    PeruAccountingReport report = PeruAccountingReport.builder()
+            .id(PeruAccountingReportId.builder()
+                    .claimNumber("SIN-001")
+                    .movementDate(movementDate)
+                    .build())
+            .noticeDate("15/06/2026")
+            .productCode(123.0)
+            .reportDate(reportDate)
+            .scoringObjectionReason("Test reason")
+            .build();
+
+    System.out.println("=== REPORT CONSTRUIDO: " + report + " ===");
+    System.out.println("=== LLAMANDO generateExcel ===");
+
+    byte[] file = helper.generateExcel(Collections.singletonList(report));
+
+    System.out.println("=== generateExcel COMPLETADO, bytes: " + (file != null ? file.length : "NULL") + " ===");
+
+    assertNotNull(file);
+    assertTrue(file.length > 0);
+    // ... resto igual
+}
