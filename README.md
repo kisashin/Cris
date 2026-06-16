@@ -1,55 +1,70 @@
-src/test/java/co/com/bnpparibas/cardif/closingclaims/domain/dtos/peruaccountingreport/PeruAccountingReportResponseDTOTest.java
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.peruaccountingreport;
+@Test
+@DisplayName("Should cover equals and hashCode branches")
+void shouldCoverEqualsAndHashCodeBranches() {
+    LocalDateTime movementDate =
+            LocalDateTime.of(2026, 6, 15, 12, 0);
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+    LocalDateTime differentMovementDate =
+            LocalDateTime.of(2026, 6, 16, 12, 0);
 
-import java.time.LocalDateTime;
+    PeruAccountingReportId base =
+            new PeruAccountingReportId(
+                    "SIN-001",
+                    movementDate);
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+    PeruAccountingReportId equal =
+            new PeruAccountingReportId(
+                    "SIN-001",
+                    movementDate);
 
-class PeruAccountingReportResponseDTOTest {
+    PeruAccountingReportId differentClaim =
+            new PeruAccountingReportId(
+                    "SIN-002",
+                    movementDate);
 
-    @Test
-    @DisplayName("Should create response DTO using builder")
-    void shouldCreateResponseDTOUsingBuilder() {
-        LocalDateTime reportDate =
-                LocalDateTime.of(2026, 6, 15, 10, 30);
+    PeruAccountingReportId differentMovement =
+            new PeruAccountingReportId(
+                    "SIN-001",
+                    differentMovementDate);
 
-        PeruAccountingReportResponseDTO response =
-                PeruAccountingReportResponseDTO.builder()
-                        .reportDate(reportDate)
-                        .build();
+    PeruAccountingReportId nullClaim =
+            new PeruAccountingReportId(
+                    null,
+                    movementDate);
 
-        assertNotNull(response);
-        assertEquals(reportDate, response.getReportDate());
-    }
+    PeruAccountingReportId nullMovement =
+            new PeruAccountingReportId(
+                    "SIN-001",
+                    null);
 
-    @Test
-    @DisplayName("Should create and update response DTO")
-    void shouldCreateAndUpdateResponseDTO() {
-        PeruAccountingReportResponseDTO response =
-                new PeruAccountingReportResponseDTO();
+    PeruAccountingReportId allNull =
+            new PeruAccountingReportId(
+                    null,
+                    null);
 
-        LocalDateTime reportDate =
-                LocalDateTime.of(2026, 6, 15, 11, 0);
+    PeruAccountingReportId anotherAllNull =
+            new PeruAccountingReportId(
+                    null,
+                    null);
 
-        response.setReportDate(reportDate);
+    assertTrue(base.equals(base));
+    assertTrue(base.equals(equal));
+    assertFalse(base.equals(null));
+    assertFalse(base.equals("invalid-type"));
+    assertFalse(base.equals(differentClaim));
+    assertFalse(base.equals(differentMovement));
 
-        assertEquals(reportDate, response.getReportDate());
-    }
+    assertFalse(base.equals(nullClaim));
+    assertFalse(nullClaim.equals(base));
 
-    @Test
-    @DisplayName("Should create response DTO using all arguments constructor")
-    void shouldCreateResponseDTOUsingAllArgumentsConstructor() {
-        LocalDateTime reportDate =
-                LocalDateTime.of(2026, 6, 15, 12, 0);
+    assertFalse(base.equals(nullMovement));
+    assertFalse(nullMovement.equals(base));
 
-        PeruAccountingReportResponseDTO response =
-                new PeruAccountingReportResponseDTO(reportDate);
+    assertTrue(allNull.equals(anotherAllNull));
 
-        assertEquals(reportDate, response.getReportDate());
-    }
+    assertEquals(base.hashCode(), equal.hashCode());
+    assertEquals(allNull.hashCode(), anotherAllNull.hashCode());
 }
