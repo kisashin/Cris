@@ -1,2 +1,13 @@
-set JVM_ARGS=--add-exports=java.desktop/sun.awt.shell=ALL-UNNAMED
-jmeter.bat
+private void closeWorkbook(SXSSFWorkbook workbook)
+        throws IOException {
+
+    if (workbook == null) {
+        return;
+    }
+
+    try {
+        workbook.dispose();
+    } finally {
+        workbook.close();
+    }
+}
