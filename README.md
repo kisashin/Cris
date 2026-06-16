@@ -1,2 +1,6 @@
-set JVM_ARGS=--add-exports=java.desktop/sun.awt.shell=ALL-UNNAMED
-jmeter.bat
+| Name             | Value              |
+| ---------------- | ------------------ |
+| `_p`             | `test`             |
+| `correlation_id` | `${__UUID()}`      |
+| `request_id`     | `${__UUID()}`      |
+| `Accept`         | `application/json` |
