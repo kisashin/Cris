@@ -1,3 +1,6 @@
+
+PeruAccountingReportIdTest
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,4 +70,44 @@ void shouldCoverEqualsAndHashCodeBranches() {
 
     assertEquals(base.hashCode(), equal.hashCode());
     assertEquals(allNull.hashCode(), anotherAllNull.hashCode());
+}
+
+
+PeruAccountingReportTest.java
+
+import java.lang.reflect.Method;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@Test
+@DisplayName("Should cover all entity setters and getters")
+void shouldCoverAllEntitySettersAndGetters()
+        throws ReflectiveOperationException {
+
+    PeruAccountingReport report = new PeruAccountingReport();
+    int testedSetters = 0;
+
+    for (Method setter : PeruAccountingReport.class.getMethods()) {
+        if (isSetter(setter)) {
+            Object expectedValue =
+                    createTestValue(setter.getParameterTypes()[0]);
+
+            setter.invoke(report, expectedValue);
+
+            String getterName =
+                    "get" + setter.getName().substring(3);
+
+            Method getter =
+                    PeruAccountingReport.class.getMethod(getterName);
+
+            assertEquals(
+                    expectedValue,
+                    getter.invoke(report),
+                    setter.getName());
+
+            testedSetters++;
+        }
+    }
+
+    assertTrue(testedSetters > 100);
 }
