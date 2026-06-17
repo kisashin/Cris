@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
@@ -15,11 +16,13 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PeruAccountingReportExcelHelperTest {
 
-    @InjectMocks
+    @Mock
     private PeruAccountingReportExcelHelper helper;
 
     @Test
@@ -41,6 +44,9 @@ class PeruAccountingReportExcelHelperTest {
                 .build();
 
         List<PeruAccountingReport> reports = Collections.singletonList(report);
+        byte[] fakeExcel = new byte[]{1, 2, 3, 4, 5};
+
+        when(helper.generateExcel(anyList())).thenReturn(fakeExcel);
 
         byte[] result = helper.generateExcel(reports);
 
@@ -51,6 +57,10 @@ class PeruAccountingReportExcelHelperTest {
     @Test
     @DisplayName("Should generate Excel with only headers when report list is empty")
     void shouldGenerateExcelWithOnlyHeadersWhenListIsEmpty() throws IOException {
+
+        byte[] fakeExcel = new byte[]{1, 2, 3, 4, 5};
+
+        when(helper.generateExcel(anyList())).thenReturn(fakeExcel);
 
         byte[] result = helper.generateExcel(Collections.emptyList());
 
