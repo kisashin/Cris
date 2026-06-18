@@ -1,181 +1,91 @@
-src/app/views/claims-closing/movements-peru/peru-accounting-report/peru-accounting-report.component.ts
+src/app/views/claims-closing/movements-peru/peru-accounting-report/peru-accounting-report.component.html
 
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { HttpResponse } from '@angular/common/http';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { ToastrService } from 'ngx-toastr';
+<div class="accounting-report-container">
 
-import { PeruAccountingReportService } from '../../services/peru-accounting-report.service';
+  <div class="container-title">
+    <h1 class="title">
+      REPORTE CONTABLE (MOVIMIENTO ONBASE PERÚ)
+    </h1>
+  </div>
 
-@Component({
-  selector: 'app-peru-accounting-report',
-  standalone: true,
-  imports: [
-    CommonModule,
-    MatButtonModule,
-    MatIconModule
-  ],
-  templateUrl: './peru-accounting-report.component.html',
-  styleUrl: './peru-accounting-report.component.scss'
-})
-export class PeruAccountingReportComponent implements OnInit {
+  <section class="generation-section">
+    <span class="section-label">
+      Cargar información reporte contable:
+    </span>
 
-  public reportDate: string | null = null;
-  public errorMessage = '';
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      class="action-button"
+      [disabled]="isGenerating"
+      (click)="generateReport()">
 
-  public isLoadingDate = false;
-  public isGenerating = false;
-  public isDownloading = false;
+      <mat-icon>refresh</mat-icon>
 
-  constructor(
-    private readonly peruAccountingReportService:
-      PeruAccountingReportService,
-    private readonly toastr: ToastrService
-  ) {}
+      {{ isGenerating ? 'GENERANDO...' : 'GENERAR' }}
+    </button>
+  </section>
 
-  ngOnInit(): void {
-    this.loadLatestReportDate();
+  @if (errorMessage) {
+    <div class="error-message" role="alert">
+      {{ errorMessage }}
+    </div>
   }
 
-  /**
-   * Consulta la fecha de la última generación del reporte.
-   */
-  public loadLatestReportDate(): void {
-    this.isLoadingDate = true;
-    this.errorMessage = '';
+  <section class="previous-report-section">
 
-    this.peruAccountingReportService
-      .getLatestReportDate()
-      .subscribe({
-        next: response => {
-          this.reportDate =
-            response?.bodyResponse?.reportDate ?? null;
+    <h2 class="section-title">
+      Reporte anterior:
+    </h2>
 
-          this.isLoadingDate = false;
-        },
-        error: error => {
-          console.error(
-            'Error consulting the latest Peru accounting report date:',
-            error
-          );
+    <div class="report-table-container">
 
-          this.reportDate = null;
-          this.errorMessage =
-            'No fue posible consultar la fecha del último reporte.';
-          this.isLoadingDate = false;
-        }
-      });
-  }
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>FECHA REPORTE</th>
+            <th>REPORTES</th>
+          </tr>
+        </thead>
 
-  /**
-   * Ejecuta la carga de la información del reporte contable.
-   */
-  public generateReport(): void {
-    if (this.isGenerating) {
-      return;
-    }
+        <tbody>
+          <tr>
+            <td>
+              @if (isLoadingDate) {
+                <span>Consultando...</span>
+              } @else if (reportDate) {
+                <span>
+                  {{ reportDate | date:'dd/MM/yyyy h:mm:ss a' }}
+                </span>
+              } @else {
+                <span>Sin información disponible</span>
+              }
+            </td>
 
-    this.isGenerating = true;
-    this.errorMessage = '';
+            <td>
+              <button
+                mat-raised-button
+                color="primary"
+                type="button"
+                class="download-button"
+                [disabled]="isDownloading || !reportDate"
+                (click)="downloadReport()">
 
-    this.peruAccountingReportService
-      .generateReport()
-      .subscribe({
-        next: response => {
-          const message =
-            response?.bodyResponse ||
-            'Información generada correctamente.';
+                <mat-icon>download</mat-icon>
 
-          this.toastr.success(message);
-          this.isGenerating = false;
-          this.loadLatestReportDate();
-        },
-        error: error => {
-          console.error(
-            'Error generating the Peru accounting report:',
-            error
-          );
+                {{
+                  isDownloading
+                    ? 'DESCARGANDO...'
+                    : 'GENERAR REPORTE'
+                }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-          this.errorMessage =
-            'No fue posible generar la información del reporte.';
-          this.toastr.error(this.errorMessage);
-          this.isGenerating = false;
-        }
-      });
-  }
+    </div>
+  </section>
 
-  /**
-   * Descarga el reporte contable en formato Excel.
-   */
-  public downloadReport(): void {
-    if (this.isDownloading) {
-      return;
-    }
-
-    this.isDownloading = true;
-    this.errorMessage = '';
-
-    this.peruAccountingReportService
-      .downloadReport()
-      .subscribe({
-        next: response => {
-          this.saveExcelFile(response);
-          this.isDownloading = false;
-        },
-        error: error => {
-          console.error(
-            'Error downloading the Peru accounting report:',
-            error
-          );
-
-          this.errorMessage =
-            'No fue posible descargar el reporte contable.';
-          this.toastr.error(this.errorMessage);
-          this.isDownloading = false;
-        }
-      });
-  }
-
-  private saveExcelFile(
-    response: HttpResponse<Blob>
-  ): void {
-    const file = response.body;
-
-    if (!file || file.size === 0) {
-      this.toastr.warning(
-        'El archivo generado no contiene información.'
-      );
-      return;
-    }
-
-    const fileName = this.getFileName(response);
-    const objectUrl = window.URL.createObjectURL(file);
-    const anchor = document.createElement('a');
-
-    anchor.href = objectUrl;
-    anchor.download = fileName;
-    anchor.click();
-
-    window.URL.revokeObjectURL(objectUrl);
-
-    this.toastr.success(
-      'Reporte descargado correctamente.'
-    );
-  }
-
-  private getFileName(
-    response: HttpResponse<Blob>
-  ): string {
-    const contentDisposition =
-      response.headers.get('Content-Disposition');
-
-    const fileNameMatch = contentDisposition?.match(
-      /filename="?([^"]+)"?/
-    );
-
-    return fileNameMatch?.[1] ??
-      'ReporteContablePeru.xlsx';
-  }
-}
+</div>
