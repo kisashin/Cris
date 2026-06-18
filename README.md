@@ -1,91 +1,150 @@
-src/app/views/claims-closing/movements-peru/peru-accounting-report/peru-accounting-report.component.html
+src/app/views/claims-closing/movements-peru/peru-accounting-report/peru-accounting-report.component.scss
 
-<div class="accounting-report-container">
+.accounting-report-container {
+  width: 100%;
+  max-width: 900px;
+  padding: 1rem 0;
+}
 
-  <div class="container-title">
-    <h1 class="title">
-      REPORTE CONTABLE (MOVIMIENTO ONBASE PERÚ)
-    </h1>
-  </div>
+.container-title {
+  padding-bottom: 3rem;
 
-  <section class="generation-section">
-    <span class="section-label">
-      Cargar información reporte contable:
-    </span>
+  .title {
+    margin: 0;
+    color: #006600;
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 14pt;
+    font-weight: 600;
+  }
+}
 
-    <button
-      mat-raised-button
-      color="primary"
-      type="button"
-      class="action-button"
-      [disabled]="isGenerating"
-      (click)="generateReport()">
+.generation-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
 
-      <mat-icon>refresh</mat-icon>
+.section-label,
+.section-title {
+  color: #006600;
+  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+  font-weight: 600;
+}
 
-      {{ isGenerating ? 'GENERANDO...' : 'GENERAR' }}
-    </button>
-  </section>
+.section-label {
+  font-size: 14px;
+}
 
-  @if (errorMessage) {
-    <div class="error-message" role="alert">
-      {{ errorMessage }}
-    </div>
+.section-title {
+  margin: 0 0 1rem;
+  font-size: 14px;
+}
+
+.action-button,
+.download-button {
+  min-height: 40px;
+  padding: 0 1.25rem;
+  color: #ffffff !important;
+  background-color: #006600 !important;
+  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+
+  mat-icon {
+    margin-right: 6px;
   }
 
-  <section class="previous-report-section">
+  &:hover:not(:disabled) {
+    background-color: #004d00 !important;
+  }
 
-    <h2 class="section-title">
-      Reporte anterior:
-    </h2>
+  &:disabled {
+    color: rgba(255, 255, 255, 0.7) !important;
+    background-color: #7aa87a !important;
+    cursor: not-allowed;
+  }
+}
 
-    <div class="report-table-container">
+.error-message {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  color: #a40000;
+  background-color: #fdeaea;
+  border: 1px solid #d60000;
+  border-radius: 4px;
+  font-size: 13px;
+}
 
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>FECHA REPORTE</th>
-            <th>REPORTES</th>
-          </tr>
-        </thead>
+.previous-report-section {
+  width: 100%;
+  margin-top: 1rem;
+}
 
-        <tbody>
-          <tr>
-            <td>
-              @if (isLoadingDate) {
-                <span>Consultando...</span>
-              } @else if (reportDate) {
-                <span>
-                  {{ reportDate | date:'dd/MM/yyyy h:mm:ss a' }}
-                </span>
-              } @else {
-                <span>Sin información disponible</span>
-              }
-            </td>
+.report-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
 
-            <td>
-              <button
-                mat-raised-button
-                color="primary"
-                type="button"
-                class="download-button"
-                [disabled]="isDownloading || !reportDate"
-                (click)="downloadReport()">
+.report-table {
+  width: 100%;
+  min-width: 580px;
+  border-collapse: collapse;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
 
-                <mat-icon>download</mat-icon>
+  th,
+  td {
+    padding: 12px 16px;
+    border: 1px solid #c5cecc;
+    text-align: center;
+    vertical-align: middle;
+  }
 
-                {{
-                  isDownloading
-                    ? 'DESCARGANDO...'
-                    : 'GENERAR REPORTE'
-                }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  th {
+    color: #ffffff;
+    background-color: #1c5e55;
+    font-weight: 600;
+  }
 
-    </div>
-  </section>
+  tbody tr {
+    background-color: #e3eaeb;
+  }
 
-</div>
+  tbody tr:hover {
+    background-color: #d4e0df;
+  }
+
+  td:first-child {
+    min-width: 230px;
+  }
+
+  td:last-child {
+    min-width: 230px;
+  }
+}
+
+@media (max-width: 768px) {
+  .accounting-report-container {
+    padding: 1rem;
+  }
+
+  .container-title {
+    padding-bottom: 2rem;
+  }
+
+  .generation-section {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .action-button,
+  .download-button {
+    width: 100%;
+  }
+}
+
