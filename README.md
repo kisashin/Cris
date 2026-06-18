@@ -1,83 +1,143 @@
-src/app/views/claims-closing/models/peru-accounting-report.model.ts
+src/app/views/claims-closing/services/peru-accounting-report.service.spec.ts
 
-export interface PeruAccountingReportResponse {
-  reportDate: string | null;
-}
-
-
-src/app/views/claims-closing/services/peru-accounting-report.service.ts
-
-
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
+import {
+  HttpClientTestingModule,
+  HttpTestingController
+} from '@angular/common/http/testing';
+import { HttpHeaders } from '@angular/common/http';
 
 import { environment } from 'src/environments/environment';
+import { PeruAccountingReportService } from './peru-accounting-report.service';
 import { INewGeneralResponse } from '../models/new-general-response.interface';
 import { PeruAccountingReportResponse } from '../models/peru-accounting-report.model';
 
-@Injectable({
-  providedIn: 'root'
-})
-export class PeruAccountingReportService {
+describe('PeruAccountingReportService', () => {
+  let service: PeruAccountingReportService;
+  let httpMock: HttpTestingController;
 
-  private readonly baseUrl =
+  const baseUrl =
     `${environment.urlAPIClosingClaimsBackEnd}/v1/peru-accounting-report`;
 
-  private readonly correlationId = crypto.randomUUID();
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [PeruAccountingReportService]
+    });
 
-  constructor(private readonly http: HttpClient) {}
+    service = TestBed.inject(PeruAccountingReportService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
 
-  /**
-   * Consulta la fecha de la última generación del reporte.
-   */
-  getLatestReportDate():
-    Observable<INewGeneralResponse<PeruAccountingReportResponse>> {
+  afterEach(() => {
+    httpMock.verify();
+  });
 
-    return this.http.get<
-      INewGeneralResponse<PeruAccountingReportResponse>
-    >(
-      `${this.baseUrl}/latest`,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
 
-  /**
-   * Ejecuta la generación de la información del reporte contable.
-   */
-  generateReport(): Observable<INewGeneralResponse<string>> {
-    return this.http.put<INewGeneralResponse<string>>(
-      `${this.baseUrl}/generate`,
-      null,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+  describe('#getLatestReportDate', () => {
+    it('should GET the latest report date', () => {
+      const mockResponse:
+        INewGeneralResponse<PeruAccountingReportResponse> = {
+          correlationId: 'correlation-id',
+          responseHeader: {
+            returnCode: 200,
+            message: 'Success'
+          },
+          bodyResponse: {
+            reportDate: '2026-06-16T10:30:00'
+          }
+        };
 
-  /**
-   * Descarga el reporte contable en formato Excel.
-   */
-  downloadReport(): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.baseUrl}/download`,
-      {
-        headers: this.createHeaders(
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
+      service.getLatestReportDate().subscribe(response => {
+        expect(response).toEqual(mockResponse);
+      });
 
-  private createHeaders(accept: string): HttpHeaders {
-    return new HttpHeaders()
-      .set('correlation_id', this.correlationId)
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID())
-      .set('Accept', accept);
-  }
-}
+      const request = httpMock.expectOne(`${baseUrl}/latest`);
+
+      expect(request.request.method).toBe('GET');
+      expect(request.request.headers.has('correlation_id')).toBeTrue();
+      expect(request.request.headers.has('request_id')).toBeTrue();
+      expect(request.request.headers.has('_p')).toBeTrue();
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush(mockResponse);
+    });
+  });
+
+  describe('#generateReport', () => {
+    it('should PUT the report generation request', () => {
+      const mockResponse: INewGeneralResponse<string> = {
+        correlationId: 'correlation-id',
+        responseHeader: {
+          returnCode: 200,
+          message: 'Success'
+        },
+        bodyResponse:
+          'Información del reporte contable generada correctamente.'
+      };
+
+      service.generateReport().subscribe(response => {
+        expect(response).toEqual(mockResponse);
+      });
+
+      const request = httpMock.expectOne(`${baseUrl}/generate`);
+
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toBeNull();
+      expect(request.request.headers.has('correlation_id')).toBeTrue();
+      expect(request.request.headers.has('request_id')).toBeTrue();
+      expect(request.request.headers.has('_p')).toBeTrue();
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush(mockResponse);
+    });
+  });
+
+  describe('#downloadReport', () => {
+    it('should GET the Excel report as Blob', () => {
+      const mockBlob = new Blob(
+        ['excel-content'],
+        {
+          type:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      );
+
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition':
+          'attachment; filename="ReporteContablePeru.xlsx"'
+      });
+
+      service.downloadReport().subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(
+          response.headers.get('Content-Disposition')
+        ).toContain('ReporteContablePeru.xlsx');
+      });
+
+      const request = httpMock.expectOne(`${baseUrl}/download`);
+
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.headers.has('correlation_id')).toBeTrue();
+      expect(request.request.headers.has('request_id')).toBeTrue();
+      expect(request.request.headers.has('_p')).toBeTrue();
+      expect(request.request.headers.get('Accept')).toBe(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+
+      request.flush(mockBlob, {
+        headers: responseHeaders,
+        status: 200,
+        statusText: 'OK'
+      });
+    });
+  });
+});
+
+ng test --include="**/peru-accounting-report.service.spec.ts"
