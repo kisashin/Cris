@@ -148,3 +148,35 @@ src/app/views/claims-closing/movements-peru/peru-accounting-report/peru-accounti
   }
 }
 
+src/app/app-routing.module.ts
+
+import { PeruAccountingReportComponent } from './views/claims-closing/movements-peru/peru-accounting-report/peru-accounting-report.component';
+
+{
+  path: 'peru-accounting-report',
+  component: PeruAccountingReportComponent,
+  canActivate: [AuthenticateGuardian],
+  data: {
+    menuKey: 'ClaimsClosing'
+  }
+},
+
+
+
+
+{
+  path: 'load-movements-peru',
+  component: LoadMovementsPeruComponent,
+  canActivate: [AuthenticateGuardian],
+  data: {
+    menuKey: 'ClaimsClosing'
+  }
+},
+{
+  path: 'peru-accounting-report',
+  component: PeruAccountingReportComponent,
+  canActivate: [AuthenticateGuardian],
+  data: {
+    menuKey: 'ClaimsClosing'
+  }
+},
