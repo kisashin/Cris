@@ -1,1 +1,1 @@
-findstr /s /i /n "Movimientos OnBase Peru" src\app\*.ts src\app\*.html
+findstr /s /i /n "responseType.*blob Blob saveAs URL.createObjectURL" src\app\*.ts
