@@ -1,143 +1,181 @@
-src/app/views/claims-closing/services/peru-accounting-report.service.spec.ts
+src/app/views/claims-closing/movements-peru/peru-accounting-report/peru-accounting-report.component.ts
 
-import { TestBed } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController
-} from '@angular/common/http/testing';
-import { HttpHeaders } from '@angular/common/http';
+import { CommonModule } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { HttpResponse } from '@angular/common/http';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { ToastrService } from 'ngx-toastr';
 
-import { environment } from 'src/environments/environment';
-import { PeruAccountingReportService } from './peru-accounting-report.service';
-import { INewGeneralResponse } from '../models/new-general-response.interface';
-import { PeruAccountingReportResponse } from '../models/peru-accounting-report.model';
+import { PeruAccountingReportService } from '../../services/peru-accounting-report.service';
 
-describe('PeruAccountingReportService', () => {
-  let service: PeruAccountingReportService;
-  let httpMock: HttpTestingController;
+@Component({
+  selector: 'app-peru-accounting-report',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatButtonModule,
+    MatIconModule
+  ],
+  templateUrl: './peru-accounting-report.component.html',
+  styleUrl: './peru-accounting-report.component.scss'
+})
+export class PeruAccountingReportComponent implements OnInit {
 
-  const baseUrl =
-    `${environment.urlAPIClosingClaimsBackEnd}/v1/peru-accounting-report`;
+  public reportDate: string | null = null;
+  public errorMessage = '';
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [PeruAccountingReportService]
-    });
+  public isLoadingDate = false;
+  public isGenerating = false;
+  public isDownloading = false;
 
-    service = TestBed.inject(PeruAccountingReportService);
-    httpMock = TestBed.inject(HttpTestingController);
-  });
+  constructor(
+    private readonly peruAccountingReportService:
+      PeruAccountingReportService,
+    private readonly toastr: ToastrService
+  ) {}
 
-  afterEach(() => {
-    httpMock.verify();
-  });
+  ngOnInit(): void {
+    this.loadLatestReportDate();
+  }
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
-  });
+  /**
+   * Consulta la fecha de la última generación del reporte.
+   */
+  public loadLatestReportDate(): void {
+    this.isLoadingDate = true;
+    this.errorMessage = '';
 
-  describe('#getLatestReportDate', () => {
-    it('should GET the latest report date', () => {
-      const mockResponse:
-        INewGeneralResponse<PeruAccountingReportResponse> = {
-          correlationId: 'correlation-id',
-          responseHeader: {
-            returnCode: 200,
-            message: 'Success'
-          },
-          bodyResponse: {
-            reportDate: '2026-06-16T10:30:00'
-          }
-        };
+    this.peruAccountingReportService
+      .getLatestReportDate()
+      .subscribe({
+        next: response => {
+          this.reportDate =
+            response?.bodyResponse?.reportDate ?? null;
 
-      service.getLatestReportDate().subscribe(response => {
-        expect(response).toEqual(mockResponse);
-      });
-
-      const request = httpMock.expectOne(`${baseUrl}/latest`);
-
-      expect(request.request.method).toBe('GET');
-      expect(request.request.headers.has('correlation_id')).toBeTrue();
-      expect(request.request.headers.has('request_id')).toBeTrue();
-      expect(request.request.headers.has('_p')).toBeTrue();
-      expect(request.request.headers.get('Accept'))
-        .toBe('application/json');
-
-      request.flush(mockResponse);
-    });
-  });
-
-  describe('#generateReport', () => {
-    it('should PUT the report generation request', () => {
-      const mockResponse: INewGeneralResponse<string> = {
-        correlationId: 'correlation-id',
-        responseHeader: {
-          returnCode: 200,
-          message: 'Success'
+          this.isLoadingDate = false;
         },
-        bodyResponse:
-          'Información del reporte contable generada correctamente.'
-      };
+        error: error => {
+          console.error(
+            'Error consulting the latest Peru accounting report date:',
+            error
+          );
 
-      service.generateReport().subscribe(response => {
-        expect(response).toEqual(mockResponse);
-      });
-
-      const request = httpMock.expectOne(`${baseUrl}/generate`);
-
-      expect(request.request.method).toBe('PUT');
-      expect(request.request.body).toBeNull();
-      expect(request.request.headers.has('correlation_id')).toBeTrue();
-      expect(request.request.headers.has('request_id')).toBeTrue();
-      expect(request.request.headers.has('_p')).toBeTrue();
-      expect(request.request.headers.get('Accept'))
-        .toBe('application/json');
-
-      request.flush(mockResponse);
-    });
-  });
-
-  describe('#downloadReport', () => {
-    it('should GET the Excel report as Blob', () => {
-      const mockBlob = new Blob(
-        ['excel-content'],
-        {
-          type:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          this.reportDate = null;
+          this.errorMessage =
+            'No fue posible consultar la fecha del último reporte.';
+          this.isLoadingDate = false;
         }
+      });
+  }
+
+  /**
+   * Ejecuta la carga de la información del reporte contable.
+   */
+  public generateReport(): void {
+    if (this.isGenerating) {
+      return;
+    }
+
+    this.isGenerating = true;
+    this.errorMessage = '';
+
+    this.peruAccountingReportService
+      .generateReport()
+      .subscribe({
+        next: response => {
+          const message =
+            response?.bodyResponse ||
+            'Información generada correctamente.';
+
+          this.toastr.success(message);
+          this.isGenerating = false;
+          this.loadLatestReportDate();
+        },
+        error: error => {
+          console.error(
+            'Error generating the Peru accounting report:',
+            error
+          );
+
+          this.errorMessage =
+            'No fue posible generar la información del reporte.';
+          this.toastr.error(this.errorMessage);
+          this.isGenerating = false;
+        }
+      });
+  }
+
+  /**
+   * Descarga el reporte contable en formato Excel.
+   */
+  public downloadReport(): void {
+    if (this.isDownloading) {
+      return;
+    }
+
+    this.isDownloading = true;
+    this.errorMessage = '';
+
+    this.peruAccountingReportService
+      .downloadReport()
+      .subscribe({
+        next: response => {
+          this.saveExcelFile(response);
+          this.isDownloading = false;
+        },
+        error: error => {
+          console.error(
+            'Error downloading the Peru accounting report:',
+            error
+          );
+
+          this.errorMessage =
+            'No fue posible descargar el reporte contable.';
+          this.toastr.error(this.errorMessage);
+          this.isDownloading = false;
+        }
+      });
+  }
+
+  private saveExcelFile(
+    response: HttpResponse<Blob>
+  ): void {
+    const file = response.body;
+
+    if (!file || file.size === 0) {
+      this.toastr.warning(
+        'El archivo generado no contiene información.'
       );
+      return;
+    }
 
-      const responseHeaders = new HttpHeaders({
-        'Content-Disposition':
-          'attachment; filename="ReporteContablePeru.xlsx"'
-      });
+    const fileName = this.getFileName(response);
+    const objectUrl = window.URL.createObjectURL(file);
+    const anchor = document.createElement('a');
 
-      service.downloadReport().subscribe(response => {
-        expect(response.body).toEqual(mockBlob);
-        expect(
-          response.headers.get('Content-Disposition')
-        ).toContain('ReporteContablePeru.xlsx');
-      });
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    anchor.click();
 
-      const request = httpMock.expectOne(`${baseUrl}/download`);
+    window.URL.revokeObjectURL(objectUrl);
 
-      expect(request.request.method).toBe('GET');
-      expect(request.request.responseType).toBe('blob');
-      expect(request.request.headers.has('correlation_id')).toBeTrue();
-      expect(request.request.headers.has('request_id')).toBeTrue();
-      expect(request.request.headers.has('_p')).toBeTrue();
-      expect(request.request.headers.get('Accept')).toBe(
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      );
+    this.toastr.success(
+      'Reporte descargado correctamente.'
+    );
+  }
 
-      request.flush(mockBlob, {
-        headers: responseHeaders,
-        status: 200,
-        statusText: 'OK'
-      });
-    });
-  });
-});
+  private getFileName(
+    response: HttpResponse<Blob>
+  ): string {
+    const contentDisposition =
+      response.headers.get('Content-Disposition');
 
-ng test --include="**/peru-accounting-report.service.spec.ts"
+    const fileNameMatch = contentDisposition?.match(
+      /filename="?([^"]+)"?/
+    );
+
+    return fileNameMatch?.[1] ??
+      'ReporteContablePeru.xlsx';
+  }
+}
