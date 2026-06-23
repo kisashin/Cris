@@ -1,53 +1,23 @@
-CardifPeruClosingRepository
+CardifPeruClosingRepositoryCustom
 
 package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifPeruClosing;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-
 /**
- * Repositorio para el cierre de movimientos Cardif Perú (legacy {@code _ext}).
+ * Fragmento personalizado del repositorio para ejecutar el procedimiento
+ * almacenado de contabilización.
  *
- * <p>La lectura del reporte se hace contra la vista {@code dbo.vw_mov_cardif_ext}.
- * El conteo de pendientes y la ejecución del procedimiento se hacen contra la
- * tabla real {@code dbo.historicomovimientos_ext}.</p>
+ * <p>El procedimiento {@code dbo.sp_contabiliza_cardif_ext} devuelve un
+ * result-set, por lo que NO puede invocarse con el patrón
+ * {@code @Modifying @Query void} (Hibernate espera un update-count y falla
+ * al recibir filas). Por eso se ejecuta vía {@code JdbcTemplate} en la
+ * implementación, que tolera tanto result-sets como update-counts.</p>
  */
-@Repository
-public interface CardifPeruClosingRepository
-        extends JpaRepository<CardifPeruClosing, Long>,
-        CardifPeruClosingRepositoryCustom {
+public interface CardifPeruClosingRepositoryCustom {
 
     /**
-     * Cuenta los movimientos pendientes por contabilizar.
-     *
-     * <p>Se conserva el doble criterio del legacy ({@code IS NULL} y cadena
-     * vacía) porque {@code Fechacontabilizacion} es {@code varchar}, no
-     * {@code datetime}; validar solo {@code IS NULL} dejaría fuera los
-     * registros con cadena vacía.</p>
-     *
-     * @return cantidad de movimientos pendientes.
+     * Ejecuta el procedimiento que contabiliza los movimientos pendientes.
+     * El result-set que devuelve el procedimiento se ignora, igual que el
+     * legacy.
      */
-    @Query(
-            value = "SELECT COUNT(1) "
-                    + "FROM dbo.historicomovimientos_ext "
-                    + "WHERE Fechacontabilizacion IS NULL "
-                    + "OR LTRIM(RTRIM(Fechacontabilizacion)) = ''",
-            nativeQuery = true)
-    long countPendingMovements();
-
-    /**
-     * Consulta todos los movimientos para generar el archivo Excel.
-     *
-     * @return registros de la vista del reporte.
-     */
-    @Query(
-            value = "SELECT * "
-                    + "FROM dbo.vw_mov_cardif_ext "
-                    + "ORDER BY IDCARVAJAL",
-            nativeQuery = true)
-    List<CardifPeruClosing> findAllForExport();
+    void executeAccountingProcedure();
 }
