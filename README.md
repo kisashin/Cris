@@ -1,23 +1,61 @@
-CardifPeruClosingRepositoryCustom
-
 package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifPeruClosing;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
 /**
- * Fragmento personalizado del repositorio para ejecutar el procedimiento
- * almacenado de contabilización.
+ * Repositorio para el cierre de movimientos Cardif Perú (legacy {@code _ext}).
  *
- * <p>El procedimiento {@code dbo.sp_contabiliza_cardif_ext} devuelve un
- * result-set, por lo que NO puede invocarse con el patrón
- * {@code @Modifying @Query void} (Hibernate espera un update-count y falla
- * al recibir filas). Por eso se ejecuta vía {@code JdbcTemplate} en la
- * implementación, que tolera tanto result-sets como update-counts.</p>
+ * <p>La lectura del reporte se hace contra la vista {@code dbo.vw_mov_cardif_ext}.
+ * El conteo de pendientes y la ejecución del procedimiento se hacen contra la
+ * tabla real {@code dbo.historicomovimientos_ext}.</p>
  */
-public interface CardifPeruClosingRepositoryCustom {
+@Repository
+public interface CardifPeruClosingRepository
+        extends JpaRepository<CardifPeruClosing, Long> {
 
     /**
-     * Ejecuta el procedimiento que contabiliza los movimientos pendientes.
-     * El result-set que devuelve el procedimiento se ignora, igual que el
-     * legacy.
+     * Cuenta los movimientos pendientes por contabilizar.
+     *
+     * <p>Se conserva el doble criterio del legacy ({@code IS NULL} y cadena
+     * vacía) porque {@code Fechacontabilizacion} es {@code varchar}, no
+     * {@code datetime}; validar solo {@code IS NULL} dejaría fuera los
+     * registros con cadena vacía.</p>
+     *
+     * @return cantidad de movimientos pendientes.
      */
+    @Query(
+            value = "SELECT COUNT(1) "
+                    + "FROM dbo.historicomovimientos_ext "
+                    + "WHERE Fechacontabilizacion IS NULL "
+                    + "OR LTRIM(RTRIM(Fechacontabilizacion)) = ''",
+            nativeQuery = true)
+    long countPendingMovements();
+
+    /**
+     * Ejecuta el procedimiento almacenado que contabiliza los movimientos
+     * pendientes. Mismo patrón que el módulo Perú ({@code generateReport}).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            value = "EXEC dbo.sp_contabiliza_cardif_ext",
+            nativeQuery = true)
     void executeAccountingProcedure();
+
+    /**
+     * Consulta todos los movimientos para generar el archivo Excel.
+     *
+     * @return registros de la vista del reporte.
+     */
+    @Query(
+            value = "SELECT * "
+                    + "FROM dbo.vw_mov_cardif_ext "
+                    + "ORDER BY IDCARVAJAL",
+            nativeQuery = true)
+    List<CardifPeruClosing> findAllForExport();
 }
