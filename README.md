@@ -1,261 +1,107 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+package co.com.bnpparibas.cardif.closingclaims.api;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.hibernate.annotations.Immutable;
-
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import java.io.Serializable;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseHeader;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
+import co.com.bnpparibas.cardif.closingclaims.domain.services.ICardifPeruClosingService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Entidad de solo lectura que representa la vista {@code dbo.vw_mov_cardif_ext}.
+ * API REST del cierre de movimientos Cardif Perú (legacy {@code _ext}).
  *
- * <p>Corresponde al reporte de movimientos de la pantalla legacy
- * "Cierre Cardif Perú" ({@code AsientoCardif_ext.aspx.vb}). No confundir con
- * el módulo {@code PeruAccountingReport}, que mapea otra tabla
- * ({@code reportecontable_peru}).</p>
- *
- * <p>La vista entrega TODAS las fechas y varios identificadores como texto
- * ({@code varchar}); por eso casi todos los campos son {@code String}. Solo
- * {@code Valordeuda}, {@code Valoraseguradototal} y {@code Vrmovimiento} son
- * {@code float} en base de datos. La llave {@code IDCARVAJAL} es {@code bigint}
- * y única por fila, por lo que se usa como identificador simple.</p>
- *
- * <p>Marcada como {@link Immutable} porque es una vista: la aplicación solo la
- * lee, nunca la escribe.</p>
+ * <p>Reemplaza la pantalla {@code AsientoCardif_ext.aspx} con dos operaciones
+ * independientes: contabilizar (botón "Genera XML") y descargar el reporte
+ * (botón "Consultar"). La descarga NO ejecuta el procedimiento.</p>
  */
-@Entity
-@Immutable
-@Table(name = "vw_mov_cardif_ext")
-@Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class CardifPeruClosing implements Serializable {
-
-    private static final long serialVersionUID = 1L;
-
-    @Id
-    @Column(name = "IDCARVAJAL")
-    private Long idCarvajal;
-
-    @Column(name = "Socio")
-    private String partner;
-
-    @Column(name = "NumeroSiniestro")
-    private String claimNumber;
-
-    @Column(name = "Nroidentificacion")
-    private String identificationNumber;
-
-    @Column(name = "Tipodocumento")
-    private String documentType;
-
-    @Column(name = "Fechanacimiento")
-    private String birthDate;
-
-    @Column(name = "Genero")
-    private String gender;
-
-    @Column(name = "Direccion")
-    private String address;
-
-    @Column(name = "Ciudad")
-    private String city;
-
-    @Column(name = "Telefono")
-    private String phone;
-
-    @Column(name = "Celular")
-    private String mobilePhone;
-
-    @Column(name = "Actividad")
-    private String activity;
-
-    @Column(name = "Nomproducto")
-    private String productName;
-
-    @Column(name = "Codproducto")
-    private String productCode;
-
-    @Column(name = "CodPlan")
-    private String planCode;
-
-    @Column(name = "Cobertura")
-    private String coverage;
-
-    @Column(name = "Ramo")
-    private String branch;
-
-    @Column(name = "Cuotasapagar")
-    private Integer installmentsToPay;
-
-    @Column(name = "Certificado")
-    private String certificate;
-
-    @Column(name = "Fechainiciovigencia")
-    private String policyStartDate;
-
-    @Column(name = "Fechaocurrencia")
-    private String occurrenceDate;
-
-    @Column(name = "Fechaavisosocio")
-    private String partnerNoticeDate;
-
-    @Column(name = "Fechaavisocardif")
-    private String cardifNoticeDate;
-
-    @Column(name = "Valordeuda")
-    private Double debtValue;
-
-    @Column(name = "Valoraseguradototal")
-    private Double totalInsuredValue;
-
-    @Column(name = "Fechasistematizacion")
-    private String systematizationDate;
-
-    @Column(name = "Fecharecepmiddle")
-    private String middleReceptionDate;
-
-    @Column(name = "Fecharecepback")
-    private String backReceptionDate;
-
-    @Column(name = "Fechaconfcartera")
-    private String portfolioConfirmationDate;
-
-    @Column(name = "Causaobjecion")
-    private String objectionReason;
-
-    @Column(name = "Fechaenviocartaobj")
-    private String objectionLetterSentDate;
-
-    @Column(name = "Causalsuspenso")
-    private String suspenseReason;
-
-    @Column(name = "Fechamovimiento")
-    private String movementDate;
-
-    @Column(name = "Vrmovimiento")
-    private Double movementValue;
-
-    @Column(name = "Beneficiariopago")
-    private String paymentBeneficiary;
-
-    @Column(name = "Pagocomercial")
-    private String commercialPayment;
-
-    @Column(name = "Fechaentregaultdocto")
-    private String lastDocumentDeliveryDate;
-
-    @Column(name = "Iddoctosoportemanutencion")
-    private String maintenanceSupportDocumentId;
-
-    @Column(name = "Codsocio")
-    private Integer partnerCode;
-
-    @Column(name = "Analista")
-    private String analyst;
-
-    @Column(name = "Nopoliza")
-    private String policyNumber;
-
-    @Column(name = "Idcardif")
-    private String cardifId;
-
-    @Column(name = "Llavesiniestro")
-    private String claimKey;
-
-    @Column(name = "Nombreasegurado")
-    private String insuredName;
-
-    @Column(name = "Edad")
-    private Integer age;
-
-    @Column(name = "Estadosiniestro")
-    private String claimStatus;
-
-    @Column(name = "Estadomayor")
-    private String majorStatus;
-
-    @Column(name = "Fechaestadosiniestro")
-    private String claimStatusDate;
-
-    @Column(name = "Tipomovimiento")
-    private String movementType;
-
-    @Column(name = "Conceptopago")
-    private String paymentConcept;
-
-    @Column(name = "Informacion")
-    private String information;
-
-    @Column(name = "Baseorigen")
-    private String sourceBase;
-
-    @Column(name = "Anomovimiento")
-    private Integer movementYear;
-
-    @Column(name = "Mesmovimiento")
-    private Integer movementMonth;
-
-    @Column(name = "Diamovimiento")
-    private Integer movementDay;
-
-    @Column(name = "Anomessist")
-    private String systemYearMonth;
-
-    @Column(name = "Anosist")
-    private Integer systemYear;
-
-    @Column(name = "Messist")
-    private Integer systemMonth;
-
-    @Column(name = "Agrupacionmov")
-    private String movementGrouping;
-
-    @Column(name = "Tipopago")
-    private String paymentType;
-
-    @Column(name = "Fechadesembolso")
-    private String disbursementDate;
-
-    @Column(name = "Clasepago")
-    private String paymentClass;
-
-    @Column(name = "Estadopagoprog")
-    private String scheduledPaymentStatus;
-
-    @Column(name = "Vrcuotaplan")
-    private String planInstallmentValue;
-
-    @Column(name = "Estadosiniestro2")
-    private String claimStatusTwo;
-
-    @Column(name = "Estadomayor2")
-    private String majorStatusTwo;
-
-    @Column(name = "Fechaestadosiniestro2")
-    private String claimStatusDateTwo;
-
-    @Column(name = "Fechaentregaultdocto2")
-    private String lastDocumentDeliveryDateTwo;
-
-    @Column(name = "Fechamovimiento2")
-    private String movementDateTwo;
-
-    @Column(name = "Fechacontabilizacion")
-    private String accountingDate;
-
-    @Column(name = "vrReaseguroRetenido")
-    private String retainedReinsuranceValue;
-
-    @Column(name = "Moneda")
-    private String currency;
+@RestController
+@RequestMapping("/v1")
+@Tag(name = "Cardif Peru Closing")
+@CrossOrigin("*")
+public class CardifPeruClosingController {
+
+    private static final String EXCEL_CONTENT_TYPE =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    private static final String FILE_NAME =
+            "ReporteMovimientosCardifPeru.xlsx";
+
+    private final ICardifPeruClosingService service;
+
+    public CardifPeruClosingController(
+            ICardifPeruClosingService service) {
+        this.service = service;
+    }
+
+    /**
+     * Ejecuta la contabilización de los movimientos pendientes.
+     */
+    @PutMapping(
+            path = "/cardif-peru-closing/generate",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ResponseModel<String>> generateAccountingEntries(
+            @RequestHeader(value = "_p", required = false)
+            String pHeader,
+            @RequestHeader(value = "correlation_id", required = false)
+            String correlationId,
+            @RequestHeader(value = "request_id", required = false)
+            String requestId) {
+
+        String result = service.generateAccountingEntries(
+                pHeader,
+                correlationId,
+                requestId);
+
+        return buildResponse(correlationId, result);
+    }
+
+    /**
+     * Descarga el reporte de movimientos en formato Excel.
+     */
+    @GetMapping(
+            path = "/cardif-peru-closing/download",
+            produces = EXCEL_CONTENT_TYPE)
+    public ResponseEntity<byte[]> downloadMovementsReport(
+            @RequestHeader(value = "_p", required = false)
+            String pHeader,
+            @RequestHeader(value = "correlation_id", required = false)
+            String correlationId,
+            @RequestHeader(value = "request_id", required = false)
+            String requestId) {
+
+        byte[] file = service.downloadMovementsReport(
+                pHeader,
+                correlationId,
+                requestId);
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + FILE_NAME + "\"")
+                .contentType(MediaType.parseMediaType(EXCEL_CONTENT_TYPE))
+                .contentLength(file.length)
+                .body(file);
+    }
+
+    private <T> ResponseEntity<ResponseModel<T>> buildResponse(
+            String correlationId,
+            T data) {
+
+        ResponseModel<T> response = new ResponseModel<>(
+                correlationId,
+                ResponseHeader.builder()
+                        .returnCode(HttpStatus.OK.value())
+                        .build(),
+                data);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
 }
