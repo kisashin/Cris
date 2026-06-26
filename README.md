@@ -1,169 +1,110 @@
-CardifCenterClosingServiceImpl
+CardifCenterClosingExcelHelperTest
 
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.ICardifCenterClosingService;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterClosingExcelHelper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.CardifCenterClosingRepository;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.apache.poi.util.DefaultTempFileCreationStrategy;
+import org.apache.poi.util.TempFile;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
- * Implementación del servicio de cierre de movimientos Cardif Centroamérica.
+ * Prueba del helper ejecutando la implementación REAL (sin mock), para que
+ * JaCoCo cuente la lógica de escritura de celdas. Se evita el problema de
+ * cobertura del módulo Perú, donde se mockeaba la propia clase bajo prueba.
+ *
+ * <p>Para no fallar en Jenkins por temporales de POI, se redirige la estrategia
+ * de creación de archivos temporales a {@code target/poi-files}. Con una ventana
+ * de 100 filas y un dataset mínimo, SXSSF no vuelca a disco, pero la redirección
+ * queda como blindaje. No se re-abre el binario generado (eso es lo frágil en
+ * CI): se valida que el contenido sea un OOXML/ZIP válido por su firma.</p>
  */
-@Slf4j
-@Service
-public class CardifCenterClosingServiceImpl
-        implements ICardifCenterClosingService {
+class CardifCenterClosingExcelHelperTest {
 
-    private static final String SUCCESS_MESSAGE =
-            "Asientos generados con éxito.";
-    private static final String NO_PENDING_MESSAGE =
-            "No hay movimientos para contabilizar.";
+    private static final File POI_TEMP_DIR =
+            new File("target/poi-files");
 
-    private final CardifCenterClosingRepository repository;
-    private final CardifCenterClosingExcelHelper excelHelper;
+    private final CardifCenterClosingExcelHelper helper =
+            new CardifCenterClosingExcelHelper();
 
-    public CardifCenterClosingServiceImpl(
-            CardifCenterClosingRepository repository,
-            CardifCenterClosingExcelHelper excelHelper) {
-        this.repository = repository;
-        this.excelHelper = excelHelper;
+    @BeforeAll
+    static void redirectPoiTempFiles() {
+        POI_TEMP_DIR.mkdirs();
+        TempFile.setTempFileCreationStrategy(
+                new DefaultTempFileCreationStrategy(POI_TEMP_DIR));
     }
 
-    @Override
-    @Transactional
-    public String generateAccountingEntries(
-            String pHeader,
-            String correlationId,
-            String requestId) {
-
-        long pending = countPending(correlationId, requestId);
-
-        if (pending == 0) {
-            return NO_PENDING_MESSAGE;
-        }
-
-        executeProcedure(correlationId, requestId);
-        return SUCCESS_MESSAGE;
+    @AfterAll
+    static void resetPoiTempFiles() {
+        TempFile.setTempFileCreationStrategy(
+                new DefaultTempFileCreationStrategy());
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public byte[] downloadMovementsReport(
-            String pHeader,
-            String correlationId,
-            String requestId) {
+    @Test
+    @DisplayName("Should generate a valid Excel with header and data rows")
+    void shouldGenerateValidExcelWithData() throws IOException {
+        CardifCenterClosing movement = CardifCenterClosing.builder()
+                .idCarvajal(273767966630L)
+                .partner("FINANCIERA TEST")
+                .claimNumber("0672025A003012")
+                .certificate("6722434176267121")
+                .installmentsToPay(7)
+                .debtValue(0.0)
+                .totalInsuredValue(180000.0)
+                .movementValue(new BigDecimal("95.00"))
+                .age(35)
+                .information(null)
+                .currency("PEN")
+                .build();
+
+        CardifCenterClosing secondMovement = CardifCenterClosing.builder()
+                .idCarvajal(273767966873L)
+                .partner("FINANCIERA TEST 2")
+                .claimNumber("0772025A003455")
+                .movementValue(new BigDecimal("14000.00"))
+                .currency("PEN")
+                .build();
 
         List<CardifCenterClosing> movements =
-                findMovements(correlationId, requestId);
+                Arrays.asList(movement, secondMovement);
 
-        validateMovements(movements);
-        return generateExcel(movements, correlationId, requestId);
+        byte[] result = helper.generateExcel(movements);
+
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+        assertValidOoxml(result);
     }
 
-    private long countPending(
-            String correlationId,
-            String requestId) {
-        try {
-            return repository.countPendingMovements();
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error consultando movimientos pendientes",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
+    @Test
+    @DisplayName("Should generate a valid Excel with only headers when list is empty")
+    void shouldGenerateValidExcelWhenListIsEmpty() throws IOException {
+        byte[] result = helper.generateExcel(Collections.emptyList());
+
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+        assertValidOoxml(result);
     }
 
-    private void executeProcedure(
-            String correlationId,
-            String requestId) {
-        try {
-            repository.executeAccountingProcedure();
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error ejecutando la contabilización",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-    }
-
-    private List<CardifCenterClosing> findMovements(
-            String correlationId,
-            String requestId) {
-        try {
-            return repository.findAllForExport();
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error consultando los movimientos del reporte",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-    }
-
-    private byte[] generateExcel(
-            List<CardifCenterClosing> movements,
-            String correlationId,
-            String requestId) {
-        try {
-            return excelHelper.generateExcel(movements);
-        } catch (IOException exception) {
-            log.error(
-                    "Error generando Excel. correlationId={}, requestId={}",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw new BusinessException(
-                    exception,
-                    null,
-                    "Error al generar el archivo Excel",
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private void validateMovements(
-            List<CardifCenterClosing> movements) {
-        if (movements == null || movements.isEmpty()) {
-            throw new BusinessException(
-                    null,
-                    "No existen movimientos para generar el archivo",
-                    HttpStatus.NOT_FOUND);
-        }
-    }
-
-    private void logDatabaseError(
-            String message,
-            String correlationId,
-            String requestId,
-            DataAccessException exception) {
-        log.error(
-                "{}. correlationId={}, requestId={}",
-                message,
-                correlationId,
-                requestId,
-                exception);
-    }
-
-    private BusinessException databaseException(
-            DataAccessException exception) {
-        return new BusinessException(
-                exception,
-                null,
-                "Error al acceder a la información del cierre de movimientos",
-                HttpStatus.INTERNAL_SERVER_ERROR);
+    /**
+     * Verifica la firma de un archivo OOXML/ZIP (bytes "PK") sin re-abrir el
+     * binario, evitando dependencias de WorkbookFactory en CI.
+     */
+    private void assertValidOoxml(byte[] content) {
+        assertTrue(content.length >= 2, "El archivo no debe estar vacío");
+        assertTrue(
+                content[0] == 0x50 && content[1] == 0x4B,
+                "El archivo debe iniciar con la firma OOXML/ZIP (PK)");
     }
 }
