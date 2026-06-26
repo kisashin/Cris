@@ -1,11 +1,8 @@
-CardifCenterClosingServiceImplTest
+CardifCenterClosingControllerTest
 
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+package co.com.bnpparibas.cardif.closingclaims.api;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterClosingExcelHelper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.CardifCenterClosingRepository;
+import co.com.bnpparibas.cardif.closingclaims.domain.services.ICardifCenterClosingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,94 +10,51 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessResourceFailureException;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.never;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class CardifCenterClosingServiceImplTest {
+class CardifCenterClosingControllerTest {
 
     private static final String P_HEADER = "test";
     private static final String CORRELATION_ID = "correlation-id";
     private static final String REQUEST_ID = "request-id";
 
     @Mock
-    private CardifCenterClosingRepository repository;
-
-    @Mock
-    private CardifCenterClosingExcelHelper excelHelper;
+    private ICardifCenterClosingService service;
 
     @InjectMocks
-    private CardifCenterClosingServiceImpl service;
+    private CardifCenterClosingController controller;
 
     @Nested
     @DisplayName("Generate accounting entries")
     class GenerateAccountingEntries {
 
         @Test
-        @DisplayName("Should execute procedure and return success when pending exist")
-        void shouldExecuteProcedureWhenPendingExist() {
-            when(repository.countPendingMovements()).thenReturn(2L);
+        @DisplayName("Should generate accounting entries successfully")
+        void shouldGenerateAccountingEntriesSuccessfully() {
+            String expectedMessage = "Asientos generados con éxito.";
 
-            String result = service.generateAccountingEntries(
+            when(service.generateAccountingEntries(
+                    P_HEADER, CORRELATION_ID, REQUEST_ID))
+                    .thenReturn(expectedMessage);
+
+            ResponseEntity<?> response =
+                    controller.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID);
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertNotNull(response.getBody());
+
+            verify(service).generateAccountingEntries(
                     P_HEADER, CORRELATION_ID, REQUEST_ID);
-
-            assertEquals("Asientos generados con éxito.", result);
-            verify(repository).countPendingMovements();
-            verify(repository).executeAccountingProcedure();
-        }
-
-        @Test
-        @DisplayName("Should not execute procedure when there are no pending")
-        void shouldNotExecuteProcedureWhenNoPending() {
-            when(repository.countPendingMovements()).thenReturn(0L);
-
-            String result = service.generateAccountingEntries(
-                    P_HEADER, CORRELATION_ID, REQUEST_ID);
-
-            assertEquals("No hay movimientos para contabilizar.", result);
-            verify(repository).countPendingMovements();
-            verify(repository, never()).executeAccountingProcedure();
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when counting fails")
-        void shouldThrowWhenCountingFails() {
-            when(repository.countPendingMovements())
-                    .thenThrow(new DataAccessResourceFailureException("DB error"));
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.generateAccountingEntries(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            verify(repository, never()).executeAccountingProcedure();
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when procedure fails")
-        void shouldThrowWhenProcedureFails() {
-            when(repository.countPendingMovements()).thenReturn(1L);
-            org.mockito.Mockito.doThrow(
-                            new DataAccessResourceFailureException("SP error"))
-                    .when(repository).executeAccountingProcedure();
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.generateAccountingEntries(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            verify(repository).executeAccountingProcedure();
         }
     }
 
@@ -109,85 +63,36 @@ class CardifCenterClosingServiceImplTest {
     class DownloadMovementsReport {
 
         @Test
-        @DisplayName("Should generate Excel successfully")
-        void shouldGenerateExcelSuccessfully() throws IOException {
-            List<CardifCenterClosing> movements =
-                    Collections.singletonList(
-                            CardifCenterClosing.builder().build());
-            byte[] expectedFile = new byte[]{1, 2, 3};
+        @DisplayName("Should download Excel report successfully")
+        void shouldDownloadExcelReportSuccessfully() {
+            byte[] expectedFile = new byte[]{1, 2, 3, 4};
 
-            when(repository.findAllForExport()).thenReturn(movements);
-            when(excelHelper.generateExcel(movements)).thenReturn(expectedFile);
+            when(service.downloadMovementsReport(
+                    P_HEADER, CORRELATION_ID, REQUEST_ID))
+                    .thenReturn(expectedFile);
 
-            byte[] result = service.downloadMovementsReport(
+            ResponseEntity<byte[]> response =
+                    controller.downloadMovementsReport(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID);
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertArrayEquals(expectedFile, response.getBody());
+
+            assertEquals(
+                    "attachment; filename=\"ReporteMovimientosCentro.xlsx\"",
+                    response.getHeaders()
+                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
+
+            assertEquals(
+                    expectedFile.length,
+                    response.getHeaders().getContentLength());
+
+            assertEquals(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    response.getHeaders().getContentType().toString());
+
+            verify(service).downloadMovementsReport(
                     P_HEADER, CORRELATION_ID, REQUEST_ID);
-
-            assertArrayEquals(expectedFile, result);
-            verify(repository).findAllForExport();
-            verify(excelHelper).generateExcel(movements);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when movement list is empty")
-        void shouldThrowWhenListIsEmpty() {
-            when(repository.findAllForExport())
-                    .thenReturn(Collections.emptyList());
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadMovementsReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verifyNoInteractions(excelHelper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when movement list is null")
-        void shouldThrowWhenListIsNull() {
-            when(repository.findAllForExport()).thenReturn(null);
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadMovementsReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verifyNoInteractions(excelHelper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when query fails")
-        void shouldThrowWhenQueryFails() {
-            when(repository.findAllForExport())
-                    .thenThrow(new DataAccessResourceFailureException("DB error"));
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadMovementsReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            verify(repository).findAllForExport();
-            verifyNoInteractions(excelHelper);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when Excel generation fails")
-        void shouldThrowWhenExcelGenerationFails() throws IOException {
-            List<CardifCenterClosing> movements =
-                    Collections.singletonList(
-                            CardifCenterClosing.builder().build());
-
-            when(repository.findAllForExport()).thenReturn(movements);
-            when(excelHelper.generateExcel(movements))
-                    .thenThrow(new IOException("Excel error"));
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadMovementsReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            verify(excelHelper).generateExcel(movements);
         }
     }
 }
