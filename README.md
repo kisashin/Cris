@@ -1,7 +1,5 @@
-EXEC sp_describe_first_result_set
-    N'SELECT * FROM dbo.vw_mov_cardif_cen', NULL, 0;
+EXEC sp_helptext 'dbo.sp_contabiliza_cardifCentro';
 
-SELECT IDCARVAJAL, COUNT(*)
-FROM dbo.vw_mov_cardif_cen
-GROUP BY IDCARVAJAL
-HAVING COUNT(*) > 1;
+SELECT name, type_name(user_type_id) AS tipo
+FROM sys.parameters
+WHERE object_id = OBJECT_ID('dbo.sp_contabiliza_cardifCentro');
