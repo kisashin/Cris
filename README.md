@@ -1,3 +1,9 @@
-_p: test
-correlation_id: 11111111-1111-1111-1111-111111111111
-request_id: 22222222-2222-2222-2222-22222222222
+@Value("${cardif.center.closing.report-filename:ReporteMovimientosCentro.xlsx}")
+private String fileName;
+
+"attachment; filename=\"" + fileName + "\"")
+
+cardif:
+  center:
+    closing:
+      report-filename: ReporteMovimientosCentro.xlsx
