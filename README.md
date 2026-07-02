@@ -1,69 +1,110 @@
-AccountingClosingCaService
+accounting-closing-ca.service.spec.ts
 
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+
+
+import { TestBed } from '@angular/core/testing';
+import {
+  HttpClientTestingModule,
+  HttpTestingController
+} from '@angular/common/http/testing';
+import { HttpHeaders } from '@angular/common/http';
 
 import { environment } from 'src/environments/environment';
+import { AccountingClosingCaService } from './accounting-closing-ca.service';
 import { INewGeneralResponse } from '../../models/new-general-response.interface';
 
-/**
- * Servicio del cierre contable Centroamérica.
- *
- * <p>Consume los endpoints del backend ws-closing-claims:
- * PUT /v1/cardif-center-closing/generate (ejecuta la contabilización) y
- * GET /v1/cardif-center-closing/download (descarga el reporte en Excel).</p>
- *
- * <p>Los headers correlation_id, request_id y _p se generan aquí porque el
- * interceptor de la aplicación no los inyecta (solo agrega UID_USER y el
- * spinner).</p>
- */
-@Injectable({
-  providedIn: 'root'
-})
-export class AccountingClosingCaService {
+describe('AccountingClosingCaService', () => {
+  let service: AccountingClosingCaService;
+  let httpMock: HttpTestingController;
 
-  private readonly baseUrl =
+  const baseUrl =
     `${environment.urlAPIClosingClaimsBackEnd}/v1/cardif-center-closing`;
 
-  private readonly correlationId = crypto.randomUUID();
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [AccountingClosingCaService]
+    });
 
-  constructor(private readonly http: HttpClient) {}
+    service = TestBed.inject(AccountingClosingCaService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
 
-  /**
-   * Ejecuta la generación de los asientos contables (procedimiento).
-   */
-  generateAccountingEntries(): Observable<INewGeneralResponse<string>> {
-    return this.http.put<INewGeneralResponse<string>>(
-      `${this.baseUrl}/generate`,
-      null,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+  afterEach(() => {
+    httpMock.verify();
+  });
 
-  /**
-   * Descarga el reporte de movimientos en formato Excel.
-   */
-  downloadMovementsReport(): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.baseUrl}/download`,
-      {
-        headers: this.createHeaders(
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
 
-  private createHeaders(accept: string): HttpHeaders {
-    return new HttpHeaders()
-      .set('correlation_id', this.correlationId)
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID())
-      .set('Accept', accept);
-  }
-}
+  describe('#generateAccountingEntries', () => {
+    it('should PUT the accounting generation request', () => {
+      const mockResponse: INewGeneralResponse<string> = {
+        correlationId: 'correlation-id',
+        responseHeader: {
+          returnCode: 200,
+          message: 'Success'
+        },
+        bodyResponse: 'Asientos generados con éxito.'
+      };
+
+      service.generateAccountingEntries().subscribe(response => {
+        expect(response).toEqual(mockResponse);
+      });
+
+      const request = httpMock.expectOne(`${baseUrl}/generate`);
+
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toBeNull();
+      expect(request.request.headers.has('correlation_id')).toBeTrue();
+      expect(request.request.headers.has('request_id')).toBeTrue();
+      expect(request.request.headers.has('_p')).toBeTrue();
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush(mockResponse);
+    });
+  });
+
+  describe('#downloadMovementsReport', () => {
+    it('should GET the Excel report as Blob', () => {
+      const mockBlob = new Blob(
+        ['excel-content'],
+        {
+          type:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      );
+
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition':
+          'attachment; filename="ReporteMovimientosCentro.xlsx"'
+      });
+
+      service.downloadMovementsReport().subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(
+          response.headers.get('Content-Disposition')
+        ).toContain('ReporteMovimientosCentro.xlsx');
+      });
+
+      const request = httpMock.expectOne(`${baseUrl}/download`);
+
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.headers.has('correlation_id')).toBeTrue();
+      expect(request.request.headers.has('request_id')).toBeTrue();
+      expect(request.request.headers.has('_p')).toBeTrue();
+      expect(request.request.headers.get('Accept')).toBe(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+
+      request.flush(mockBlob, {
+        headers: responseHeaders,
+        status: 200,
+        statusText: 'OK'
+      });
+    });
+  });
+});
