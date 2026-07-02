@@ -1,42 +1,30 @@
-CardifCenterClosingComponent
-
-import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { HttpResponse } from '@angular/common/http';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { ToastrService } from 'ngx-toastr';
 
-import { CardifCenterClosingService } from '../../services/cardif-center-closing.service';
+import { AccountingClosingCaService } from '../../services/accounting-closing-ca.service';
 
 /**
  * Pantalla "Cierre Mensual (Centroamérica)" (legacy AsientoCardifCentro.aspx).
  *
  * <p>Dos acciones independientes: generar los asientos contables (ejecuta el
  * procedimiento en el backend) y consultar/descargar el reporte de movimientos
- * en Excel. El mensaje del Toast de generación proviene del backend, no se
- * fija en el front.</p>
+ * en Excel. El mensaje del Toast de generación proviene del backend.</p>
  */
 @Component({
-  selector: 'app-cardif-center-closing',
+  selector: 'app-accounting-closing-ca',
+  imports: [],
   standalone: true,
-  imports: [
-    CommonModule,
-    MatButtonModule,
-    MatIconModule
-  ],
-  templateUrl: './cardif-center-closing.component.html',
-  styleUrl: './cardif-center-closing.component.scss'
+  templateUrl: './accounting-closing-ca.component.html',
+  styleUrl: './accounting-closing-ca.component.scss',
 })
-export class CardifCenterClosingComponent {
-
-  public errorMessage = '';
+export class AccountingClosingCAComponent {
 
   public isGenerating = false;
   public isDownloading = false;
 
   constructor(
-    private readonly cardifCenterClosingService: CardifCenterClosingService,
+    private readonly accountingClosingCaService: AccountingClosingCaService,
     private readonly toastr: ToastrService
   ) {}
 
@@ -49,9 +37,8 @@ export class CardifCenterClosingComponent {
     }
 
     this.isGenerating = true;
-    this.errorMessage = '';
 
-    this.cardifCenterClosingService
+    this.accountingClosingCaService
       .generateAccountingEntries()
       .subscribe({
         next: response => {
@@ -64,13 +51,13 @@ export class CardifCenterClosingComponent {
         },
         error: error => {
           console.error(
-            'Error generating Cardif Centro accounting entries:',
+            'Error generating Centroamerica accounting entries:',
             error
           );
 
-          this.errorMessage =
-            'No fue posible generar los asientos contables.';
-          this.toastr.error(this.errorMessage);
+          this.toastr.error(
+            'No fue posible generar los asientos contables.'
+          );
           this.isGenerating = false;
         }
       });
@@ -85,9 +72,8 @@ export class CardifCenterClosingComponent {
     }
 
     this.isDownloading = true;
-    this.errorMessage = '';
 
-    this.cardifCenterClosingService
+    this.accountingClosingCaService
       .downloadMovementsReport()
       .subscribe({
         next: response => {
@@ -96,13 +82,13 @@ export class CardifCenterClosingComponent {
         },
         error: error => {
           console.error(
-            'Error downloading the Cardif Centro movements report:',
+            'Error downloading the Centroamerica movements report:',
             error
           );
 
-          this.errorMessage =
-            'No fue posible descargar el reporte de movimientos.';
-          this.toastr.error(this.errorMessage);
+          this.toastr.error(
+            'No fue posible descargar el reporte de movimientos.'
+          );
           this.isDownloading = false;
         }
       });
