@@ -1,14 +1,69 @@
-.text-primary-color {
-    color: #006600;
-    font-family: Franklin Gothic Medium;
-}
-.container-title {
-    padding-bottom: 3rem;
-    .title {
-        font-family: Franklin Gothic Medium;
-        font-size: 14pt;
-    }
-}
-.container-report-movements{
-    padding-bottom: 6rem;
+AccountingClosingCaService
+
+import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+
+import { environment } from 'src/environments/environment';
+import { INewGeneralResponse } from '../../models/new-general-response.interface';
+
+/**
+ * Servicio del cierre contable Centroamérica.
+ *
+ * <p>Consume los endpoints del backend ws-closing-claims:
+ * PUT /v1/cardif-center-closing/generate (ejecuta la contabilización) y
+ * GET /v1/cardif-center-closing/download (descarga el reporte en Excel).</p>
+ *
+ * <p>Los headers correlation_id, request_id y _p se generan aquí porque el
+ * interceptor de la aplicación no los inyecta (solo agrega UID_USER y el
+ * spinner).</p>
+ */
+@Injectable({
+  providedIn: 'root'
+})
+export class AccountingClosingCaService {
+
+  private readonly baseUrl =
+    `${environment.urlAPIClosingClaimsBackEnd}/v1/cardif-center-closing`;
+
+  private readonly correlationId = crypto.randomUUID();
+
+  constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Ejecuta la generación de los asientos contables (procedimiento).
+   */
+  generateAccountingEntries(): Observable<INewGeneralResponse<string>> {
+    return this.http.put<INewGeneralResponse<string>>(
+      `${this.baseUrl}/generate`,
+      null,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
+
+  /**
+   * Descarga el reporte de movimientos en formato Excel.
+   */
+  downloadMovementsReport(): Observable<HttpResponse<Blob>> {
+    return this.http.get(
+      `${this.baseUrl}/download`,
+      {
+        headers: this.createHeaders(
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ),
+        observe: 'response',
+        responseType: 'blob'
+      }
+    );
+  }
+
+  private createHeaders(accept: string): HttpHeaders {
+    return new HttpHeaders()
+      .set('correlation_id', this.correlationId)
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID())
+      .set('Accept', accept);
+  }
 }
