@@ -149,3 +149,35 @@ GROUP BY perfil;
 --    usa sp_send_dbmail, pero esto confirma que el perfil existe.
 -- ---------------------------------------------------------------------
 -- SELECT name FROM msdb.dbo.sysmail_profile;
+
+
+///////////////
+
+-- ============================================================
+-- 1. BLOQUEANTE: ¿qué bases existen y hay synonyms?
+-- ============================================================
+SELECT name FROM sys.databases ORDER BY name;
+SELECT name, base_object_name FROM sys.synonyms;
+
+-- ============================================================
+-- 2. Staging real (correr en SiniestrosWp; si CardifWp existe, repetir allá)
+--    Confirma id2 identity, columna 45 (Num_planilla) y nombres con espacio final
+-- ============================================================
+EXEC sp_help 'dbo.tmpsiniestros';
+
+-- ============================================================
+-- 3. Rutas de salida del XML (enmascara 'valor' si trae usuario/clave)
+-- ============================================================
+SELECT llave, valor FROM dbo.tbl_parametros_locales;
+
+-- ============================================================
+-- 4. Plan de cuentas base + periodo activo
+-- ============================================================
+SELECT * FROM dbo.Parametro WHERE id IN (1,2,3,4);
+
+-- ============================================================
+-- 5. Destinatarios reales del correo (¿personas o lista de distribución?)
+--    y perfiles reales (apareció 'ProvProduccion')
+-- ============================================================
+SELECT Usuario, perfil, mail FROM dbo.UsuariosCierre;
+EXEC sp_helptext 'dbo.PRC_SEND_MAIL';
