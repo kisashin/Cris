@@ -1,4 +1,4 @@
-AccountingDateResponseDto
+ProductResponseDto
 
 package co.com.bnpparibas.cardif.cierres.domain.dtos;
 
@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class AccountingDateResponseDto {
-	private String accountingDate;
+public class ProductResponseDto {
+	private String product;
 }
