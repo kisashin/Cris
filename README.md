@@ -1,14 +1,21 @@
-ClaimAccountingControllerImplTest
+ClaimAccountingServiceImplTest
 
-package co.com.bnpparibas.cardif.controller.impl;
+package co.com.bnpparibas.cardif.repository.imp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.StoredProcedureQuery;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,82 +26,84 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import co.com.bnpparibas.cardif.builders.ClaimAccountingBuilder;
-import co.com.bnpparibas.cardif.cierres.api.controller.impl.ClaimAccountingControllerImpl;
-import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingDateResponseDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.SendResponseDto;
-import co.com.bnpparibas.cardif.cierres.domain.service.ClaimAccountingService;
-import co.com.bnpparibas.webservicemask.model.ws.response.BNPResponse;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
+import co.com.bnpparibas.cardif.cierres.infraestructure.repository.impl.ClaimAccountingRepositoryImpl;
 
 @ExtendWith(MockitoExtension.class)
-class ClaimAccountingControllerImplTest {
+class ClaimAccountingRepositoryImplTest {
 
 	@InjectMocks
-	private ClaimAccountingControllerImpl controller;
+	private ClaimAccountingRepositoryImpl repository;
 
 	@Mock
-	private ClaimAccountingService service;
+	private EntityManager entityManager;
+
+	@Mock
+	private StoredProcedureQuery storedProcedureQuery;
+
+	@Mock
+	private Query nativeQuery;
 
 	@BeforeEach
 	void setUp() {
 		MockitoAnnotations.initMocks(this);
 	}
 
+	/**
+	 * El test que importa: valida que las 27 columnas del modo 1 se mapean en el
+	 * orden correcto. Si alguien reordena el SELECT del SP, este test se cae ANTES
+	 * de que el error llegue a contabilidad como XML mal armado.
+	 */
 	@Test
-	void getAccountingDate_envuelveEnBNPResponse() {
-		when(service.getAccountingDate()).thenReturn(new AccountingDateResponseDto("20240630"));
+	void generateEntry_mapeaLas27ColumnasEnOrden() {
+		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
+		when(storedProcedureQuery.getResultList())
+			.thenReturn(Collections.singletonList(ClaimAccountingBuilder.entryRowMode1()));
 
-		BNPResponse response = controller.getAccountingDate();
+		List<AccountingEntryRowDto> rows =
+			repository.generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
 
-		assertEquals(200, response.getReturnCode());
-		AccountingDateResponseDto body = (AccountingDateResponseDto) response.getBodyResponse();
-		assertEquals("20240630", body.getAccountingDate());
+		assertEquals(1, rows.size());
+		AccountingEntryRowDto r = rows.get(0);
+		assertEquals("SINIE", r.getJournalType());
+		assertEquals("51144000", r.getAccountCode());
+		assertEquals("Avisos", r.getTransactionReference());
+		assertEquals("D", r.getDebitCredit());
+		assertEquals("0430", r.getProduct());
+		assertEquals("SIN-001", r.getClaimNumber());          // última posición (col 27)
+		assertEquals(0, r.getTransactionAmount().compareTo(new java.math.BigDecimal("150000")));
 	}
 
 	@Test
-	void generateEntry_delegaAlServicio() {
-		when(service.generateEntry(any(GenerateAccountingRequestDto.class)))
-			.thenReturn(Collections.emptyList());
+	@SuppressWarnings("unchecked")
+	void getProducts_devuelveLista() {
+		when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
+		when(nativeQuery.getResultList()).thenReturn(Arrays.asList("2005", "3601"));
 
-		BNPResponse response = controller.generateEntry(ClaimAccountingBuilder.generateRequest());
+		List<String> products = repository.getProducts();
 
-		assertEquals(200, response.getReturnCode());
-		assertNotNull(response);
+		assertEquals(2, products.size());
+		assertTrue(products.contains("2005"));
 	}
 
 	@Test
-	void sendEntry_devuelveOk() {
-		when(service.sendEntry(any())).thenReturn(new SendResponseDto("x.XML", "Interfaz enviada a contabilidad."));
+	void generateXml_traduceCeroAVacio() {
+		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
+		when(storedProcedureQuery.getResultList()).thenReturn(Collections.singletonList("0"));
 
-		BNPResponse response = controller.sendEntry(ClaimAccountingBuilder.sendRequest());
+		String xml = repository.generateXml("SINIE", "2024/006", "2005", ClaimAccountingBuilder.COMMENT);
 
-		SendResponseDto body = (SendResponseDto) response.getBodyResponse();
-		assertEquals("x.XML", body.getFileName());
-		assertEquals(200, response.getReturnCode());
+		assertEquals("", xml); // '0' del SP => sin asientos => cadena vacía
 	}
 
 	@Test
-	void registerEntry_noRetornaBody() {
-		BNPResponse response = controller.registerEntry(
-			(co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto)
-			toRegister(ClaimAccountingBuilder.generateRequest()));
+	void generateXml_devuelveElXml() {
+		String payload = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC/>";
+		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
+		when(storedProcedureQuery.getResultList()).thenReturn(Collections.singletonList(payload));
 
-		verify(service).registerEntry(any());
-		assertEquals(200, response.getReturnCode());
-	}
+		String xml = repository.generateXml("LRVSI", "2024/006", "2005", ClaimAccountingBuilder.COMMENT);
 
-	@Test
-	void ping_ok() {
-		BNPResponse response = controller.ping();
-		assertEquals(200, response.getReturnCode());
-	}
-
-	private co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto toRegister(
-			GenerateAccountingRequestDto g) {
-		co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto r =
-			new co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto();
-		r.setProduct(g.getProduct());
-		r.setComment(g.getComment());
-		return r;
+		assertEquals(payload, xml);
 	}
 }
