@@ -1,45 +1,64 @@
-ClaimAccountingController
+ClaimAccountingControllerImpl
 
-package co.com.bnpparibas.cardif.cierres.api.controller;
+package co.com.bnpparibas.cardif.cierres.api.controller.impl;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Controller;
+
+import co.com.bnpparibas.cardif.cierres.api.controller.ClaimAccountingController;
 import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
 import co.com.bnpparibas.cardif.cierres.api.dtos.LoadClaimRequestDto;
 import co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto;
 import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
+import co.com.bnpparibas.cardif.cierres.domain.service.ClaimAccountingService;
 import co.com.bnpparibas.webservicemask.model.ws.response.BNPResponse;
-import co.com.bnpparibas.webservicemask.ws.template.BNPWebService;
 
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
 
-/**
- * Asientos Siniestros (reaseguro). Réplica de la pantalla legacy AsientosSiniestros.aspx.
- * El botón "Enviar" emite los 3 tipos de diario (SINIE/LRVSI/CRVSI); "reaseguro" es el
- * nombre del ítem de menú, no el alcance.
- */
-@RestController
-@RequestMapping("/v1/claim-accounting")
-@CrossOrigin(origins = { "*" }, methods = { RequestMethod.POST, RequestMethod.GET })
-public interface ClaimAccountingController extends BNPWebService {
+@Controller
+@RequiredArgsConstructor
+public class ClaimAccountingControllerImpl implements ClaimAccountingController {
 
-	@GetMapping(path = "/accounting-date", produces = { "application/json" })
-	BNPResponse getAccountingDate();
+	private final ClaimAccountingService service;
 
-	@GetMapping(path = "/products", produces = { "application/json" })
-	BNPResponse getProducts();
+	@Override
+	public BNPResponse getAccountingDate() {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.getAccountingDate());
+	}
 
-	@PostMapping(path = "/load", produces = { "application/json" })
-	BNPResponse loadClaims(@Validated @RequestBody(required = true) LoadClaimRequestDto request);
+	@Override
+	public BNPResponse getProducts() {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.getProducts());
+	}
 
-	@PostMapping(path = "/generate", produces = { "application/json" })
-	BNPResponse generateEntry(@Validated @RequestBody(required = true) GenerateAccountingRequestDto request);
+	@Override
+	public BNPResponse loadClaims(LoadClaimRequestDto request) {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.loadClaims(request));
+	}
 
-	@PostMapping(path = "/register", produces = { "application/json" })
-	BNPResponse registerEntry(@Validated @RequestBody(required = true) RegisterAccountingRequestDto request);
+	@Override
+	public BNPResponse generateEntry(GenerateAccountingRequestDto request) {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.generateEntry(request));
+	}
 
-	@PostMapping(path = "/total-by-account", produces = { "application/json" })
-	BNPResponse totalByAccount(@Validated @RequestBody(required = true) GenerateAccountingRequestDto request);
+	@Override
+	public BNPResponse registerEntry(RegisterAccountingRequestDto request) {
+		service.registerEntry(request);
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), null);
+	}
 
-	@PostMapping(path = "/send", produces = { "application/json" })
-	BNPResponse sendEntry(@Validated @RequestBody(required = true) SendAccountingRequestDto request);
+	@Override
+	public BNPResponse totalByAccount(GenerateAccountingRequestDto request) {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.totalByAccount(request));
+	}
+
+	@Override
+	public BNPResponse sendEntry(SendAccountingRequestDto request) {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.sendEntry(request));
+	}
+
+	@Override
+	public BNPResponse ping() {
+		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), "OK");
+	}
 }
