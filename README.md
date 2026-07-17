@@ -1,21 +1,14 @@
-SendAccountingRequestDto
+AccountingDateResponseDto
 
-package co.com.bnpparibas.cardif.cierres.api.dtos;
+package co.com.bnpparibas.cardif.cierres.domain.dtos;
 
-import javax.validation.constraints.NotBlank;
-
-import co.com.bnpparibas.cardif.cierres.domain.util.constants.ExceptionConstants;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-public class SendAccountingRequestDto {
-
-	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
-	private String product;
-
-	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
-	private String comment;
-
-	/** TODO SAML: el usuario definitivo debe salir del contexto autenticado, no del front. */
-	private String userName;
+@NoArgsConstructor
+@AllArgsConstructor
+public class AccountingDateResponseDto {
+	private String accountingDate;
 }
