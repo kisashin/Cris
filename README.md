@@ -1,4 +1,4 @@
-LoadClaimRequestDto
+GenerateAccountingRequestDto
 
 package co.com.bnpparibas.cardif.cierres.api.dtos;
 
@@ -8,8 +8,11 @@ import co.com.bnpparibas.cardif.cierres.domain.util.constants.ExceptionConstants
 import lombok.Data;
 
 @Data
-public class LoadClaimRequestDto {
+public class GenerateAccountingRequestDto {
 
 	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
 	private String product;
+
+	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
+	private String comment;
 }
