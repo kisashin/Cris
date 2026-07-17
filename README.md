@@ -1,64 +1,33 @@
-ClaimAccountingControllerImpl
+ClaimAccountingService
 
-package co.com.bnpparibas.cardif.cierres.api.controller.impl;
+package co.com.bnpparibas.cardif.cierres.domain.service;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Controller;
+import java.util.List;
 
-import co.com.bnpparibas.cardif.cierres.api.controller.ClaimAccountingController;
 import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
 import co.com.bnpparibas.cardif.cierres.api.dtos.LoadClaimRequestDto;
 import co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto;
 import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.domain.service.ClaimAccountingService;
-import co.com.bnpparibas.webservicemask.model.ws.response.BNPResponse;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountTotalRowDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingDateResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.LoadMessageResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.ProductResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.SendResponseDto;
 
-import lombok.RequiredArgsConstructor;
+public interface ClaimAccountingService {
 
-@Controller
-@RequiredArgsConstructor
-public class ClaimAccountingControllerImpl implements ClaimAccountingController {
+	AccountingDateResponseDto getAccountingDate();
 
-	private final ClaimAccountingService service;
+	List<ProductResponseDto> getProducts();
 
-	@Override
-	public BNPResponse getAccountingDate() {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.getAccountingDate());
-	}
+	LoadMessageResponseDto loadClaims(LoadClaimRequestDto request);
 
-	@Override
-	public BNPResponse getProducts() {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.getProducts());
-	}
+	List<AccountingEntryRowDto> generateEntry(GenerateAccountingRequestDto request);
 
-	@Override
-	public BNPResponse loadClaims(LoadClaimRequestDto request) {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.loadClaims(request));
-	}
+	List<AccountTotalRowDto> totalByAccount(GenerateAccountingRequestDto request);
 
-	@Override
-	public BNPResponse generateEntry(GenerateAccountingRequestDto request) {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.generateEntry(request));
-	}
+	void registerEntry(RegisterAccountingRequestDto request);
 
-	@Override
-	public BNPResponse registerEntry(RegisterAccountingRequestDto request) {
-		service.registerEntry(request);
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), null);
-	}
-
-	@Override
-	public BNPResponse totalByAccount(GenerateAccountingRequestDto request) {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.totalByAccount(request));
-	}
-
-	@Override
-	public BNPResponse sendEntry(SendAccountingRequestDto request) {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.sendEntry(request));
-	}
-
-	@Override
-	public BNPResponse ping() {
-		return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), "OK");
-	}
+	SendResponseDto sendEntry(SendAccountingRequestDto request);
 }
