@@ -1,44 +1,51 @@
-AccountingEntryRowDto
+ClaimAccountingBuilder
 
-package co.com.bnpparibas.cardif.cierres.domain.dtos;
+package co.com.bnpparibas.cardif.builders;
 
-import java.math.BigDecimal;
+import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
+import co.com.bnpparibas.cardif.cierres.api.dtos.LoadClaimRequestDto;
+import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
 
-import lombok.Builder;
-import lombok.Data;
+public class ClaimAccountingBuilder {
 
-/**
- * sp_AsientoSiniestrosAdicionales modo 1 (Generar): 27 columnas.
- * El orden DEBE coincidir con el SELECT del SP (mapeo posicional en el RepositoryImpl).
- */
-@Data
-@Builder
-public class AccountingEntryRowDto {
-	private String journalType;          // 1  cu.tipodiario
-	private String accountingPeriod;     // 2  Periodo_contable
-	private String transactionDate;      // 3  Fecha_transaccion
-	private String accountCode;          // 4  cu.cuenta
-	private String transactionReference; // 5  REF_TRANSACCION
-	private String description;          // 6  SO.DESCRIPCION
-	private String dueDate;              // 7  Fecha_Vencimiento
-	private String currencyCode;         // 8  'COP'
-	private BigDecimal transactionAmount;// 9  Importe_Transaccion
-	private String baseAmount;           // 10 '0'
-	private String debitCredit;          // 11 cu.naturaleza
-	private String costCenter;           // 12 '99999'
-	private String product;              // 13 co.producto
-	private String branch;               // 14 co.ramo
-	private String tax;                  // 15 '99'
-	private String partner;              // 16 socio
-	private String nit;                  // 17 so.nit
-	private String advisorKey;           // 18 '9999999'
-	private String coverage;             // 19 co.cobertura
-	private String xDefine;              // 20 '0'
-	private String planId;               // 21 '99999'
-	private String journalSource;        // 22 'SSC'
-	private String format;               // 23 '1;2'
-	private String processDate;          // 24 Fecha_proceso
-	private String entryDescription;     // 25 @ComentarioAsiento
-	private String status;               // 26 'Pendiente XML'
-	private String claimNumber;          // 27 Siniestro
+	private ClaimAccountingBuilder() { }
+
+	public static final String PRODUCT = "2005";
+	public static final String COMMENT = "2005_202406";
+
+	public static LoadClaimRequestDto loadRequest() {
+		LoadClaimRequestDto r = new LoadClaimRequestDto();
+		r.setProduct(PRODUCT);
+		return r;
+	}
+
+	public static GenerateAccountingRequestDto generateRequest() {
+		GenerateAccountingRequestDto r = new GenerateAccountingRequestDto();
+		r.setProduct(PRODUCT);
+		r.setComment(COMMENT);
+		return r;
+	}
+
+	public static SendAccountingRequestDto sendRequest() {
+		SendAccountingRequestDto r = new SendAccountingRequestDto();
+		r.setProduct(PRODUCT);
+		r.setComment(COMMENT);
+		r.setUserName("AM\\bermudezma");
+		return r;
+	}
+
+	/** Fila cruda del modo 1 (27 columnas) en el orden EXACTO del SELECT del SP. */
+	public static Object[] entryRowMode1() {
+		return new Object[] {
+			"SINIE", "2024/006", "20240630", "51144000", "Avisos", "SOCIO X S.A.",
+			"30/06/2024", "COP", "150000", "0", "D", "99999", "0430", "31", "99",
+			"20", "830000000", "9999999", "99999", "0", "99999", "SSC", "1;2",
+			"20240630", COMMENT, "Pendiente XML", "SIN-001"
+		};
+	}
+
+	/** Fila cruda del modo 3 (6 columnas). */
+	public static Object[] totalRowMode3() {
+		return new Object[] { "0430", "SINIE", "Avisos", "51144000", "150000", "0" };
+	}
 }
