@@ -1,4 +1,4 @@
-RegisterAccountingRequestDto
+SendAccountingRequestDto
 
 package co.com.bnpparibas.cardif.cierres.api.dtos;
 
@@ -8,11 +8,14 @@ import co.com.bnpparibas.cardif.cierres.domain.util.constants.ExceptionConstants
 import lombok.Data;
 
 @Data
-public class RegisterAccountingRequestDto {
+public class SendAccountingRequestDto {
 
 	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
 	private String product;
 
 	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
 	private String comment;
+
+	/** TODO SAML: el usuario definitivo debe salir del contexto autenticado, no del front. */
+	private String userName;
 }
