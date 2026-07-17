@@ -1,51 +1,109 @@
-ClaimAccountingBuilder
+ClaimAccountingRepositoryImplTest
 
-package co.com.bnpparibas.cardif.builders;
+package co.com.bnpparibas.cardif.repository.imp;
 
-import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.LoadClaimRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
-public class ClaimAccountingBuilder {
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
-	private ClaimAccountingBuilder() { }
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.StoredProcedureQuery;
 
-	public static final String PRODUCT = "2005";
-	public static final String COMMENT = "2005_202406";
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-	public static LoadClaimRequestDto loadRequest() {
-		LoadClaimRequestDto r = new LoadClaimRequestDto();
-		r.setProduct(PRODUCT);
-		return r;
+import co.com.bnpparibas.cardif.builders.ClaimAccountingBuilder;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
+import co.com.bnpparibas.cardif.cierres.infraestructure.repository.impl.ClaimAccountingRepositoryImpl;
+
+@ExtendWith(MockitoExtension.class)
+class ClaimAccountingRepositoryImplTest {
+
+	@InjectMocks
+	private ClaimAccountingRepositoryImpl repository;
+
+	@Mock
+	private EntityManager entityManager;
+
+	@Mock
+	private StoredProcedureQuery storedProcedureQuery;
+
+	@Mock
+	private Query nativeQuery;
+
+	@BeforeEach
+	void setUp() {
+		MockitoAnnotations.initMocks(this);
 	}
 
-	public static GenerateAccountingRequestDto generateRequest() {
-		GenerateAccountingRequestDto r = new GenerateAccountingRequestDto();
-		r.setProduct(PRODUCT);
-		r.setComment(COMMENT);
-		return r;
+	/**
+	 * El test que importa: valida que las 27 columnas del modo 1 se mapean en el
+	 * orden correcto. Si alguien reordena el SELECT del SP, este test se cae ANTES
+	 * de que el error llegue a contabilidad como XML mal armado.
+	 */
+	@Test
+	void generateEntry_mapeaLas27ColumnasEnOrden() {
+		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
+		when(storedProcedureQuery.getResultList())
+			.thenReturn(Collections.singletonList(ClaimAccountingBuilder.entryRowMode1()));
+
+		List<AccountingEntryRowDto> rows =
+			repository.generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+
+		assertEquals(1, rows.size());
+		AccountingEntryRowDto r = rows.get(0);
+		assertEquals("SINIE", r.getJournalType());
+		assertEquals("51144000", r.getAccountCode());
+		assertEquals("Avisos", r.getTransactionReference());
+		assertEquals("D", r.getDebitCredit());
+		assertEquals("0430", r.getProduct());
+		assertEquals("SIN-001", r.getClaimNumber());          // última posición (col 27)
+		assertEquals(0, r.getTransactionAmount().compareTo(new java.math.BigDecimal("150000")));
 	}
 
-	public static SendAccountingRequestDto sendRequest() {
-		SendAccountingRequestDto r = new SendAccountingRequestDto();
-		r.setProduct(PRODUCT);
-		r.setComment(COMMENT);
-		r.setUserName("AM\\bermudezma");
-		return r;
+	@Test
+	@SuppressWarnings("unchecked")
+	void getProducts_devuelveLista() {
+		when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
+		when(nativeQuery.getResultList()).thenReturn(Arrays.asList("2005", "3601"));
+
+		List<String> products = repository.getProducts();
+
+		assertEquals(2, products.size());
+		assertTrue(products.contains("2005"));
 	}
 
-	/** Fila cruda del modo 1 (27 columnas) en el orden EXACTO del SELECT del SP. */
-	public static Object[] entryRowMode1() {
-		return new Object[] {
-			"SINIE", "2024/006", "20240630", "51144000", "Avisos", "SOCIO X S.A.",
-			"30/06/2024", "COP", "150000", "0", "D", "99999", "0430", "31", "99",
-			"20", "830000000", "9999999", "99999", "0", "99999", "SSC", "1;2",
-			"20240630", COMMENT, "Pendiente XML", "SIN-001"
-		};
+	@Test
+	void generateXml_traduceCeroAVacio() {
+		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
+		when(storedProcedureQuery.getResultList()).thenReturn(Collections.singletonList("0"));
+
+		String xml = repository.generateXml("SINIE", "2024/006", "2005", ClaimAccountingBuilder.COMMENT);
+
+		assertEquals("", xml); // '0' del SP => sin asientos => cadena vacía
 	}
 
-	/** Fila cruda del modo 3 (6 columnas). */
-	public static Object[] totalRowMode3() {
-		return new Object[] { "0430", "SINIE", "Avisos", "51144000", "150000", "0" };
+	@Test
+	void generateXml_devuelveElXml() {
+		String payload = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC/>";
+		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
+		when(storedProcedureQuery.getResultList()).thenReturn(Collections.singletonList(payload));
+
+		String xml = repository.generateXml("LRVSI", "2024/006", "2005", ClaimAccountingBuilder.COMMENT);
+
+		assertEquals(payload, xml);
 	}
 }
