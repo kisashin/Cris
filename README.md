@@ -1,4 +1,4 @@
-ProductResponseDto
+LoadMessageResponseDto
 
 package co.com.bnpparibas.cardif.cierres.domain.dtos;
 
@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductResponseDto {
-	private String product;
+public class LoadMessageResponseDto {
+	private String message;
 }
