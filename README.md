@@ -1,4 +1,4 @@
-LoadMessageResponseDto
+SendResponseDto
 
 package co.com.bnpparibas.cardif.cierres.domain.dtos;
 
@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoadMessageResponseDto {
+public class SendResponseDto {
+	private String fileName;
 	private String message;
 }
