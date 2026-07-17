@@ -1,109 +1,114 @@
-ClaimAccountingRepositoryImplTest
-
-package co.com.bnpparibas.cardif.repository.imp;
+package co.com.bnpparibas.cardif.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
-import javax.persistence.EntityManager;
-import javax.persistence.Query;
-import javax.persistence.StoredProcedureQuery;
-
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import co.com.bnpparibas.cardif.builders.ClaimAccountingBuilder;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
-import co.com.bnpparibas.cardif.cierres.infraestructure.repository.impl.ClaimAccountingRepositoryImpl;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.LoadMessageResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.SendResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.service.impl.ClaimAccountingServiceImpl;
+import co.com.bnpparibas.cardif.cierres.infraestructure.repository.ClaimAccountingRepository;
 
 @ExtendWith(MockitoExtension.class)
-class ClaimAccountingRepositoryImplTest {
+class ClaimAccountingServiceImplTest {
 
 	@InjectMocks
-	private ClaimAccountingRepositoryImpl repository;
+	private ClaimAccountingServiceImpl service;
 
 	@Mock
-	private EntityManager entityManager;
+	private ClaimAccountingRepository repository;
 
-	@Mock
-	private StoredProcedureQuery storedProcedureQuery;
-
-	@Mock
-	private Query nativeQuery;
-
-	@BeforeEach
-	void setUp() {
-		MockitoAnnotations.initMocks(this);
-	}
+	// NO va @BeforeEach con initMocks: MockitoExtension ya inicializa los mocks.
+	// Llamarlo a mano los volvia a crear y perdia los when(...).
 
 	/**
-	 * El test que importa: valida que las 27 columnas del modo 1 se mapean en el
-	 * orden correcto. Si alguien reordena el SELECT del SP, este test se cae ANTES
-	 * de que el error llegue a contabilidad como XML mal armado.
+	 * El test que evita el fallo silencioso tipo Onbase: el periodo que va al SP
+	 * DEBE quedar YYYY/0MM (cero fijo). Si sale YYYY/MM o YYYYMM, el WHERE del SP
+	 * no matchea y el XML sale vacio SIN error.
 	 */
 	@Test
-	void generateEntry_mapeaLas27ColumnasEnOrden() {
-		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
-		when(storedProcedureQuery.getResultList())
-			.thenReturn(Collections.singletonList(ClaimAccountingBuilder.entryRowMode1()));
+	void sendEntry_mesDeUnDigitoLlevaCeroYYYY00M() {
+		when(repository.getAccountingPeriodRaw()).thenReturn("2024/07/31");
+		when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
+			.thenReturn("<SSC/>");
 
-		List<AccountingEntryRowDto> rows =
-			repository.generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+		service.sendEntry(ClaimAccountingBuilder.sendRequest());
 
-		assertEquals(1, rows.size());
-		AccountingEntryRowDto r = rows.get(0);
-		assertEquals("SINIE", r.getJournalType());
-		assertEquals("51144000", r.getAccountCode());
-		assertEquals("Avisos", r.getTransactionReference());
-		assertEquals("D", r.getDebitCredit());
-		assertEquals("0430", r.getProduct());
-		assertEquals("SIN-001", r.getClaimNumber());          // última posición (col 27)
-		assertEquals(0, r.getTransactionAmount().compareTo(new java.math.BigDecimal("150000")));
+		ArgumentCaptor<String> period = ArgumentCaptor.forClass(String.class);
+		verify(repository).generateXml(eq("SINIE"), period.capture(), anyString(), anyString());
+		assertEquals("2024/007", period.getValue()); // YYYY/0MM
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
-	void getProducts_devuelveLista() {
-		when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
-		when(nativeQuery.getResultList()).thenReturn(Arrays.asList("2005", "3601"));
+	void sendEntry_mesDeDosDigitosMantieneCeroYYYY00M() {
+		when(repository.getAccountingPeriodRaw()).thenReturn("2024/12/31");
+		when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
+			.thenReturn("<SSC/>");
 
-		List<String> products = repository.getProducts();
+		service.sendEntry(ClaimAccountingBuilder.sendRequest());
 
-		assertEquals(2, products.size());
-		assertTrue(products.contains("2005"));
+		ArgumentCaptor<String> period = ArgumentCaptor.forClass(String.class);
+		verify(repository).generateXml(eq("SINIE"), period.capture(), anyString(), anyString());
+		// El legacy mete el '0' SIEMPRE: substring(1,4)+'/0'+substring(6,2) => 2024/012
+		assertEquals("2024/012", period.getValue());
 	}
 
 	@Test
-	void generateXml_traduceCeroAVacio() {
-		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
-		when(storedProcedureQuery.getResultList()).thenReturn(Collections.singletonList("0"));
+	void sendEntry_llamaLosTresTiposYMarcaEstado() {
+		when(repository.getAccountingPeriodRaw()).thenReturn("2024/07/31");
+		when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
+			.thenReturn("<SSC/>");
 
-		String xml = repository.generateXml("SINIE", "2024/006", "2005", ClaimAccountingBuilder.COMMENT);
+		SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
 
-		assertEquals("", xml); // '0' del SP => sin asientos => cadena vacía
+		assertNotNull(response.getFileName());
+		verify(repository, times(3)) // SINIE, LRVSI, CRVSI
+			.generateXml(anyString(), anyString(), anyString(), anyString());
+		verify(repository).markXmlGenerated(anyString(), anyString());
+		verify(repository).notifyByMail(anyString(), anyString(), anyString());
 	}
 
 	@Test
-	void generateXml_devuelveElXml() {
-		String payload = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC/>";
-		when(entityManager.createStoredProcedureQuery(anyString())).thenReturn(storedProcedureQuery);
-		when(storedProcedureQuery.getResultList()).thenReturn(Collections.singletonList(payload));
+	void sendEntry_sinAsientosNoNotificaNiMarca() {
+		when(repository.getAccountingPeriodRaw()).thenReturn("2024/07/31");
+		when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
+			.thenReturn(""); // todos los tipos vacios
 
-		String xml = repository.generateXml("LRVSI", "2024/006", "2005", ClaimAccountingBuilder.COMMENT);
+		SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
 
-		assertEquals(payload, xml);
+		assertEquals("No se generaron asientos para enviar.", response.getMessage());
+		verify(repository, times(0)).markXmlGenerated(anyString(), anyString());
+	}
+
+	@Test
+	void loadClaims_layoutMayorACeroUsaAlfa() {
+		when(repository.countProductLayout(anyString())).thenReturn(1);
+		when(repository.loadClaims(anyString(), eq(true))).thenReturn("10 Registros Cargados");
+
+		LoadMessageResponseDto response = service.loadClaims(ClaimAccountingBuilder.loadRequest());
+
+		assertEquals("10 Registros Cargados", response.getMessage());
+		verify(repository).loadClaims(anyString(), eq(true));
+	}
+
+	@Test
+	void getProducts_mapeaAProductResponseDto() {
+		when(repository.getProducts()).thenReturn(Collections.singletonList("2005"));
+
+		assertEquals("2005", service.getProducts().get(0).getProduct());
 	}
 }
