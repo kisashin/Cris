@@ -1,4 +1,4 @@
-ClaimAccountingServiceImplTest
+ClaimAccountingRepositoryImplTest
 
 package co.com.bnpparibas.cardif.repository.imp;
 
