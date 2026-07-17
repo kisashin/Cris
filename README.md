@@ -1,18 +1,14 @@
-AccountingEntryResponseDto
+ExcelFileResponseDto
 
 package co.com.bnpparibas.cardif.cierres.domain.dtos;
-
-import java.math.BigDecimal;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class AccountingEntryResponseDto {
+public class ExcelFileResponseDto {
 
-    private String account;
-    private String description;
-    private BigDecimal debit;
-    private BigDecimal credit;
+    private String fileName;
+    private String fileBase64;
 }
