@@ -1,15 +1,18 @@
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'tmpCargaSiniestrosAlfa';
+USE CardifWP;
+
+SELECT TABLE_SCHEMA, TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME LIKE '%Carga%'
+   OR TABLE_NAME LIKE '%Siniestro%'
+ORDER BY TABLE_NAME;
 
 SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'tmpCargaSiniestrosAlfa'
+WHERE TABLE_NAME = 'NOMBRE_REAL_AQUI'
 ORDER BY ORDINAL_POSITION;
 
 
-EXEC xp_cmdshell 'copy "\\ruta\donde\lo\tengas\326CO21SR0272026060105.csv" d:\CargueSocios\SALIDA\XML\';
-EXEC xp_cmdshell 'dir /B d:\CargueSocios\SALIDA\XML\326CO21SR027*.csv';
-
-
-EXEC dbo.sp_CargaSiniestrosAlfa 2028;
-SELECT TOP 10 * FROM CargaSiniestrosAlfa WHERE producto = 2028;
+SELECT OBJECT_NAME(object_id) AS procedimiento, definition
+FROM sys.sql_modules
+WHERE definition LIKE '%bulk insert%'
+  AND OBJECT_NAME(object_id) LIKE '%Siniestro%';
