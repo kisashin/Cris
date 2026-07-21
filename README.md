@@ -1,8 +1,15 @@
-EXEC xp_cmdshell 'dir d:\CargueSocios\Salida';
-EXEC xp_cmdshell 'dir d:\CargueSocios\Salida\XML';
-EXEC xp_cmdshell 'dir d:\CargueSocios\Entrada';
-EXEC xp_cmdshell 'dir d:\CargueSocios\Pruebas';
+SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'tmpCargaSiniestrosAlfa';
 
-EXEC sp_helptext 'dbo.sp_CargaSiniestrosAlfa';
+SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'tmpCargaSiniestrosAlfa'
+ORDER BY ORDINAL_POSITION;
 
-EXEC xp_cmdshell 'copy c:\archivo_prueba.csv d:\CargueSocios\Salida\XML\326CO21SR026prueba.csv';
+
+EXEC xp_cmdshell 'copy "\\ruta\donde\lo\tengas\326CO21SR0272026060105.csv" d:\CargueSocios\SALIDA\XML\';
+EXEC xp_cmdshell 'dir /B d:\CargueSocios\SALIDA\XML\326CO21SR027*.csv';
+
+
+EXEC dbo.sp_CargaSiniestrosAlfa 2028;
+SELECT TOP 10 * FROM CargaSiniestrosAlfa WHERE producto = 2028;
