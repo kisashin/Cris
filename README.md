@@ -1,13 +1,116 @@
-/* Tokens tomados de peru-accounting-report para mantener el mismo sistema:
-   verde #006600 (marca), hover #004d00, disabled #7aa87a,
-   Franklin Gothic Medium, uppercase en botones, error #a40000/#fdeaea. */
+<div class="accounting-entry-container">
+
+  <div class="container-title">
+    <h1 class="title">
+      ASIENTOS SINIESTROS (REASEGURO)
+    </h1>
+  </div>
+
+  <section class="generation-section">
+
+    <div class="field">
+      <span class="section-label">Fecha contable:</span>
+      <span class="text-primary-color">{{ accountingDate }}</span>
+    </div>
+
+    <div class="field">
+      <mat-form-field appearance="outline">
+        <mat-label>Producto</mat-label>
+        <mat-select
+          [(ngModel)]="selectedProduct"
+          (selectionChange)="onProductChange()">
+          <mat-option
+            *ngFor="let product of products"
+            [value]="product.product">
+            {{ product.product }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <button
+      mat-raised-button
+      type="button"
+      class="action-button"
+      [disabled]="loading"
+      (click)="loadClaims()">
+      {{ loading ? 'CARGANDO...' : 'CARGAR' }}
+    </button>
+
+  </section>
+
+  <section class="message-section" *ngIf="message">
+    <span class="message">{{ message }}</span>
+  </section>
+
+  <section class="comment-section">
+    <mat-form-field appearance="outline" class="comment-field">
+      <mat-label>Comentario del asiento</mat-label>
+      <input matInput [(ngModel)]="comment">
+    </mat-form-field>
+  </section>
+
+  <section class="actions-section">
+
+    <button
+      mat-raised-button
+      type="button"
+      class="action-button"
+      [disabled]="loading"
+      (click)="generateAccountingEntry()">
+      Generar Asiento
+    </button>
+
+    <button
+      mat-raised-button
+      type="button"
+      class="action-button"
+      [disabled]="loading"
+      (click)="registerAccountingEntry()">
+      Registrar Asiento
+    </button>
+
+    <button
+      mat-raised-button
+      type="button"
+      class="action-button"
+      [disabled]="loading"
+      (click)="getAccountSummary()">
+      Total x Cuenta
+    </button>
+
+    <button
+      mat-raised-button
+      type="button"
+      class="send-button"
+      [disabled]="loading"
+      (click)="sendAccountingEntry()">
+      Enviar
+    </button>
+
+  </section>
+
+  <section class="message-section" *ngIf="sendMessage">
+    <span class="success-message">{{ sendMessage }}</span>
+  </section>
+
+  <div class="container-table" *ngIf="dataSource.length > 0">
+    <app-report-table
+      [dataSource]="dataSource"
+      [displayedColumns]="displayedColumns">
+    </app-report-table>
+  </div>
+
+</div>
+
+
+
+
 
 .accounting-entry-container {
   width: 100%;
   padding: 1rem 0;
 }
-
-/* ---------- Título ---------- */
 
 .container-title {
   padding-bottom: 3rem;
@@ -21,8 +124,6 @@
   }
 }
 
-/* ---------- Fecha contable / producto ---------- */
-
 .generation-section {
   display: flex;
   align-items: center;
@@ -31,40 +132,26 @@
   margin-bottom: 2rem;
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-}
-
 .field {
   display: flex;
   flex-direction: column;
-  min-width: 180px;
+  justify-content: center;
 }
 
-.label,
 .section-label {
+  margin-bottom: .5rem;
   color: #006600;
   font-family: 'Franklin Gothic Medium', Arial, sans-serif;
   font-size: 14px;
   font-weight: 600;
 }
 
-.label {
-  margin-bottom: .5rem;
-}
-
-/* Valor de la fecha contable */
 .text-primary-color {
   color: #006600;
   font-family: 'Franklin Gothic Medium', Arial, sans-serif;
   font-size: 15px;
   font-weight: 600;
 }
-
-/* ---------- Comentario ---------- */
 
 .comment-section {
   margin-bottom: 2rem;
@@ -75,8 +162,6 @@
   max-width: 100%;
 }
 
-/* ---------- Botones ---------- */
-
 .actions-section {
   display: flex;
   flex-wrap: wrap;
@@ -84,20 +169,15 @@
   margin-bottom: 2rem;
 }
 
-/* Botón estándar verde (Cargar, Generar, Registrar, Total x Cuenta) */
 .action-button {
   min-height: 40px;
-  min-width: 150px;
+  min-width: 170px;
   padding: 0 1.25rem;
   color: #ffffff !important;
   background-color: #006600 !important;
   font-family: 'Franklin Gothic Medium', Arial, sans-serif;
   font-weight: 500;
   text-transform: uppercase;
-
-  mat-icon {
-    margin-right: 6px;
-  }
 
   &:hover:not(:disabled) {
     background-color: #004d00 !important;
@@ -110,11 +190,9 @@
   }
 }
 
-/* Enviar: acción final/irreversible. En el legacy iba en rojo, se conserva
-   esa señal pero con el mismo formato que los demás. */
 .send-button {
   min-height: 40px;
-  min-width: 150px;
+  min-width: 170px;
   padding: 0 1.25rem;
   color: #ffffff !important;
   background-color: #a40000 !important;
@@ -133,19 +211,16 @@
   }
 }
 
-/* ---------- Mensajes ---------- */
-
 .message-section {
   width: 100%;
   margin-bottom: 1.5rem;
 }
 
-/* Mensaje de carga / error (mismo patrón que .error-message de Perú) */
 .message {
   display: block;
   width: 100%;
   max-width: 700px;
-  margin: 0 0 1.5rem;
+  margin: 0;
   padding: 0.75rem 1rem;
   color: #a40000;
   background-color: #fdeaea;
@@ -154,12 +229,11 @@
   font-size: 13px;
 }
 
-/* Confirmación (registrado / enviado) */
 .success-message {
   display: block;
   width: 100%;
   max-width: 700px;
-  margin: 0 0 1.5rem;
+  margin: 0;
   padding: 0.75rem 1rem;
   color: #006600;
   background-color: #eaf5ea;
@@ -168,24 +242,30 @@
   font-size: 13px;
 }
 
-/* ---------- Tabla ---------- */
-/* La tabla la pinta <app-report-table> (componente compartido de
-   claims-closing). NO se estiliza aquí para no alterar los demás módulos
-   que lo usan (Aval, Cardif, Homologación, Perú...). */
-
 .container-table {
   width: 100%;
   margin-top: 2rem;
   overflow-x: auto;
 }
 
-/* ---------- Ancho uniforme de los form-field ---------- */
+::ng-deep .accounting-entry-container {
 
-::ng-deep .mat-mdc-form-field {
-  width: 250px;
+  .mat-mdc-form-field {
+    width: 250px;
+  }
+
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: #006600;
+  }
+
+  .mdc-floating-label,
+  .mat-mdc-select-arrow,
+  .mat-mdc-select-value {
+    color: #006600;
+  }
 }
-
-/* ---------- Responsive (igual que Perú) ---------- */
 
 @media (max-width: 768px) {
 
@@ -197,8 +277,7 @@
     padding-bottom: 2rem;
   }
 
-  .generation-section,
-  .row {
+  .generation-section {
     align-items: flex-start;
     flex-direction: column;
     gap: 1rem;
