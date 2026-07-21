@@ -1,10 +1,12 @@
 USE CardifWP;
 GO
 
+--exec sp_CargaSiniestrosAlfa
 ALTER PROCEDURE [dbo].[sp_CargaSiniestrosAlfa] (@Producto int=null)
 AS
 BEGIN
 declare @patron nvarchar(20)
+--select @patron=case @Producto when 2005 then '326CO21SR02' end
 select @patron=(select patron from dbo.PatronxProd_siniestros where producto = @Producto)
 
 		Declare @Archivo as nvarchar(200),@cmd nvarchar(500),@j int,@Ruta nvarchar(100),@bulk nvarchar(500);
@@ -62,7 +64,41 @@ Begin
 		update tmpCargaSiniestrosAlfa set VLR_RECLAMO=VLR_RECLAMO+'0' where substring(right(VLR_RECLAMO,2),1,1)=','
 		update tmpCargaSiniestrosAlfa set VLR_DESEMBOLSO=VLR_DESEMBOLSO+'0' where substring(right(VLR_DESEMBOLSO,2),1,1)=','
 
-		delete from CargaSiniestrosAlfa where NombreArchivo=@Archivo
+
+/*
+		update tmpCargaSiniestrosAlfa set RES_ANTERIOR=DBO.FFLOAT(RES_ANTERIOR)
+		update tmpCargaSiniestrosAlfa set avisos=DBO.FFLOAT(avisos)
+		update tmpCargaSiniestrosAlfa set PAGO_DEFINITIVO=DBO.FFLOAT(PAGO_DEFINITIVO)
+		update tmpCargaSiniestrosAlfa set SOBREPAGO=DBO.FFLOAT(SOBREPAGO)
+		update tmpCargaSiniestrosAlfa set LIBERACIONES_rebajas=DBO.FFLOAT(LIBERACIONES_rebajas)
+		update tmpCargaSiniestrosAlfa set INCREMENTOS=DBO.FFLOAT(INCREMENTOS)
+		update tmpCargaSiniestrosAlfa set CANCELACIONES_liberaciones=DBO.FFLOAT(CANCELACIONES_liberaciones)
+		update tmpCargaSiniestrosAlfa set REVERSIONES= DBO.FFLOAT(REVERSIONES)
+		update tmpCargaSiniestrosAlfa set RES_ACTUAL= DBO.FFLOAT(RES_ACTUAL)
+		update tmpCargaSiniestrosAlfa set RECUP_PAGOS= DBO.FFLOAT(RECUP_PAGOS)
+		update tmpCargaSiniestrosAlfa set VLR_RECLAMO= DBO.FFLOAT(VLR_RECLAMO)
+		update tmpCargaSiniestrosAlfa set VLR_DESEMBOLSO=DBO.FFLOAT(VLR_DESEMBOLSO)
+*/
+
+	/*
+		if (select count(*) from CargaSiniestrosAlfa where producto=@producto)>0
+		begin
+			declare @ReservaAnterior float
+			declare @ReservaActual float
+			select @ReservaAnterior=sum(RES_ACTUAL) from CargaSiniestrosAlfa where NombreArchivo=(select top 1 nombrearchivo
+						from CargaSiniestrosAlfa where producto=@producto and FechaProceso=(select max(FechaProceso)from dbo.CargaSiniestrosAlfa where producto=@producto))
+
+			select @ReservaActual=sum(DBO.FFLOAT(RES_ANTERIOR)) from tmpCargaSiniestrosAlfa
+
+			if (@ReservaActual <>@ReservaAnterior)
+				begin
+				select 'Reserva anterior no coincide en el archivo: '+@Archivo
+				return
+				end
+		end
+		*/
+
+		delete from CargaSiniestrosAlfa where NombreArchivo=@Archivo --and dbo.truncdate(fechaProceso)= dbo.truncdate(getdate())
 		insert into CargaSiniestrosAlfa
 		SELECT [NoRAMO] ,[RAMO],[SINIESTRO],[T_PAGO],[SUC] ,[SIMB],[POLIZA],[VIG] ,[ASEGURADO] ,[CC_ASEGURADO]
       ,[TOMADOR] ,DBO.FFLOAT(RES_ANTERIOR) ,DBO.FFLOAT(avisos),DBO.FFLOAT(PAGO_DEFINITIVO) ,DBO.FFLOAT(SOBREPAGO) ,DBO.FFLOAT(LIBERACIONES_rebajas) ,DBO.FFLOAT(INCREMENTOS)
