@@ -1,18 +1,10 @@
 USE CardifWP;
 
-SELECT TABLE_SCHEMA, TABLE_NAME
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_NAME LIKE '%Carga%'
-   OR TABLE_NAME LIKE '%Siniestro%'
-ORDER BY TABLE_NAME;
+SELECT 'CargueSociosSiniestros' AS objeto, OBJECT_ID('dbo.CargueSociosSiniestros') AS id
+UNION ALL
+SELECT 'configuracion_carguesocios', OBJECT_ID('dbo.configuracion_carguesocios');
 
-SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'NOMBRE_REAL_AQUI'
-ORDER BY ORDINAL_POSITION;
-
-
-SELECT OBJECT_NAME(object_id) AS procedimiento, definition
-FROM sys.sql_modules
-WHERE definition LIKE '%bulk insert%'
-  AND OBJECT_NAME(object_id) LIKE '%Siniestro%';
+SELECT producto, tipo_Archivo, MAX(idCampo) AS campos
+FROM configuracion_carguesocios
+WHERE producto IN (2011, 2012, 2014, 2020, 2028)
+GROUP BY producto, tipo_Archivo;
