@@ -1,315 +1,220 @@
-import { Component, OnInit } from '@angular/core';
-import { IMetaColumn } from '../../claims-closing/models/IMetaColumn.models';
-import { AccountingEntryService } from '../services/accounting-entry.service';
-import { AccountingProduct } from '../models/accounting-product.model';
+/* Tokens tomados de peru-accounting-report para mantener el mismo sistema:
+   verde #006600 (marca), hover #004d00, disabled #7aa87a,
+   Franklin Gothic Medium, uppercase en botones, error #a40000/#fdeaea. */
 
-@Component({
-  selector: 'app-accounting-entry',
-  standalone: false,
-  templateUrl: './accounting-entry.component.html',
-  styleUrl: './accounting-entry.component.scss'
-})
-export class AccountingEntryComponent implements OnInit {
+.accounting-entry-container {
+  width: 100%;
+  padding: 1rem 0;
+}
 
-  loading = false;
+/* ---------- Título ---------- */
 
-  accountingDate = '';
+.container-title {
+  padding-bottom: 3rem;
 
-  message = '';
+  .title {
+    margin: 0;
+    color: #006600;
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 14pt;
+    font-weight: 600;
+  }
+}
 
-  sendMessage = '';
+/* ---------- Fecha contable / producto ---------- */
 
-  comment = '';
+.generation-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
 
-  selectedProduct!: string;
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
 
-  products: AccountingProduct[] = [];
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
 
-  // Carga dos formas distintas (modo 1 = 27 col, modo 3 = 6 col) => any[]
-  dataSource: any[] = [];
+.label,
+.section-label {
+  color: #006600;
+  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
 
-  // Columnas de "Generar Asiento" (modo 1). Los field DEBEN coincidir con
-  // los nombres de AccountingEntryRowDto del back.
-  generateColumns: IMetaColumn[] = [
-    { title: 'Tipo', field: 'journalType' },
-    { title: 'Cuenta', field: 'accountCode' },
-    { title: 'Referencia', field: 'transactionReference' },
-    { title: 'Descripción', field: 'description' },
-    { title: 'D/C', field: 'debitCredit' },
-    { title: 'Importe', field: 'transactionAmount' }
-  ];
+.label {
+  margin-bottom: .5rem;
+}
 
-  // Columnas de "Total x Cuenta" (modo 3). Coinciden con AccountTotalRowDto.
-  totalColumns: IMetaColumn[] = [
-    { title: 'Producto', field: 'product' },
-    { title: 'Tipo', field: 'journalType' },
-    { title: 'Referencia', field: 'transactionReference' },
-    { title: 'Cuenta', field: 'accountCode' },
-    { title: 'Débito', field: 'debit' },
-    { title: 'Crédito', field: 'credit' }
-  ];
+/* Valor de la fecha contable */
+.text-primary-color {
+  color: #006600;
+  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
 
-  // Se cambia según el botón que se presione
-  displayedColumns: IMetaColumn[] = this.totalColumns;
+/* ---------- Comentario ---------- */
 
-  constructor(
-    private accountingEntryService: AccountingEntryService
-  ) { }
+.comment-section {
+  margin-bottom: 2rem;
+}
 
-  ngOnInit(): void {
+.comment-field {
+  width: 420px;
+  max-width: 100%;
+}
 
-    this.loadAccountingDate();
+/* ---------- Botones ---------- */
 
-    this.loadProducts();
+.actions-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
 
+/* Botón estándar verde (Cargar, Generar, Registrar, Total x Cuenta) */
+.action-button {
+  min-height: 40px;
+  min-width: 150px;
+  padding: 0 1.25rem;
+  color: #ffffff !important;
+  background-color: #006600 !important;
+  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+
+  mat-icon {
+    margin-right: 6px;
   }
 
-  /**
-   * Fecha contable
-   */
-  loadAccountingDate(): void {
-
-    this.accountingEntryService
-      .getAccountingDate()
-      .subscribe(response => {
-
-        this.accountingDate = response.bodyResponse.accountingDate;
-
-      });
-
+  &:hover:not(:disabled) {
+    background-color: #004d00 !important;
   }
 
-  /**
-   * Productos
-   */
-  loadProducts(): void {
+  &:disabled {
+    color: rgba(255, 255, 255, 0.7) !important;
+    background-color: #7aa87a !important;
+    cursor: not-allowed;
+  }
+}
 
-    this.accountingEntryService
-      .getProducts()
-      .subscribe(response => {
+/* Enviar: acción final/irreversible. En el legacy iba en rojo, se conserva
+   esa señal pero con el mismo formato que los demás. */
+.send-button {
+  min-height: 40px;
+  min-width: 150px;
+  padding: 0 1.25rem;
+  color: #ffffff !important;
+  background-color: #a40000 !important;
+  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
 
-        this.products = response.bodyResponse;
-
-        if (this.products.length > 0) {
-
-          this.selectedProduct = this.products[0].product;
-
-          this.buildComment();
-
-        }
-
-      });
-
+  &:hover:not(:disabled) {
+    background-color: #7d0000 !important;
   }
 
-  /**
-   * Cambio de producto
-   */
-  onProductChange(): void {
+  &:disabled {
+    color: rgba(255, 255, 255, 0.7) !important;
+    background-color: #c98080 !important;
+    cursor: not-allowed;
+  }
+}
 
-    this.buildComment();
+/* ---------- Mensajes ---------- */
 
-    this.dataSource = [];
+.message-section {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
 
-    this.sendMessage = '';
+/* Mensaje de carga / error (mismo patrón que .error-message de Perú) */
+.message {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  color: #a40000;
+  background-color: #fdeaea;
+  border: 1px solid #d60000;
+  border-radius: 4px;
+  font-size: 13px;
+}
 
-    this.message = '';
+/* Confirmación (registrado / enviado) */
+.success-message {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  color: #006600;
+  background-color: #eaf5ea;
+  border: 1px solid #006600;
+  border-radius: 4px;
+  font-size: 13px;
+}
 
+/* ---------- Tabla ---------- */
+/* La tabla la pinta <app-report-table> (componente compartido de
+   claims-closing). NO se estiliza aquí para no alterar los demás módulos
+   que lo usan (Aval, Cardif, Homologación, Perú...). */
+
+.container-table {
+  width: 100%;
+  margin-top: 2rem;
+  overflow-x: auto;
+}
+
+/* ---------- Ancho uniforme de los form-field ---------- */
+
+::ng-deep .mat-mdc-form-field {
+  width: 250px;
+}
+
+/* ---------- Responsive (igual que Perú) ---------- */
+
+@media (max-width: 768px) {
+
+  .accounting-entry-container {
+    padding: 1rem;
   }
 
-  /**
-   * Comentario
-   */
-  private buildComment(): void {
-
-    if (!this.accountingDate || !this.selectedProduct) {
-
-      return;
-
-    }
-
-    const period = this.accountingDate.substring(0, 6);
-
-    this.comment = `${this.selectedProduct}_${period}`;
-
+  .container-title {
+    padding-bottom: 2rem;
   }
 
-  /**
-   * Cargar
-   */
-  loadClaims(): void {
-
-    this.loading = true;
-
-    this.accountingEntryService
-      .loadClaims({
-        product: this.selectedProduct
-      })
-      .subscribe({
-
-        next: response => {
-
-          this.loading = false;
-
-          this.message = response.bodyResponse.message;
-
-          this.dataSource = [];
-
-        },
-
-        error: () => {
-
-          this.loading = false;
-
-        }
-
-      });
-
+  .generation-section,
+  .row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
   }
 
-  /**
-   * Generar asiento (modo 1)
-   */
-  generateAccountingEntry(): void {
-
-    this.loading = true;
-
-    this.accountingEntryService
-      .previewAccountingEntry({
-
-        product: this.selectedProduct,
-
-        comment: this.comment
-
-      })
-      .subscribe({
-
-        next: response => {
-
-          this.loading = false;
-
-          this.displayedColumns = this.generateColumns;
-
-          this.dataSource = response.bodyResponse;
-
-        },
-
-        error: () => {
-
-          this.loading = false;
-
-        }
-
-      });
-
+  .comment-field {
+    width: 100%;
   }
 
-  /**
-   * Registrar asiento
-   * El back /register devuelve cuerpo null: NO se lee del response, texto fijo.
-   */
-  registerAccountingEntry(): void {
-
-    this.loading = true;
-
-    this.accountingEntryService
-      .registerAccountingEntry({
-
-        product: this.selectedProduct,
-
-        comment: this.comment
-
-      })
-      .subscribe({
-
-        next: () => {
-
-          this.loading = false;
-
-          this.sendMessage = 'Asiento registrado';
-
-        },
-
-        error: () => {
-
-          this.loading = false;
-
-        }
-
-      });
-
+  .actions-section {
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  /**
-   * Total por cuenta (modo 3)
-   */
-  getAccountSummary(): void {
-
-    this.loading = true;
-
-    this.accountingEntryService
-      .getAccountSummary({
-
-        product: this.selectedProduct,
-
-        comment: this.comment
-
-      })
-      .subscribe({
-
-        next: response => {
-
-          this.loading = false;
-
-          this.displayedColumns = this.totalColumns;
-
-          this.dataSource = response.bodyResponse;
-
-        },
-
-        error: () => {
-
-          this.loading = false;
-
-        }
-
-      });
-
+  .action-button,
+  .send-button {
+    width: 100%;
   }
-
-  /**
-   * Enviar
-   */
-  sendAccountingEntry(): void {
-
-    this.loading = true;
-
-    this.accountingEntryService
-      .sendAccountingEntry({
-
-        product: this.selectedProduct,
-
-        comment: this.comment
-
-      })
-      .subscribe({
-
-        next: response => {
-
-          this.loading = false;
-
-          this.sendMessage = response.bodyResponse.message;
-
-        },
-
-        error: () => {
-
-          this.loading = false;
-
-        }
-
-      });
-
-  }
-
 }
