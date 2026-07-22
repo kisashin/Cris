@@ -1,4 +1,3 @@
-SELECT OBJECT_ID('dbo.HistoricoAsientosPru') AS tabla_local;
+SELECT name, base_object_name FROM sys.synonyms WHERE name = 'ha';
 
-DROP SYNONYM dbo.ha;
-CREATE SYNONYM dbo.ha FOR [CardifWP].[dbo].[HistoricoasientosPru];
+SELECT COUNT(*) FROM ha;
