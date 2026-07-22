@@ -1,9 +1,7 @@
-SELECT COUNT(*) FROM Socios_Prod_Siniestros WHERE producto = 2028;
-SELECT COUNT(*) FROM Cobertura_Prod_Xpln_Plz_Cnl WHERE producto = 2028;
-SELECT COUNT(*) FROM Cuentas_Contables_Prod_Siniestros WHERE tipodiario IN ('LRVSI','CRVSI','SINIE');
+SELECT DISTINCT producto FROM Cobertura_Prod_Xpln_Plz_Cnl ORDER BY producto;
 
-SELECT TOP 5 NombreArchivo, FechaProceso, COUNT(*) AS filas
-FROM CargaSiniestrosAlfa
-WHERE producto = 2028
-GROUP BY NombreArchivo, FechaProceso
-ORDER BY FechaProceso DESC;
+SELECT p.producto,
+       (SELECT COUNT(*) FROM Socios_Prod_Siniestros s WHERE s.producto = p.producto) AS socios,
+       (SELECT COUNT(*) FROM Cobertura_Prod_Xpln_Plz_Cnl c WHERE c.producto = p.producto) AS coberturas
+FROM PatronxProd_siniestros p
+WHERE p.producto IN (2011, 2012, 2014, 2020, 2028);
