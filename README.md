@@ -1,12 +1,16 @@
-SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'tmpAR'
-ORDER BY ORDINAL_POSITION;
+SELECT COUNT(*) AS total_sesiones_abiertas
+FROM sys.dm_exec_sessions
+WHERE is_user_process = 1;
 
-
-SELECT s.session_id, s.login_name, s.status, s.last_request_end_time
-FROM sys.dm_tran_session_transactions t
-JOIN sys.dm_exec_sessions s ON s.session_id = t.session_id;
-
-
-EXEC dbo.sp_AsientoSiniestrosAdicionales 2, '2012_202602', '2012';
+SELECT
+    session_id,
+    login_name,
+    host_name,
+    program_name,
+    status,
+    login_time,
+    last_request_start_time,
+    last_request_end_time
+FROM sys.dm_exec_sessions
+WHERE is_user_process = 1
+ORDER BY session_id;
