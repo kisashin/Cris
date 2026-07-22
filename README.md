@@ -1,10 +1,9 @@
-SELECT session_id, status, command, wait_type, wait_time, blocking_session_id
-FROM sys.dm_exec_requests
-WHERE session_id > 50;
+SELECT s.session_id, s.login_name, s.status, r.command, r.wait_type,
+       r.blocking_session_id, t.transaction_id
+FROM sys.dm_exec_sessions s
+LEFT JOIN sys.dm_exec_requests r ON r.session_id = s.session_id
+LEFT JOIN sys.dm_tran_session_transactions t ON t.session_id = s.session_id
+WHERE s.is_user_process = 1;
 
-SELECT DISTINCT estado FROM ha WHERE descripcion_asiento = '2012_202602';
-
-EXEC xp_cmdshell 'dir /B d:\CargueSocios\SALIDA\XML\*2012*.XML';
-
-
-SELECT * FROM UsuariosCierre;
+SELECT ORDINAL_POSITION, COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tmpAR';
