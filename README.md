@@ -1,16 +1,15 @@
-package co.com.bnpparibas.cardif.cierres.api.dtos;
+package co.com.bnpparibas.cardif.cierres.domain.dtos;
 
-import javax.validation.constraints.NotBlank;
+import java.util.List;
 
-import co.com.bnpparibas.cardif.cierres.domain.util.constants.ExceptionConstants;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-public class SendAccountingRequestDto {
-
-	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
-	private String product;
-
-	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
-	private String comment;
+@NoArgsConstructor
+@AllArgsConstructor
+public class SendResponseDto {
+	private List<String> files;
+	private String message;
 }
