@@ -1,31 +1,16 @@
-package co.com.bnpparibas.cardif.cierres.domain.service;
+package co.com.bnpparibas.cardif.cierres.api.dtos;
 
-import java.util.List;
+import javax.validation.constraints.NotBlank;
 
-import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.LoadClaimRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountTotalRowDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingDateResponseDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.LoadMessageResponseDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.ProductResponseDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.SendResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.util.constants.ExceptionConstants;
+import lombok.Data;
 
-public interface ClaimAccountingService {
+@Data
+public class SendAccountingRequestDto {
 
-	AccountingDateResponseDto getAccountingDate();
+	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
+	private String product;
 
-	List<ProductResponseDto> getProducts();
-
-	LoadMessageResponseDto loadClaims(LoadClaimRequestDto request);
-
-	List<AccountingEntryRowDto> generateEntry(GenerateAccountingRequestDto request);
-
-	List<AccountTotalRowDto> totalByAccount(GenerateAccountingRequestDto request);
-
-	void registerEntry(RegisterAccountingRequestDto request);
-
-	SendResponseDto sendEntry(SendAccountingRequestDto request);
+	@NotBlank(message = ExceptionConstants.REQUIRED_FIELD)
+	private String comment;
 }
