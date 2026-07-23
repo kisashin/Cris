@@ -1,29 +1,31 @@
-package co.com.bnpparibas.cardif.cierres.infraestructure.repository;
+package co.com.bnpparibas.cardif.cierres.domain.service;
 
 import java.util.List;
 
+import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
+import co.com.bnpparibas.cardif.cierres.api.dtos.LoadClaimRequestDto;
+import co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto;
+import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
 import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountTotalRowDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingDateResponseDto;
 import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.LoadMessageResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.ProductResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.SendResponseDto;
 
-public interface ClaimAccountingRepository {
+public interface ClaimAccountingService {
 
-	String getAccountingDate();
+	AccountingDateResponseDto getAccountingDate();
 
-	String getAccountingPeriodRaw();
+	List<ProductResponseDto> getProducts();
 
-	List<String> getProducts();
+	LoadMessageResponseDto loadClaims(LoadClaimRequestDto request);
 
-	int countProductLayout(String product);
+	List<AccountingEntryRowDto> generateEntry(GenerateAccountingRequestDto request);
 
-	String loadClaims(String product, boolean alpha);
+	List<AccountTotalRowDto> totalByAccount(GenerateAccountingRequestDto request);
 
-	List<AccountingEntryRowDto> generateEntry(String comment, String product);
+	void registerEntry(RegisterAccountingRequestDto request);
 
-	List<AccountTotalRowDto> totalByAccount(String comment, String product);
-
-	void registerEntry(String comment, String product);
-
-	void markXmlGenerated(String comment, String product);
-
-	String generateXml(String journalType, String period, String product, String comment);
+	SendResponseDto sendEntry(SendAccountingRequestDto request);
 }
