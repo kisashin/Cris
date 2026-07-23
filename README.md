@@ -1,289 +1,216 @@
-package co.com.bnpparibas.cardif.repository.imp;
+package co.com.bnpparibas.cardif.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
-import javax.persistence.EntityManager;
-import javax.persistence.Query;
-
-import org.hibernate.Session;
-import org.hibernate.jdbc.ReturningWork;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import co.com.bnpparibas.cardif.builders.ClaimAccountingBuilder;
 import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountTotalRowDto;
 import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingEntryRowDto;
-import co.com.bnpparibas.cardif.cierres.domain.util.exception.DatabaseException;
-import co.com.bnpparibas.cardif.cierres.infraestructure.repository.impl.ClaimAccountingRepositoryImpl;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.LoadMessageResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.ProductResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.SendResponseDto;
+import co.com.bnpparibas.cardif.cierres.domain.service.impl.ClaimAccountingServiceImpl;
+import co.com.bnpparibas.cardif.cierres.infraestructure.repository.ClaimAccountingRepository;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
-class ClaimAccountingRepositoryImplTest {
+class ClaimAccountingServiceImplTest {
 
     @InjectMocks
-    private ClaimAccountingRepositoryImpl repository;
+    private ClaimAccountingServiceImpl service;
 
     @Mock
-    private EntityManager entityManager;
+    private ClaimAccountingRepository repository;
 
-    @Mock
-    private Session session;
+    @Test
+    void getAccountingDate_devuelveLaFechaDelRepositorio() {
+        when(repository.getAccountingDate()).thenReturn("20260201");
 
-    @Mock
-    private Connection connection;
-
-    @Mock
-    private CallableStatement statement;
-
-    @Mock
-    private ResultSet resultSet;
-
-    @Mock
-    private ResultSetMetaData metaData;
-
-    @Mock
-    private Query query;
-
-    private void mockNativeQuery(Object singleResult, List<?> resultList) {
-        when(entityManager.createNativeQuery(anyString())).thenReturn(query);
-        when(query.setParameter(anyString(), any())).thenReturn(query);
-        when(query.getSingleResult()).thenReturn(singleResult);
-        when(query.getResultList()).thenReturn(resultList);
-    }
-
-    private void mockProcedure(Object[]... rows) throws SQLException {
-        when(entityManager.unwrap(Session.class)).thenReturn(session);
-        when(session.doReturningWork(any())).thenAnswer(invocation -> {
-            ReturningWork<?> work = invocation.getArgument(0);
-            return work.execute(connection);
-        });
-        when(connection.prepareCall(anyString())).thenReturn(statement);
-        when(statement.execute()).thenReturn(true);
-        when(statement.getResultSet()).thenReturn(resultSet);
-        when(statement.getMoreResults()).thenReturn(false);
-        when(statement.getUpdateCount()).thenReturn(-1);
-        when(resultSet.getMetaData()).thenReturn(metaData);
-
-        if (rows.length == 0) {
-            when(metaData.getColumnCount()).thenReturn(1);
-            when(resultSet.next()).thenReturn(false);
-            return;
-        }
-
-        when(metaData.getColumnCount()).thenReturn(rows[0].length);
-
-        Boolean[] remaining = new Boolean[rows.length];
-        Arrays.fill(remaining, Boolean.TRUE);
-        when(resultSet.next()).thenReturn(Boolean.TRUE, appendFalse(remaining));
-
-        when(resultSet.getObject(anyInt())).thenAnswer(invocation -> {
-            int column = invocation.getArgument(0);
-            return rows[0][column - 1];
-        });
-    }
-
-    private Boolean[] appendFalse(Boolean[] values) {
-        Boolean[] result = Arrays.copyOf(values, values.length);
-        result[values.length - 1] = Boolean.FALSE;
-        return result;
+        assertEquals("20260201", service.getAccountingDate().getAccountingDate());
     }
 
     @Test
-    void getAccountingDate_devuelveElValorDeLaFuncion() {
-        mockNativeQuery("20260201", null);
+    void getProducts_convierteCadaValorEnUnObjetoDeRespuesta() {
+        when(repository.getProducts()).thenReturn(Arrays.asList("2012", "2028"));
 
-        assertEquals("20260201", repository.getAccountingDate());
-    }
-
-    @Test
-    void getAccountingPeriodRaw_devuelveElValorConSeparador() {
-        mockNativeQuery("2026/02/01", null);
-
-        assertEquals("2026/02/01", repository.getAccountingPeriodRaw());
-    }
-
-    @Test
-    void getProducts_convierteLosValoresNumericosATexto() {
-        mockNativeQuery(null, Arrays.asList(2012, 2028));
-
-        List<String> products = repository.getProducts();
+        List<ProductResponseDto> products = service.getProducts();
 
         assertEquals(2, products.size());
-        assertTrue(products.contains("2012"));
+        assertEquals("2012", products.get(0).getProduct());
+        assertEquals("2028", products.get(1).getProduct());
     }
 
     @Test
-    void countProductLayout_devuelveElConteo() {
-        mockNativeQuery(1, null);
+    void getProducts_sinProductosDevuelveListaVacia() {
+        when(repository.getProducts()).thenReturn(Collections.emptyList());
 
-        assertEquals(1, repository.countProductLayout(ClaimAccountingBuilder.PRODUCT));
+        assertTrue(service.getProducts().isEmpty());
     }
 
     @Test
-    void loadClaims_devuelveElMensajeDelProcedimiento() throws SQLException {
-        mockProcedure(new Object[] { "119 Registros Cargados" });
+    void loadClaims_conLayoutUnoUsaLaCargaAlterna() {
+        when(repository.countProductLayout(anyString())).thenReturn(1);
+        when(repository.loadClaims(anyString(), eq(true))).thenReturn("119 Registros Cargados");
 
-        assertEquals("119 Registros Cargados",
-                repository.loadClaims(ClaimAccountingBuilder.PRODUCT, true));
+        LoadMessageResponseDto response = service.loadClaims(ClaimAccountingBuilder.loadRequest());
+
+        assertEquals("119 Registros Cargados", response.getMessage());
+        verify(repository).loadClaims(ClaimAccountingBuilder.PRODUCT, true);
     }
 
     @Test
-    void loadClaims_sinResultadoDevuelveVacio() throws SQLException {
-        mockProcedure();
+    void loadClaims_sinLayoutUnoUsaLaCargaEstandar() {
+        when(repository.countProductLayout(anyString())).thenReturn(0);
+        when(repository.loadClaims(anyString(), eq(false))).thenReturn("No hay archivo de siniestros");
 
-        assertEquals("", repository.loadClaims(ClaimAccountingBuilder.PRODUCT, false));
+        LoadMessageResponseDto response = service.loadClaims(ClaimAccountingBuilder.loadRequest());
+
+        assertEquals("No hay archivo de siniestros", response.getMessage());
+        verify(repository).loadClaims(ClaimAccountingBuilder.PRODUCT, false);
     }
 
     @Test
-    void loadClaims_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
+    void generateEntry_delegaEnElRepositorio() {
+        List<AccountingEntryRowDto> expected =
+                Collections.singletonList(AccountingEntryRowDto.builder().journalType("SINIE").build());
+        when(repository.generateEntry(anyString(), anyString())).thenReturn(expected);
 
-        assertThrows(DatabaseException.class,
-                () -> repository.loadClaims(ClaimAccountingBuilder.PRODUCT, true));
-    }
-
-    @Test
-    void generateEntry_mapeaLasVeintisieteColumnasEnOrden() throws SQLException {
-        mockProcedure(ClaimAccountingBuilder.entryRow());
-
-        List<AccountingEntryRowDto> rows =
-                repository.generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+        List<AccountingEntryRowDto> rows = service.generateEntry(ClaimAccountingBuilder.generateRequest());
 
         assertEquals(1, rows.size());
-        AccountingEntryRowDto row = rows.get(0);
-        assertEquals("SINIE", row.getJournalType());
-        assertEquals("51144000", row.getAccountCode());
-        assertEquals("Pago Definitivo", row.getTransactionReference());
-        assertEquals("D", row.getDebitCredit());
-        assertEquals("2012", row.getProduct());
-        assertEquals("SIN-001", row.getClaimNumber());
-        assertEquals(0, row.getTransactionAmount().compareTo(new java.math.BigDecimal("150000")));
+        verify(repository).generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
     }
 
     @Test
-    void generateEntry_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
+    void totalByAccount_delegaEnElRepositorio() {
+        List<AccountTotalRowDto> expected =
+                Collections.singletonList(AccountTotalRowDto.builder().product("2012").build());
+        when(repository.totalByAccount(anyString(), anyString())).thenReturn(expected);
 
-        assertThrows(DatabaseException.class,
-                () -> repository.generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT));
-    }
-
-    @Test
-    void totalByAccount_mapeaLasSeisColumnas() throws SQLException {
-        mockProcedure(ClaimAccountingBuilder.totalRow());
-
-        List<AccountTotalRowDto> rows =
-                repository.totalByAccount(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+        List<AccountTotalRowDto> rows = service.totalByAccount(ClaimAccountingBuilder.generateRequest());
 
         assertEquals(1, rows.size());
-        AccountTotalRowDto row = rows.get(0);
-        assertEquals("2012", row.getProduct());
-        assertEquals("SINIE", row.getJournalType());
-        assertEquals("51144000", row.getAccountCode());
-        assertEquals(0, row.getDebit().compareTo(new java.math.BigDecimal("150000")));
-        assertEquals(0, row.getCredit().compareTo(java.math.BigDecimal.ZERO));
+        verify(repository).totalByAccount(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
     }
 
     @Test
-    void totalByAccount_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
+    void registerEntry_delegaEnElRepositorio() {
+        service.registerEntry(ClaimAccountingBuilder.registerRequest());
 
-        assertThrows(DatabaseException.class,
-                () -> repository.totalByAccount(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT));
+        verify(repository).registerEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+    }
+
+    /**
+     * El periodo debe llevar el cero antes del mes. Un formato distinto no
+     * produce error, devuelve un XML vacio.
+     */
+    @Test
+    void sendEntry_construyeElPeriodoConElCeroAntesDelMes() {
+        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
+        when(repository.generateXml(anyString(), anyString(), anyString(), anyString())).thenReturn("<SSC/>");
+
+        service.sendEntry(ClaimAccountingBuilder.sendRequest());
+
+        ArgumentCaptor<String> period = ArgumentCaptor.forClass(String.class);
+        verify(repository).generateXml(eq("SINIE"), period.capture(), anyString(), anyString());
+        assertEquals("2026/002", period.getValue());
     }
 
     @Test
-    void registerEntry_ejecutaElProcedimiento() throws SQLException {
-        mockProcedure();
+    void sendEntry_conMesDeDosDigitosMantieneElCero() {
+        when(repository.getAccountingPeriodRaw()).thenReturn("2026/12/31");
+        when(repository.generateXml(anyString(), anyString(), anyString(), anyString())).thenReturn("<SSC/>");
 
-        repository.registerEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+        service.sendEntry(ClaimAccountingBuilder.sendRequest());
+
+        ArgumentCaptor<String> period = ArgumentCaptor.forClass(String.class);
+        verify(repository).generateXml(eq("SINIE"), period.capture(), anyString(), anyString());
+        assertEquals("2026/012", period.getValue());
     }
 
     @Test
-    void registerEntry_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
+    void sendEntry_generaLosTresTiposDeDiarioYActualizaElEstado() {
+        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
+        when(repository.generateXml(anyString(), anyString(), anyString(), anyString())).thenReturn("<SSC/>");
 
-        assertThrows(DatabaseException.class,
-                () -> repository.registerEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT));
+        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
+
+        assertEquals(3, response.getFiles().size());
+        assertEquals("Interfaz enviada a contabilidad.", response.getMessage());
+        verify(repository, times(3)).generateXml(anyString(), anyString(), anyString(), anyString());
+        verify(repository).markXmlGenerated(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
     }
 
     @Test
-    void markXmlGenerated_ejecutaElProcedimiento() throws SQLException {
-        mockProcedure();
+    void sendEntry_omiteLosTiposSinAsientos() {
+        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
+        when(repository.generateXml(eq("SINIE"), anyString(), anyString(), anyString())).thenReturn("<SSC/>");
+        when(repository.generateXml(eq("LRVSI"), anyString(), anyString(), anyString())).thenReturn("");
+        when(repository.generateXml(eq("CRVSI"), anyString(), anyString(), anyString())).thenReturn(null);
 
-        repository.markXmlGenerated(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
+
+        assertEquals(1, response.getFiles().size());
+        assertTrue(response.getFiles().get(0).contains("SINIE"));
     }
 
     @Test
-    void markXmlGenerated_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
+    void sendEntry_sinAsientosNoActualizaElEstado() {
+        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
+        when(repository.generateXml(anyString(), anyString(), anyString(), anyString())).thenReturn("");
 
-        assertThrows(DatabaseException.class,
-                () -> repository.markXmlGenerated(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT));
+        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
+
+        assertTrue(response.getFiles().isEmpty());
+        assertEquals("No se generaron asientos para enviar.", response.getMessage());
+        verify(repository, never()).markXmlGenerated(anyString(), anyString());
     }
 
     @Test
-    void generateXml_devuelveElContenido() throws SQLException {
-        String payload = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC/>";
-        mockProcedure(new Object[] { payload });
+    void sendEntry_construyeElNombreDelArchivoComoElProcedimiento() {
+        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
+        when(repository.generateXml(anyString(), anyString(), anyString(), anyString())).thenReturn("<SSC/>");
 
-        assertEquals(payload, repository.generateXml("SINIE", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
+        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
+
+        assertEquals("2012_202602SINIE_20122026.XML", response.getFiles().get(0));
     }
 
     @Test
-    void generateXml_traduceElIndicadorSinAsientosAVacio() throws SQLException {
-        mockProcedure(new Object[] { "0" });
+    void buildXmlName_recortaElComentarioYReemplazaLosEspacios() {
+        String name = service.buildXmlName("comentario muy largo de prueba", "SINIE", "2012", "2026/002");
 
-        assertEquals("", repository.generateXml("LRVSI", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
+        assertTrue(name.startsWith("comentario_muy_largo"));
+        assertTrue(name.endsWith(".XML"));
     }
 
     @Test
-    void generateXml_sinResultadoDevuelveVacio() throws SQLException {
-        mockProcedure();
+    void buildXmlName_quitaElCeroInicialDelProducto() {
+        String name = service.buildXmlName("ajuste", "SINIE", "0430", "2026/002");
 
-        assertEquals("", repository.generateXml("CRVSI", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
+        assertTrue(name.contains("430"));
     }
 
     @Test
-    void generateXml_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
+    void buildXmlName_conValoresNulosNoFalla() {
+        String name = service.buildXmlName(null, "SINIE", null, "2026/002");
 
-        assertThrows(DatabaseException.class, () -> repository.generateXml("SINIE",
-                ClaimAccountingBuilder.PERIOD, ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
-    }
-
-    @Test
-    void generateEntry_conValoresNulosDevuelveCamposNulos() throws SQLException {
-        Object[] row = new Object[27];
-        mockProcedure(row);
-
-        List<AccountingEntryRowDto> rows =
-                repository.generateEntry(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
-
-        assertNull(rows.get(0).getJournalType());
-        assertNull(rows.get(0).getTransactionAmount());
+        assertEquals("SINIE_2026.XML", name);
     }
 }
