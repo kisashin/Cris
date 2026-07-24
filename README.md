@@ -1,171 +1,81 @@
-<div>
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { of } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 
-  <div class="container-title">
+import { ReportDataComponent } from './report-data-ca.component';
+import { ReportDataService } from '../../services/report-data.service';
 
-    <h1 class="title">
-      REPORTE DE DATOS (MOVIMIENTO ONBASE CENTROAMERICA)
-    </h1>
+describe('ReportDataComponent', () => {
 
-  </div>
+  let component: ReportDataComponent;
+  let fixture: ComponentFixture<ReportDataComponent>;
 
-  <hr>
+  const reportDataServiceMock = {
+    getReportStatus: jasmine
+      .createSpy()
+      .and.returnValue(of([])),
 
-  <div class="container-generate">
+    getInconsistentCoverages: jasmine
+      .createSpy()
+      .and.returnValue(of([])),
 
-    <span class="generate-text">
-      Genere la información para el reporte de Datos y Movimientos
-    </span>
+    generateInformation: jasmine
+      .createSpy()
+      .and.returnValue(of(void 0)),
 
-    <button
-      mat-raised-button
-      color="primary"
-      type="button"
-      [disabled]="loading"
-      (click)="generateInformation()">
+    downloadDataReport: jasmine
+      .createSpy(),
 
-      GENERAR
+    downloadMovementsReport: jasmine
+      .createSpy(),
 
-    </button>
+    downloadFile: jasmine
+      .createSpy()
+  };
 
-  </div>
+  const toastrServiceMock = {
+    success: jasmine.createSpy(),
+    error: jasmine.createSpy(),
+    warning: jasmine.createSpy()
+  };
 
-  <hr>
+  beforeEach(async () => {
 
-  <div class="container-title-table">
+    await TestBed.configureTestingModule({
+      declarations: [
+        ReportDataComponent
+      ],
+      imports: [
+        NoopAnimationsModule
+      ],
+      providers: [
+        {
+          provide: ReportDataService,
+          useValue: reportDataServiceMock
+        },
+        {
+          provide: ToastrService,
+          useValue: toastrServiceMock
+        }
+      ],
+      schemas: [
+        NO_ERRORS_SCHEMA
+      ]
+    }).compileComponents();
 
-    <h2>
-      Estado del Reporte
-    </h2>
+    fixture = TestBed.createComponent(
+      ReportDataComponent
+    );
 
-  </div>
+    component = fixture.componentInstance;
 
-  <div class="container-table">
+    fixture.detectChanges();
+  });
 
-    <table
-      mat-table
-      [dataSource]="reportStatus"
-      class="report-status-table">
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
 
-      <ng-container matColumnDef="fechaproceso">
-
-        <th
-          mat-header-cell
-          *matHeaderCellDef>
-
-          Fecha Proceso
-
-        </th>
-
-        <td
-          mat-cell
-          *matCellDef="let row">
-
-          {{ row.fechaproceso | date:'dd/MM/yyyy HH:mm' }}
-
-        </td>
-
-      </ng-container>
-
-      <ng-container matColumnDef="reportes">
-
-        <th
-          mat-header-cell
-          *matHeaderCellDef>
-
-          Reportes
-
-        </th>
-
-        <td
-          mat-cell
-          *matCellDef="let row">
-
-          <button
-            mat-raised-button
-            color="primary"
-            type="button"
-            class="btn-report"
-            [disabled]="loading"
-            (click)="downloadData()">
-
-            Rpt Datos
-
-          </button>
-
-          <button
-            mat-raised-button
-            color="primary"
-            type="button"
-            class="btn-report"
-            [disabled]="loading"
-            (click)="downloadMovements()">
-
-            Rpt Movimientos
-
-          </button>
-
-        </td>
-
-      </ng-container>
-
-      <tr
-        mat-header-row
-        *matHeaderRowDef="statusColumns">
-      </tr>
-
-      <tr
-        mat-row
-        *matRowDef="let row; columns: statusColumns;">
-      </tr>
-
-    </table>
-
-  </div>
-
-  <hr>
-
-  <div class="container-title-table">
-
-    <h2>
-      Coberturas Inconsistentes
-    </h2>
-
-  </div>
-
-  <div
-    *ngIf="inconsistentCoverages.length === 0"
-    class="empty-information">
-
-    No hay registros para mostrar.
-
-  </div>
-
-  <div
-    *ngIf="inconsistentCoverages.length > 0"
-    class="container-table">
-
-    <app-report-table
-      [dataSource]="pagedInconsistentCoverages"
-      [displayedColumns]="displayedColumnsCoverage">
-    </app-report-table>
-
-    <mat-paginator
-      [length]="coverageTotalElements"
-      [pageIndex]="coveragePageIndex"
-      [pageSize]="coveragePageSize"
-      [pageSizeOptions]="[10]"
-      (page)="changeCoveragePage($event)">
-    </mat-paginator>
-
-  </div>
-
-  <div
-    class="container-loading"
-    *ngIf="loading">
-
-    <mat-spinner diameter="45">
-    </mat-spinner>
-
-  </div>
-
-</div>
+});
