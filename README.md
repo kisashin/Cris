@@ -1,219 +1,171 @@
-import { Component, OnInit } from '@angular/core';
-import { PageEvent } from '@angular/material/paginator';
-import { ToastrService } from 'ngx-toastr';
-import { finalize } from 'rxjs/operators';
+<div>
 
-import {
-  AuxiliaryPaymentsReportStatus,
-  AuxiliaryPaymentsInconsistentCoverage
-} from '../../models/report-data.model';
+  <div class="container-title">
 
-import { ReportDataService } from '../../services/report-data.service';
-import { IMetaColumn } from '../../models/IMetaColumn.models';
+    <h1 class="title">
+      REPORTE DE DATOS (MOVIMIENTO ONBASE CENTROAMERICA)
+    </h1>
 
-@Component({
-  selector: 'report-data-ca',
-  templateUrl: './report-data-ca.component.html',
-  styleUrls: ['./report-data-ca.component.scss'],
-  standalone: false
-})
-export class ReportDataComponent implements OnInit {
+  </div>
 
-  loading = false;
+  <hr>
 
-  reportStatus: AuxiliaryPaymentsReportStatus[] = [];
+  <div class="container-generate">
 
-  inconsistentCoverages: AuxiliaryPaymentsInconsistentCoverage[] = [];
+    <span class="generate-text">
+      Genere la información para el reporte de Datos y Movimientos
+    </span>
 
-  /**
-   * Columnas de la tabla Estado del Reporte.
-   */
-  statusColumns: string[] = [
-    'fechaproceso',
-    'reportes'
-  ];
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      [disabled]="loading"
+      (click)="generateInformation()">
 
-  /**
-   * Columnas de la tabla Coberturas Inconsistentes.
-   */
-  displayedColumnsCoverage: IMetaColumn[] = [
-    {
-      title: 'Llave Siniestro',
-      field: 'llavesiniestros'
-    }
-  ];
+      GENERAR
 
-  coveragePageIndex = 0;
-  coveragePageSize = 10;
-  coverageTotalElements = 0;
+    </button>
 
-  pagedInconsistentCoverages: AuxiliaryPaymentsInconsistentCoverage[] = [];
+  </div>
 
-  constructor(
-    private readonly reportDataService: ReportDataService,
-    private readonly toastr: ToastrService
-  ) { }
+  <hr>
 
-  ngOnInit(): void {
-    this.loadInformation();
-  }
+  <div class="container-title-table">
 
-  loadInformation(): void {
-    this.loading = true;
+    <h2>
+      Estado del Reporte
+    </h2>
 
-    this.loadStatus();
-    this.loadInconsistentCoverages();
-  }
+  </div>
 
-  private loadStatus(): void {
-    this.reportDataService
-      .getReportStatus()
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-        })
-      )
-      .subscribe({
-        next: response => {
-          this.reportStatus = response ?? [];
-        },
-        error: () => {
-          this.toastr.error(
-            'Error consultando estado del reporte.'
-          );
-        }
-      });
-  }
+  <div class="container-table">
 
-  private loadInconsistentCoverages(): void {
-    this.reportDataService
-      .getInconsistentCoverages()
-      .subscribe({
-        next: response => {
-          this.inconsistentCoverages = response ?? [];
-          this.coverageTotalElements =
-            this.inconsistentCoverages.length;
+    <table
+      mat-table
+      [dataSource]="reportStatus"
+      class="report-status-table">
 
-          this.coveragePageIndex = 0;
-          this.updateCoveragePage();
-        },
-        error: () => {
-          this.inconsistentCoverages = [];
-          this.coverageTotalElements = 0;
-          this.pagedInconsistentCoverages = [];
+      <ng-container matColumnDef="fechaproceso">
 
-          this.toastr.error(
-            'Error consultando coberturas inconsistentes.'
-          );
-        }
-      });
-  }
+        <th
+          mat-header-cell
+          *matHeaderCellDef>
 
-  private updateCoveragePage(): void {
-    const start =
-      this.coveragePageIndex * this.coveragePageSize;
+          Fecha Proceso
 
-    const end =
-      start + this.coveragePageSize;
+        </th>
 
-    this.pagedInconsistentCoverages =
-      this.inconsistentCoverages.slice(start, end);
-  }
+        <td
+          mat-cell
+          *matCellDef="let row">
 
-  changeCoveragePage(event: PageEvent): void {
-    this.coveragePageIndex = event.pageIndex;
-    this.coveragePageSize = event.pageSize;
+          {{ row.fechaproceso | date:'dd/MM/yyyy HH:mm' }}
 
-    this.updateCoveragePage();
-  }
+        </td>
 
-  generateInformation(): void {
-    if (this.loading) {
-      return;
-    }
+      </ng-container>
 
-    this.loading = true;
+      <ng-container matColumnDef="reportes">
 
-    this.reportDataService
-      .generateInformation()
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-        })
-      )
-      .subscribe({
-        next: () => {
-          this.toastr.success(
-            'Información generada correctamente.'
-          );
+        <th
+          mat-header-cell
+          *matHeaderCellDef>
 
-          this.loadInformation();
-        },
-        error: () => {
-          this.toastr.error(
-            'Error generando la información.'
-          );
-        }
-      });
-  }
+          Reportes
 
-  downloadData(): void {
-    if (this.loading) {
-      return;
-    }
+        </th>
 
-    this.loading = true;
+        <td
+          mat-cell
+          *matCellDef="let row">
 
-    this.reportDataService
-      .downloadDataReport()
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-        })
-      )
-      .subscribe({
-        next: response => {
-          this.reportDataService.downloadFile(response);
+          <button
+            mat-raised-button
+            color="primary"
+            type="button"
+            class="btn-report"
+            [disabled]="loading"
+            (click)="downloadData()">
 
-          this.toastr.success(
-            'Reporte de datos descargado correctamente.'
-          );
-        },
-        error: () => {
-          this.toastr.error(
-            'Error descargando el reporte de datos.'
-          );
-        }
-      });
-  }
+            Rpt Datos
 
-  downloadMovements(): void {
-    if (this.loading) {
-      return;
-    }
+          </button>
 
-    this.loading = true;
+          <button
+            mat-raised-button
+            color="primary"
+            type="button"
+            class="btn-report"
+            [disabled]="loading"
+            (click)="downloadMovements()">
 
-    this.reportDataService
-      .downloadMovementsReport()
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-        })
-      )
-      .subscribe({
-        next: response => {
-          this.reportDataService.downloadFile(response);
+            Rpt Movimientos
 
-          this.toastr.success(
-            'Reporte de movimientos descargado correctamente.'
-          );
-        },
-        error: () => {
-          this.toastr.error(
-            'Error descargando el reporte de movimientos.'
-          );
-        }
-      });
-  }
-}
+          </button>
+
+        </td>
+
+      </ng-container>
+
+      <tr
+        mat-header-row
+        *matHeaderRowDef="statusColumns">
+      </tr>
+
+      <tr
+        mat-row
+        *matRowDef="let row; columns: statusColumns;">
+      </tr>
+
+    </table>
+
+  </div>
+
+  <hr>
+
+  <div class="container-title-table">
+
+    <h2>
+      Coberturas Inconsistentes
+    </h2>
+
+  </div>
+
+  <div
+    *ngIf="inconsistentCoverages.length === 0"
+    class="empty-information">
+
+    No hay registros para mostrar.
+
+  </div>
+
+  <div
+    *ngIf="inconsistentCoverages.length > 0"
+    class="container-table">
+
+    <app-report-table
+      [dataSource]="pagedInconsistentCoverages"
+      [displayedColumns]="displayedColumnsCoverage">
+    </app-report-table>
+
+    <mat-paginator
+      [length]="coverageTotalElements"
+      [pageIndex]="coveragePageIndex"
+      [pageSize]="coveragePageSize"
+      [pageSizeOptions]="[10]"
+      (page)="changeCoveragePage($event)">
+    </mat-paginator>
+
+  </div>
+
+  <div
+    class="container-loading"
+    *ngIf="loading">
+
+    <mat-spinner diameter="45">
+    </mat-spinner>
+
+  </div>
+
+</div>
