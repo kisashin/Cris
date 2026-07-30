@@ -1,116 +1,286 @@
-ReportStoredProcedureRepository
+ReportStoredProcedureRepositoryTest
 
 package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportTabularDto;
-import org.hibernate.Session;
-import org.springframework.stereotype.Repository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 /**
- * Ejecuta los procedimientos almacenados de reportes recuperando
- * los datos y los nombres de columna del result set.
- *
- * Los nombres se toman de ResultSetMetaData, que es el equivalente
- * al DataTable.Columns que usaba el GridView del legacy con
- * AutoGenerateColumns. No se quema ningun nombre de columna.
+ * Pruebas de la lectura del result set. Se mockean las interfaces de
+ * java.sql, por lo que no se requiere base de datos, archivos
+ * temporales ni acceso a red.
  */
-@Repository
-public class ReportStoredProcedureRepository {
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class ReportStoredProcedureRepositoryTest {
 
-    /** Longitud maxima de una celda de Excel. */
-    private static final int EXCEL_MAX_CELL_LENGTH = 32767;
+    private static final String SP = "dbo.SP_Reporte_Datos_Siniestros";
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final ReportStoredProcedureRepository repository =
+            new ReportStoredProcedureRepository();
 
-    /**
-     * @param storedProcedure nombre calificado del procedimiento,
-     *                        por ejemplo dbo.SP_Reporte_Datos_Siniestros
-     * @return cabeceras y filas del primer result set del procedimiento.
-     */
-    public ReportTabularDto execute(final String storedProcedure) {
-        Session session = entityManager.unwrap(Session.class);
-        return session.doReturningWork(connection ->
-                readFirstResultSet(connection, storedProcedure));
-    }
+    /** Arma un ResultSet mockeado con las cabeceras y filas indicadas. */
+    private ResultSet mockResultSet(final String[] headers,
+                                    final String[][] rows) throws SQLException {
 
-    /**
-     * Visibilidad de paquete para permitir pruebas unitarias con
-     * mocks de java.sql, sin base de datos ni archivos temporales.
-     */
-    ReportTabularDto readFirstResultSet(final Connection connection,
-                                        final String storedProcedure)
-            throws SQLException {
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        when(metaData.getColumnCount()).thenReturn(headers.length);
 
-        try (CallableStatement statement =
-                     connection.prepareCall("{call " + storedProcedure + "}")) {
+        for (int index = 0; index < headers.length; index++) {
+            when(metaData.getColumnLabel(index + 1)).thenReturn(headers[index]);
+        }
 
-            boolean hasResultSet = statement.execute();
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getMetaData()).thenReturn(metaData);
 
-            while (true) {
-                if (hasResultSet) {
-                    try (ResultSet resultSet = statement.getResultSet()) {
-                        return map(resultSet);
-                    }
-                }
-                if (statement.getUpdateCount() == -1) {
-                    return ReportTabularDto.empty();
-                }
-                hasResultSet = statement.getMoreResults();
+        Boolean[] nextValues = new Boolean[rows.length + 1];
+        for (int index = 0; index < rows.length; index++) {
+            nextValues[index] = Boolean.TRUE;
+        }
+        nextValues[rows.length] = Boolean.FALSE;
+
+        if (rows.length == 0) {
+            when(resultSet.next()).thenReturn(false);
+        } else {
+            Boolean[] rest = new Boolean[nextValues.length - 1];
+            System.arraycopy(nextValues, 1, rest, 0, rest.length);
+            when(resultSet.next()).thenReturn(nextValues[0], rest);
+        }
+
+        for (int column = 0; column < headers.length; column++) {
+            if (rows.length == 0) {
+                continue;
             }
-        }
-    }
-
-    /** Visibilidad de paquete para permitir pruebas unitarias. */
-    ReportTabularDto map(final ResultSet resultSet) throws SQLException {
-
-        ResultSetMetaData metaData = resultSet.getMetaData();
-        int columnCount = metaData.getColumnCount();
-
-        List<String> headers = new ArrayList<>(columnCount);
-        for (int index = 1; index <= columnCount; index++) {
-            headers.add(metaData.getColumnLabel(index));
-        }
-
-        List<String[]> rows = new ArrayList<>();
-        while (resultSet.next()) {
-            String[] row = new String[columnCount];
-            for (int index = 1; index <= columnCount; index++) {
-                row[index - 1] = readAsText(resultSet, index);
+            String first = rows[0][column];
+            String[] rest = new String[rows.length - 1];
+            for (int row = 1; row < rows.length; row++) {
+                rest[row - 1] = rows[row][column];
             }
-            rows.add(row);
+            when(resultSet.getString(column + 1)).thenReturn(first, rest);
         }
 
-        return new ReportTabularDto(headers, rows);
+        return resultSet;
     }
 
-    /**
-     * Todo se lee como texto para replicar el mso-number-format:@ del
-     * legacy y evitar la corrupcion de identificadores largos como
-     * Certificado. Los procedimientos ya devuelven fechas y valores
-     * formateados con CONVERT(varchar, ..., 103) y replace('.', ',').
-     */
-    private String readAsText(final ResultSet resultSet, final int index)
-            throws SQLException {
+    // =========================
+    // MAPEO DE CABECERAS Y DATOS
+    // =========================
 
-        String value = resultSet.getString(index);
+    @Test
+    void map_shouldReadHeadersFromMetadata() throws SQLException {
 
-        if (value == null) {
-            return "";
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Llavesiniestro", "Socio", "Edad"},
+                new String[][]{{"SIN-1", "BANISTMO S.A", "43"}});
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertTrue(result.hasColumns());
+        assertEquals(3, result.getHeaders().size());
+        assertEquals("Llavesiniestro", result.getHeaders().get(0));
+        assertEquals("Socio", result.getHeaders().get(1));
+        assertEquals("Edad", result.getHeaders().get(2));
+    }
+
+    @Test
+    void map_shouldReadRows() throws SQLException {
+
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Llavesiniestro", "Socio"},
+                new String[][]{
+                        {"SIN-1", "BANISTMO S.A"},
+                        {"SIN-2", "BANISTMO S.A"}
+                });
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertEquals(2, result.getRows().size());
+        assertEquals("SIN-1", result.getRows().get(0)[0]);
+        assertEquals("SIN-2", result.getRows().get(1)[0]);
+    }
+
+    @Test
+    void map_withHeadersAndNoRows() throws SQLException {
+
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Llavesiniestro"},
+                new String[][]{});
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertTrue(result.hasColumns());
+        assertTrue(result.getRows().isEmpty());
+    }
+
+    // =========================
+    // LECTURA COMO TEXTO
+    // =========================
+
+    @Test
+    void map_shouldConvertNullToEmptyString() throws SQLException {
+
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        when(metaData.getColumnCount()).thenReturn(1);
+        when(metaData.getColumnLabel(1)).thenReturn("Distrito");
+
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getMetaData()).thenReturn(metaData);
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString(1)).thenReturn(null);
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertEquals("", result.getRows().get(0)[0]);
+    }
+
+    @Test
+    void map_shouldTruncateValuesLongerThanExcelLimit() throws SQLException {
+
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < 40000; index++) {
+            builder.append('A');
         }
-        if (value.length() > EXCEL_MAX_CELL_LENGTH) {
-            return value.substring(0, EXCEL_MAX_CELL_LENGTH);
-        }
-        return value;
+
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        when(metaData.getColumnCount()).thenReturn(1);
+        when(metaData.getColumnLabel(1)).thenReturn("Informacion");
+
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getMetaData()).thenReturn(metaData);
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString(1)).thenReturn(builder.toString());
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertEquals(32767, result.getRows().get(0)[0].length());
+    }
+
+    @Test
+    void map_shouldKeepValuesWithinExcelLimit() throws SQLException {
+
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Certificado"},
+                new String[][]{{"'8902875520925260"}});
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertEquals("'8902875520925260", result.getRows().get(0)[0]);
+    }
+
+    // =========================
+    // RECORRIDO DEL CALLABLE STATEMENT
+    // =========================
+
+    @Test
+    void readFirstResultSet_shouldReturnFirstResultSet() throws SQLException {
+
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Socio"},
+                new String[][]{{"BANISTMO S.A"}});
+
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(true);
+        when(statement.getResultSet()).thenReturn(resultSet);
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        ReportTabularDto result = repository.readFirstResultSet(connection, SP);
+
+        assertTrue(result.hasColumns());
+        assertEquals(1, result.getRows().size());
+    }
+
+    /** El procedimiento emite conteos intermedios antes del rowset real. */
+    @Test
+    void readFirstResultSet_shouldSkipIntermediateUpdateCounts() throws SQLException {
+
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Socio"},
+                new String[][]{{"BANISTMO S.A"}});
+
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(5, 3);
+        when(statement.getMoreResults()).thenReturn(false, true);
+        when(statement.getResultSet()).thenReturn(resultSet);
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        ReportTabularDto result = repository.readFirstResultSet(connection, SP);
+
+        assertTrue(result.hasColumns());
+    }
+
+    /** El procedimiento no devuelve ningun result set. */
+    @Test
+    void readFirstResultSet_shouldReturnEmptyWhenNoResultSet() throws SQLException {
+
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        ReportTabularDto result = repository.readFirstResultSet(connection, SP);
+
+        assertFalse(result.hasColumns());
+        assertTrue(result.getRows().isEmpty());
+    }
+
+    @Test
+    void readFirstResultSet_shouldBuildCallSyntax() throws SQLException {
+
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        repository.readFirstResultSet(connection, SP);
+
+        verify(connection).prepareCall("{call " + SP + "}");
+    }
+
+    @Test
+    void readFirstResultSet_shouldPropagateSqlException() throws SQLException {
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString()))
+                .thenThrow(new SQLException("fallo de conexion"));
+
+        assertThrows(SQLException.class,
+                () -> repository.readFirstResultSet(connection, SP));
+    }
+
+    // =========================
+    // DTO
+    // =========================
+
+    @Test
+    void reportTabularDto_empty() {
+
+        ReportTabularDto empty = ReportTabularDto.empty();
+
+        assertFalse(empty.hasColumns());
+        assertTrue(empty.getHeaders().isEmpty());
+        assertTrue(empty.getRows().isEmpty());
     }
 }
