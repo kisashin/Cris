@@ -1,44 +1,4 @@
-ReportTabularDto
-
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata;
-
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
-import java.util.Collections;
-import java.util.List;
-
-/**
- * Resultado tabular de un procedimiento almacenado de reportes,
- * con las cabeceras resueltas desde la metadata del result set.
- */
-@Getter
-@AllArgsConstructor
-public class ReportTabularDto {
-
-    private final List<String> headers;
-
-    private final List<String[]> rows;
-
-    public static ReportTabularDto empty() {
-        return new ReportTabularDto(
-                Collections.emptyList(),
-                Collections.emptyList());
-    }
-
-    public boolean hasColumns() {
-        return headers != null && !headers.isEmpty();
-    }
-}
-
-
-
-
-
-
-ReportStoredProcedureRepository
-
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.impl;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportTabularDto;
 import org.hibernate.Session;
@@ -74,6 +34,7 @@ public class ReportStoredProcedureRepository {
     /**
      * @param storedProcedure nombre calificado del procedimiento,
      *                        por ejemplo dbo.SP_Reporte_Datos_Siniestros
+     * @return cabeceras y filas del primer result set del procedimiento.
      */
     public ReportTabularDto execute(final String storedProcedure) {
         Session session = entityManager.unwrap(Session.class);
