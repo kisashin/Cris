@@ -1,3 +1,5 @@
+ReportStoredProcedureRepository
+
 package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportTabularDto;
