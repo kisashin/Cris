@@ -1,493 +1,286 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+ReportStoredProcedureRepositoryTest
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.KeyClaimPageDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.InconsistentCoverageResponseDto;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportFileResponseDto;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportStatusResponseDto;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportStatusPageDTO;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportTabularDto;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.FileData;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.FileDataExt;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.FileDataExtRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.FileDataRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ReportDataRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ReportStoredProcedureRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+/**
+ * Pruebas de la lectura del result set. Se mockean las interfaces de
+ * java.sql, por lo que no se requiere base de datos, archivos
+ * temporales ni acceso a red.
+ */
 @ExtendWith(MockitoExtension.class)
-class ReportDataServiceImplTest {
+@MockitoSettings(strictness = Strictness.LENIENT)
+class ReportStoredProcedureRepositoryTest {
 
-    @InjectMocks
-    private ReportDataServiceImpl reportDataService;
+    private static final String SP = "dbo.SP_Reporte_Datos_Siniestros";
 
-    @Mock
-    private FileDataRepository fileDataRepository;
+    private final ReportStoredProcedureRepository repository =
+            new ReportStoredProcedureRepository();
 
-    @Mock
-    private FileDataExtRepository fileDataExtRepository;
+    /** Arma un ResultSet mockeado con las cabeceras y filas indicadas. */
+    private ResultSet mockResultSet(final String[] headers,
+                                    final String[][] rows) throws SQLException {
 
-    @Mock
-    private ReportDataRepository reportDataRepository;
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        when(metaData.getColumnCount()).thenReturn(headers.length);
 
-    @Mock
-    private ReportStoredProcedureRepository reportStoredProcedureRepository;
+        for (int index = 0; index < headers.length; index++) {
+            when(metaData.getColumnLabel(index + 1)).thenReturn(headers[index]);
+        }
 
-    private static final String P_HEADER = "pHeaderValue";
-    private static final String CORRELATION_ID = "corr-123";
-    private static final String REQUEST_ID = "req-456";
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getMetaData()).thenReturn(metaData);
 
-    private static final String SP_DATA = "dbo.SP_Reporte_Datos_Siniestros";
-    private static final String SP_MOVEMENTS = "dbo.SP_Reporte_Movimientos_Siniestros";
+        Boolean[] nextValues = new Boolean[rows.length + 1];
+        for (int index = 0; index < rows.length; index++) {
+            nextValues[index] = Boolean.TRUE;
+        }
+        nextValues[rows.length] = Boolean.FALSE;
 
-    /** Construye un resultado tabular de prueba con cabeceras y filas. */
-    private ReportTabularDto buildTabular() {
+        if (rows.length == 0) {
+            when(resultSet.next()).thenReturn(false);
+        } else {
+            Boolean[] rest = new Boolean[nextValues.length - 1];
+            System.arraycopy(nextValues, 1, rest, 0, rest.length);
+            when(resultSet.next()).thenReturn(nextValues[0], rest);
+        }
 
-        List<String> headers = Arrays.asList("Llavesiniestro", "Socio", "Edad");
+        for (int column = 0; column < headers.length; column++) {
+            if (rows.length == 0) {
+                continue;
+            }
+            String first = rows[0][column];
+            String[] rest = new String[rows.length - 1];
+            for (int row = 1; row < rows.length; row++) {
+                rest[row - 1] = rows[row][column];
+            }
+            when(resultSet.getString(column + 1)).thenReturn(first, rest);
+        }
 
-        List<String[]> rows = new ArrayList<>();
-        rows.add(new String[]{"089102L64996162-DESEMPLEO", "BANISTMO S.A", "43"});
-        rows.add(new String[]{"089102M06622162-DESEMPLEO", "BANISTMO S.A", "53"});
-
-        return new ReportTabularDto(headers, rows);
+        return resultSet;
     }
 
     // =========================
-    // EXISTENTES
+    // MAPEO DE CABECERAS Y DATOS
     // =========================
 
     @Test
-    void getReportData() {
+    void map_shouldReadHeadersFromMetadata() throws SQLException {
 
-        FileData fileData = new FileData();
-        fileData.setId(1L);
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Llavesiniestro", "Socio", "Edad"},
+                new String[][]{{"SIN-1", "BANISTMO S.A", "43"}});
 
-        Page<FileData> page = mock(Page.class);
+        ReportTabularDto result = repository.map(resultSet);
 
-        when(page.getContent()).thenReturn(Collections.singletonList(fileData));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(3);
-        when(page.getTotalElements()).thenReturn(1L);
-
-        when(fileDataRepository.findAll((Pageable) any())).thenReturn(page);
-
-        ReportStatusPageDTO result =
-                reportDataService.getReportData("p", "ci", "rq", 1, 10);
-
-        assertNotNull(result);
+        assertTrue(result.hasColumns());
+        assertEquals(3, result.getHeaders().size());
+        assertEquals("Llavesiniestro", result.getHeaders().get(0));
+        assertEquals("Socio", result.getHeaders().get(1));
+        assertEquals("Edad", result.getHeaders().get(2));
     }
 
     @Test
-    void changeStatusFileData() {
+    void map_shouldReadRows() throws SQLException {
 
-        when(fileDataRepository.changeStatusFile()).thenReturn(1);
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Llavesiniestro", "Socio"},
+                new String[][]{
+                        {"SIN-1", "BANISTMO S.A"},
+                        {"SIN-2", "BANISTMO S.A"}
+                });
 
-        String rs = reportDataService.changeStatusFileData(
-                P_HEADER, CORRELATION_ID, REQUEST_ID);
+        ReportTabularDto result = repository.map(resultSet);
 
-        assertNotNull(rs);
+        assertEquals(2, result.getRows().size());
+        assertEquals("SIN-1", result.getRows().get(0)[0]);
+        assertEquals("SIN-2", result.getRows().get(1)[0]);
     }
 
     @Test
-    void changeStatusFileDataError() {
+    void map_withHeadersAndNoRows() throws SQLException {
 
-        when(fileDataRepository.changeStatusFile())
-                .thenThrow(new RuntimeException());
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Llavesiniestro"},
+                new String[][]{});
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> reportDataService.changeStatusFileData(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID));
+        ReportTabularDto result = repository.map(resultSet);
 
-        assertEquals(HttpStatus.PRECONDITION_FAILED, ex.getHttpStatus());
-    }
-
-    @Test
-    void getKeyClaims() {
-
-        Page<FileDataRepository.LlaveSiniestroProjection> page = mock(Page.class);
-
-        when(page.getContent()).thenReturn(Collections.emptyList());
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(3);
-        when(page.getTotalElements()).thenReturn(1L);
-
-        when(fileDataRepository.findKeyClaims(any(Pageable.class)))
-                .thenReturn(page);
-
-        KeyClaimPageDTO rs =
-                reportDataService.getKeyClaims(P_HEADER, CORRELATION_ID, REQUEST_ID, 0, 10);
-
-        assertNotNull(rs);
-    }
-
-    @Test
-    void getReportDataPeru() {
-
-        FileDataExt fileDataExt = new FileDataExt();
-        fileDataExt.setId(1L);
-
-        Page<FileDataExt> page = mock(Page.class);
-
-        when(page.getContent()).thenReturn(Collections.singletonList(fileDataExt));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(2);
-        when(page.getTotalElements()).thenReturn(1L);
-
-        when(fileDataExtRepository.findAll(any(Pageable.class)))
-                .thenReturn(page);
-
-        ReportStatusPageDTO response =
-                reportDataService.getReportData("51", CORRELATION_ID, REQUEST_ID, 0, 10);
-
-        assertNotNull(response);
-    }
-
-    @Test
-    void getReportDataWithNullPagination() {
-
-        Page<FileData> page = mock(Page.class);
-
-        when(page.getContent()).thenReturn(Collections.emptyList());
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(0);
-        when(page.getTotalElements()).thenReturn(0L);
-
-        when(fileDataRepository.findAll(any(Pageable.class)))
-                .thenReturn(page);
-
-        ReportStatusPageDTO response =
-                reportDataService.getReportData(P_HEADER, CORRELATION_ID, REQUEST_ID, null, null);
-
-        assertNotNull(response);
-        verify(fileDataRepository).findAll(any(Pageable.class));
-    }
-
-    @Test
-    void changeStatusFileDataPeru() {
-
-        when(fileDataExtRepository.changeStatusFile())
-                .thenReturn(1);
-
-        String response =
-                reportDataService.changeStatusFileData("51", CORRELATION_ID, REQUEST_ID);
-
-        assertEquals("Aceptado!! En Proceso.", response);
-
-        verify(fileDataExtRepository).changeStatusFile();
-        verify(fileDataRepository, never()).changeStatusFile();
-    }
-
-    @Test
-    void changeStatusFileDataPeruError() {
-
-        when(fileDataExtRepository.changeStatusFile())
-                .thenThrow(new RuntimeException("error"));
-
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> reportDataService.changeStatusFileData(
-                        "51", CORRELATION_ID, REQUEST_ID));
-
-        assertEquals(HttpStatus.PRECONDITION_FAILED, exception.getHttpStatus());
-    }
-
-    @Test
-    void getKeyClaimsPeru() {
-
-        FileDataExtRepository.LlaveSiniestroExtProjection projection =
-                mock(FileDataExtRepository.LlaveSiniestroExtProjection.class);
-
-        when(projection.getLlavesiniestros()).thenReturn("SIN123");
-
-        Page<FileDataExtRepository.LlaveSiniestroExtProjection> page =
-                mock(Page.class);
-
-        when(page.getContent()).thenReturn(Collections.singletonList(projection));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(1);
-        when(page.getTotalElements()).thenReturn(1L);
-
-        when(fileDataExtRepository.findKeyClaims(any(Pageable.class)))
-                .thenReturn(page);
-
-        KeyClaimPageDTO response =
-                reportDataService.getKeyClaims("51", CORRELATION_ID, REQUEST_ID, 0, 10);
-
-        assertNotNull(response);
-        assertEquals(1, response.getKeyClaimDTOS().size());
-    }
-
-    @Test
-    void getKeyClaimsShouldFilterInvalidKeys() {
-
-        FileDataRepository.LlaveSiniestroProjection valid =
-                mock(FileDataRepository.LlaveSiniestroProjection.class);
-
-        FileDataRepository.LlaveSiniestroProjection invalid =
-                mock(FileDataRepository.LlaveSiniestroProjection.class);
-
-        when(valid.getLlavesiniestros()).thenReturn("SIN123");
-        when(invalid.getLlavesiniestros()).thenReturn(".");
-
-        Page<FileDataRepository.LlaveSiniestroProjection> page =
-                mock(Page.class);
-
-        when(page.getContent()).thenReturn(Arrays.asList(valid, invalid));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(1);
-        when(page.getTotalElements()).thenReturn(2L);
-
-        when(fileDataRepository.findKeyClaims(any(Pageable.class)))
-                .thenReturn(page);
-
-        KeyClaimPageDTO response =
-                reportDataService.getKeyClaims(P_HEADER, CORRELATION_ID, REQUEST_ID, 0, 10);
-
-        assertEquals(1, response.getKeyClaimDTOS().size());
-    }
-
-    @Test
-    void getKeyClaimsShouldFilterNullValues() {
-
-        FileDataRepository.LlaveSiniestroProjection valid =
-                mock(FileDataRepository.LlaveSiniestroProjection.class);
-
-        when(valid.getLlavesiniestros()).thenReturn("SIN123");
-
-        Page<FileDataRepository.LlaveSiniestroProjection> page =
-                mock(Page.class);
-
-        when(page.getContent()).thenReturn(Arrays.asList(valid, null));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getTotalPages()).thenReturn(1);
-        when(page.getTotalElements()).thenReturn(2L);
-
-        when(fileDataRepository.findKeyClaims(any(Pageable.class)))
-                .thenReturn(page);
-
-        KeyClaimPageDTO response =
-                reportDataService.getKeyClaims(P_HEADER, CORRELATION_ID, REQUEST_ID, 0, 10);
-
-        assertEquals(1, response.getKeyClaimDTOS().size());
+        assertTrue(result.hasColumns());
+        assertTrue(result.getRows().isEmpty());
     }
 
     // =========================
-    // REPORT STATUS
+    // LECTURA COMO TEXTO
     // =========================
 
     @Test
-    void getReportStatus_empty() {
+    void map_shouldConvertNullToEmptyString() throws SQLException {
 
-        when(reportDataRepository.findAllReportStatus())
-                .thenReturn(Collections.emptyList());
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        when(metaData.getColumnCount()).thenReturn(1);
+        when(metaData.getColumnLabel(1)).thenReturn("Distrito");
 
-        List<ReportStatusResponseDto> result =
-                reportDataService.getReportStatus();
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getMetaData()).thenReturn(metaData);
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString(1)).thenReturn(null);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertEquals("", result.getRows().get(0)[0]);
     }
 
     @Test
-    void getReportStatus_null() {
+    void map_shouldTruncateValuesLongerThanExcelLimit() throws SQLException {
 
-        when(reportDataRepository.findAllReportStatus())
-                .thenReturn(null);
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < 40000; index++) {
+            builder.append('A');
+        }
 
-        List<ReportStatusResponseDto> result =
-                reportDataService.getReportStatus();
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        when(metaData.getColumnCount()).thenReturn(1);
+        when(metaData.getColumnLabel(1)).thenReturn("Informacion");
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getMetaData()).thenReturn(metaData);
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString(1)).thenReturn(builder.toString());
+
+        ReportTabularDto result = repository.map(resultSet);
+
+        assertEquals(32767, result.getRows().get(0)[0].length());
     }
 
     @Test
-    void getReportStatus_success() {
+    void map_shouldKeepValuesWithinExcelLimit() throws SQLException {
 
-        ReportDataRepository.ReportStatusProjection projection =
-                mock(ReportDataRepository.ReportStatusProjection.class);
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Certificado"},
+                new String[][]{{"'8902875520925260"}});
 
-        when(projection.getId()).thenReturn(1);
-        when(projection.getFechaproceso()).thenReturn(LocalDateTime.now());
-        when(projection.getEstado()).thenReturn("OK");
+        ReportTabularDto result = repository.map(resultSet);
 
-        when(reportDataRepository.findAllReportStatus())
-                .thenReturn(Collections.singletonList(projection));
-
-        List<ReportStatusResponseDto> result =
-                reportDataService.getReportStatus();
-
-        assertEquals(1, result.size());
-        assertEquals(Integer.valueOf(1), result.get(0).getId());
-    }
-
-    // =========================
-    // GENERATE REPORT
-    // =========================
-
-    @Test
-    void generateReport_shouldDelegateToRepository() {
-
-        reportDataService.generateReport();
-
-        verify(reportDataRepository).generateReport();
+        assertEquals("'8902875520925260", result.getRows().get(0)[0]);
     }
 
     // =========================
-    // GET REPORT
+    // RECORRIDO DEL CALLABLE STATEMENT
     // =========================
 
     @Test
-    void getReport_nullType_shouldThrowBusinessException() {
+    void readFirstResultSet_shouldReturnFirstResultSet() throws SQLException {
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> reportDataService.getReport(null));
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Socio"},
+                new String[][]{{"BANISTMO S.A"}});
 
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(true);
+        when(statement.getResultSet()).thenReturn(resultSet);
 
-        verify(reportStoredProcedureRepository, never()).execute(anyString());
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        ReportTabularDto result = repository.readFirstResultSet(connection, SP);
+
+        assertTrue(result.hasColumns());
+        assertEquals(1, result.getRows().size());
+    }
+
+    /** El procedimiento emite conteos intermedios antes del rowset real. */
+    @Test
+    void readFirstResultSet_shouldSkipIntermediateUpdateCounts() throws SQLException {
+
+        ResultSet resultSet = mockResultSet(
+                new String[]{"Socio"},
+                new String[][]{{"BANISTMO S.A"}});
+
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(5, 3);
+        when(statement.getMoreResults()).thenReturn(false, true);
+        when(statement.getResultSet()).thenReturn(resultSet);
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        ReportTabularDto result = repository.readFirstResultSet(connection, SP);
+
+        assertTrue(result.hasColumns());
+    }
+
+    /** El procedimiento no devuelve ningun result set. */
+    @Test
+    void readFirstResultSet_shouldReturnEmptyWhenNoResultSet() throws SQLException {
+
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
+
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+
+        ReportTabularDto result = repository.readFirstResultSet(connection, SP);
+
+        assertFalse(result.hasColumns());
+        assertTrue(result.getRows().isEmpty());
     }
 
     @Test
-    void getReport_invalidType_shouldThrowBusinessException() {
+    void readFirstResultSet_shouldBuildCallSyntax() throws SQLException {
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> reportDataService.getReport("INVALID"));
+        CallableStatement statement = mock(CallableStatement.class);
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
 
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
 
-        verify(reportStoredProcedureRepository, never()).execute(anyString());
+        repository.readFirstResultSet(connection, SP);
+
+        verify(connection).prepareCall("{call " + SP + "}");
     }
 
     @Test
-    void getReport_data_success() {
+    void readFirstResultSet_shouldPropagateSqlException() throws SQLException {
 
-        when(reportStoredProcedureRepository.execute(SP_DATA))
-                .thenReturn(buildTabular());
+        Connection connection = mock(Connection.class);
+        when(connection.prepareCall(anyString()))
+                .thenThrow(new SQLException("fallo de conexion"));
 
-        ReportFileResponseDto result =
-                reportDataService.getReport("datos");
-
-        assertNotNull(result);
-        assertEquals("RptDatos.xlsx", result.getFileName());
-        assertEquals(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                result.getFileType());
-        assertNotNull(result.getFileBase64());
-        assertFalse(result.getFileBase64().isEmpty());
-
-        verify(reportStoredProcedureRepository).execute(SP_DATA);
-    }
-
-    @Test
-    void getReport_movements_success() {
-
-        when(reportStoredProcedureRepository.execute(SP_MOVEMENTS))
-                .thenReturn(buildTabular());
-
-        ReportFileResponseDto result =
-                reportDataService.getReport("movimientos");
-
-        assertNotNull(result);
-        assertEquals("RptMovimientos.xlsx", result.getFileName());
-        assertNotNull(result.getFileBase64());
-
-        verify(reportStoredProcedureRepository).execute(SP_MOVEMENTS);
-    }
-
-    @Test
-    void getReport_typeIsCaseInsensitive() {
-
-        when(reportStoredProcedureRepository.execute(SP_DATA))
-                .thenReturn(buildTabular());
-
-        ReportFileResponseDto result =
-                reportDataService.getReport("DATOS");
-
-        assertEquals("RptDatos.xlsx", result.getFileName());
-    }
-
-    /** Sin filas pero con cabeceras: se genera el archivo solo con encabezados. */
-    @Test
-    void getReport_withHeadersAndNoRows_shouldGenerateFile() {
-
-        ReportTabularDto onlyHeaders = new ReportTabularDto(
-                Arrays.asList("Llavesiniestro", "Socio"),
-                Collections.emptyList());
-
-        when(reportStoredProcedureRepository.execute(SP_DATA))
-                .thenReturn(onlyHeaders);
-
-        ReportFileResponseDto result =
-                reportDataService.getReport("datos");
-
-        assertNotNull(result.getFileBase64());
-        assertFalse(result.getFileBase64().isEmpty());
-    }
-
-    /** Sin metadata: el procedimiento no devolvio result set. */
-    @Test
-    void getReport_withoutColumns_shouldThrowBusinessException() {
-
-        when(reportStoredProcedureRepository.execute(SP_DATA))
-                .thenReturn(ReportTabularDto.empty());
-
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> reportDataService.getReport("datos"));
-
-        assertEquals(HttpStatus.PRECONDITION_FAILED, ex.getHttpStatus());
+        assertThrows(SQLException.class,
+                () -> repository.readFirstResultSet(connection, SP));
     }
 
     // =========================
-    // INCONSISTENT COVERAGES
+    // DTO
     // =========================
 
     @Test
-    void getInconsistentCoverages_success() {
+    void reportTabularDto_empty() {
 
-        ReportDataRepository.InconsistentCoverageProjection projection =
-                mock(ReportDataRepository.InconsistentCoverageProjection.class);
+        ReportTabularDto empty = ReportTabularDto.empty();
 
-        when(projection.getLlavesiniestros()).thenReturn("SIN-123");
-
-        when(reportDataRepository.findInconsistentCoverages())
-                .thenReturn(Collections.singletonList(projection));
-
-        List<InconsistentCoverageResponseDto> result =
-                reportDataService.getInconsistentCoverages();
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("SIN-123", result.get(0).getLlavesiniestros());
-    }
-
-    @Test
-    void getInconsistentCoverages_empty() {
-
-        when(reportDataRepository.findInconsistentCoverages())
-                .thenReturn(Collections.emptyList());
-
-        List<InconsistentCoverageResponseDto> result =
-                reportDataService.getInconsistentCoverages();
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertFalse(empty.hasColumns());
+        assertTrue(empty.getHeaders().isEmpty());
+        assertTrue(empty.getRows().isEmpty());
     }
 }
