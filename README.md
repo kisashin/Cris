@@ -1,109 +1,323 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.ReportTabularDto;
-import org.hibernate.Session;
-import org.springframework.stereotype.Repository;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.loaddata.*;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.FileData;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.FileDataExt;
+import co.com.bnpparibas.cardif.closingclaims.domain.services.IReportDataService;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.constants.FlagCode;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.ReportDataMapper;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.FileDataExtRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.FileDataRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ReportDataRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.impl.ReportStoredProcedureRepository;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
 
-/**
- * Ejecuta los procedimientos almacenados de reportes recuperando
- * los datos y los nombres de columna del result set.
- *
- * Los nombres se toman de ResultSetMetaData, que es el equivalente
- * al DataTable.Columns que usaba el GridView del legacy con
- * AutoGenerateColumns. No se quema ningun nombre de columna.
- */
-@Repository
-public class ReportStoredProcedureRepository {
+@Service
+public class ReportDataServiceImpl implements IReportDataService {
 
-    /** Longitud maxima de una celda de Excel. */
-    private static final int EXCEL_MAX_CELL_LENGTH = 32767;
+    private static final Logger logger =
+            LoggerFactory.getLogger(ReportDataServiceImpl.class);
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final FileDataRepository fileDataRepository;
+    private final FileDataExtRepository fileDataExtRepository;
+    private final ReportDataRepository reportDataRepository;
+    private final ReportStoredProcedureRepository reportStoredProcedureRepository;
 
-    /**
-     * @param storedProcedure nombre calificado del procedimiento,
-     *                        por ejemplo dbo.SP_Reporte_Datos_Siniestros
-     * @return cabeceras y filas del primer result set del procedimiento.
-     */
-    public ReportTabularDto execute(final String storedProcedure) {
-        Session session = entityManager.unwrap(Session.class);
-        return session.doReturningWork(connection ->
-                readFirstResultSet(connection, storedProcedure));
+    private static final String INVALID_KEY = ".";
+
+    private static final String REPORT_TYPE_DATA = "datos";
+    private static final String REPORT_TYPE_MOVEMENTS = "movimientos";
+
+    /** Nombre de hoja y de archivo, igual al del legacy. */
+    private static final String REPORT_NAME_DATA = "RptDatos";
+    private static final String REPORT_NAME_MOVEMENTS = "RptMovimientos";
+
+    private static final String SP_REPORT_DATA =
+            "dbo.SP_Reporte_Datos_Siniestros";
+    private static final String SP_REPORT_MOVEMENTS =
+            "dbo.SP_Reporte_Movimientos_Siniestros";
+
+    private static final String XLSX_CONTENT_TYPE =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final String XLSX_EXTENSION = ".xlsx";
+
+    private static final int ROWS_IN_MEMORY = 500;
+
+    public ReportDataServiceImpl(
+            FileDataRepository fileDataRepository,
+            FileDataExtRepository fileDataExtRepository,
+            ReportDataRepository reportDataRepository,
+            ReportStoredProcedureRepository reportStoredProcedureRepository) {
+
+        this.fileDataRepository = fileDataRepository;
+        this.fileDataExtRepository = fileDataExtRepository;
+        this.reportDataRepository = reportDataRepository;
+        this.reportStoredProcedureRepository = reportStoredProcedureRepository;
     }
 
-    private ReportTabularDto readFirstResultSet(final Connection connection,
-                                                final String storedProcedure)
-            throws SQLException {
+    @Override
+    public ReportStatusPageDTO getReportData(String pHeader, String correlationId,
+                                             String requestId, Integer page,
+                                             Integer pageSize) {
 
-        try (CallableStatement statement =
-                     connection.prepareCall("{call " + storedProcedure + "}")) {
+        int pageNumber = (page == null) ? 0 : page;
+        int size = (pageSize == null) ? 50 : pageSize;
+        Pageable pageable = PageRequest.of(pageNumber, size);
+        List<ReportStatusDTO> reportStatusDTOS;
 
-            boolean hasResultSet = statement.execute();
+        int currentPage;
+        int totalPages;
+        long totalElements;
 
-            while (true) {
-                if (hasResultSet) {
-                    try (ResultSet resultSet = statement.getResultSet()) {
-                        return map(resultSet);
-                    }
+        if (FlagCode.PERU.equalsIgnoreCase(pHeader)) {
+            Page<FileDataExt> result = fileDataExtRepository.findAll(pageable);
+            reportStatusDTOS = ReportDataMapper.INSTANCE
+                    .fileDataExtListToReportStatusDTOList(result.getContent());
+
+            currentPage = result.getNumber();
+            totalPages = result.getTotalPages();
+            totalElements = result.getTotalElements();
+
+        } else {
+            Page<FileData> result = fileDataRepository.findAll(pageable);
+            reportStatusDTOS = ReportDataMapper.INSTANCE
+                    .fileDataListToReportStatusDTOList(result.getContent());
+
+            currentPage = result.getNumber();
+            totalPages = result.getTotalPages();
+            totalElements = result.getTotalElements();
+        }
+
+        return ReportStatusPageDTO.builder()
+                .reportStatusDTOS(reportStatusDTOS)
+                .currentPage(currentPage)
+                .totalPages(totalPages)
+                .remainingPages(totalPages - currentPage - 1)
+                .totalElements(totalElements)
+                .build();
+    }
+
+    @Override
+    public String changeStatusFileData(String pHeader, String correlationId,
+                                       String requestId) {
+        try {
+            if (FlagCode.PERU.equalsIgnoreCase(pHeader)) {
+                fileDataExtRepository.changeStatusFile();
+            } else {
+                fileDataRepository.changeStatusFile();
+            }
+            return "Aceptado!! En Proceso.";
+        } catch (Exception ex) {
+            logger.error("Error cambiando estado del archivo. CorrelationId={}, RequestId={}",
+                    correlationId, requestId, ex);
+            throw new BusinessException(null,
+                    "No se pudo cambiar el estado del archivo. Por favor, intente nuevamente.",
+                    HttpStatus.PRECONDITION_FAILED);
+        }
+    }
+
+    @Override
+    public KeyClaimPageDTO getKeyClaims(String pHeader, String correlationId,
+                                        String requestId, Integer page,
+                                        Integer pageSize) {
+
+        int pageNumber = (page == null) ? 0 : page;
+        int size = (pageSize == null) ? 50 : pageSize;
+        Pageable pageable = PageRequest.of(pageNumber, size);
+        List<KeyClaimDTO> keyClaims;
+        int currentPage;
+        int totalPages;
+        long totalElements;
+
+        if (FlagCode.PERU.equalsIgnoreCase(pHeader)) {
+            Page<FileDataExtRepository.LlaveSiniestroExtProjection> result =
+                    fileDataExtRepository.findKeyClaims(pageable);
+
+            keyClaims = result.getContent().stream()
+                    .filter(k -> k != null && !INVALID_KEY.equals(k.getLlavesiniestros()))
+                    .map(k -> new KeyClaimDTO(k.getLlavesiniestros()))
+                    .collect(Collectors.toList());
+
+            currentPage = result.getNumber();
+            totalPages = result.getTotalPages();
+            totalElements = result.getTotalElements();
+
+        } else {
+            Page<FileDataRepository.LlaveSiniestroProjection> result =
+                    fileDataRepository.findKeyClaims(pageable);
+
+            keyClaims = result.getContent().stream()
+                    .filter(k -> k != null && !INVALID_KEY.equals(k.getLlavesiniestros()))
+                    .map(k -> new KeyClaimDTO(k.getLlavesiniestros()))
+                    .collect(Collectors.toList());
+
+            currentPage = result.getNumber();
+            totalPages = result.getTotalPages();
+            totalElements = result.getTotalElements();
+        }
+
+        return KeyClaimPageDTO.builder()
+                .keyClaimDTOS(keyClaims)
+                .currentPage(currentPage)
+                .totalPages(totalPages)
+                .remainingPages(totalPages - currentPage - 1)
+                .totalElements(totalElements)
+                .build();
+    }
+
+    @Override
+    public List<ReportStatusResponseDto> getReportStatus() {
+
+        List<ReportDataRepository.ReportStatusProjection> reportStatus =
+                reportDataRepository.findAllReportStatus();
+
+        List<ReportStatusResponseDto> response = new ArrayList<>();
+
+        if (reportStatus == null || reportStatus.isEmpty()) {
+            return response;
+        }
+
+        for (ReportDataRepository.ReportStatusProjection projection : reportStatus) {
+            ReportStatusResponseDto dto = new ReportStatusResponseDto();
+            dto.setId(projection.getId());
+            dto.setFechaproceso(projection.getFechaproceso());
+            dto.setEstado(projection.getEstado());
+            response.add(dto);
+        }
+        return response;
+    }
+
+    /**
+     * Sin @Transactional: el procedimiento ejecuta decenas de UPDATE y
+     * DELETE sobre tablas completas y en el legacy corria en autocommit.
+     * Envolverlo en una sola transaccion escala bloqueos a nivel tabla.
+     */
+    @Override
+    public void generateReport() {
+        reportDataRepository.generateReport();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReportFileResponseDto getReport(final String reportType) {
+
+        validateReportType(reportType);
+
+        boolean isDataReport = REPORT_TYPE_DATA.equalsIgnoreCase(reportType);
+
+        String storedProcedure = isDataReport ? SP_REPORT_DATA : SP_REPORT_MOVEMENTS;
+        String reportName = isDataReport ? REPORT_NAME_DATA : REPORT_NAME_MOVEMENTS;
+
+        ReportTabularDto reportInformation =
+                reportStoredProcedureRepository.execute(storedProcedure);
+
+        if (!reportInformation.hasColumns()) {
+            logger.error("El procedimiento {} no devolvio un result set.", storedProcedure);
+            throw new BusinessException(null,
+                    "No fue posible obtener la informacion del reporte.",
+                    HttpStatus.PRECONDITION_FAILED);
+        }
+
+        ReportFileResponseDto response = new ReportFileResponseDto();
+        response.setFileType(XLSX_CONTENT_TYPE);
+        response.setFileName(reportName + XLSX_EXTENSION);
+        response.setFileBase64(Base64.getEncoder()
+                .encodeToString(buildExcel(reportName, reportInformation)));
+
+        return response;
+    }
+
+    private void validateReportType(final String reportType) {
+        if (reportType == null
+                || (!REPORT_TYPE_DATA.equalsIgnoreCase(reportType)
+                && !REPORT_TYPE_MOVEMENTS.equalsIgnoreCase(reportType))) {
+            throw new BusinessException(null,
+                    "El tipo de reporte solicitado no es valido.",
+                    HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Construye el xlsx con la fila de cabeceras tomada de la metadata
+     * del procedimiento y todas las celdas como texto.
+     */
+    private byte[] buildExcel(final String sheetName,
+                              final ReportTabularDto information) {
+
+        SXSSFWorkbook workbook = new SXSSFWorkbook(ROWS_IN_MEMORY);
+
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+
+            Sheet sheet = workbook.createSheet(sheetName);
+
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            int rowNumber = 0;
+
+            List<String> headers = information.getHeaders();
+            Row headerRow = sheet.createRow(rowNumber++);
+            for (int column = 0; column < headers.size(); column++) {
+                Cell cell = headerRow.createCell(column);
+                cell.setCellStyle(headerStyle);
+                cell.setCellValue(headers.get(column));
+            }
+
+            for (String[] values : information.getRows()) {
+                Row row = sheet.createRow(rowNumber++);
+                for (int column = 0; column < values.length; column++) {
+                    row.createCell(column).setCellValue(values[column]);
                 }
-                if (statement.getUpdateCount() == -1) {
-                    return ReportTabularDto.empty();
-                }
-                hasResultSet = statement.getMoreResults();
+            }
+
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+
+        } catch (IOException exception) {
+            logger.error("Error generando el archivo {}.", sheetName, exception);
+            throw new BusinessException(null,
+                    "No fue posible generar el archivo del reporte.",
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } finally {
+            workbook.dispose();
+            try {
+                workbook.close();
+            } catch (IOException exception) {
+                logger.warn("No se pudo cerrar el libro de {}.", sheetName, exception);
             }
         }
     }
 
-    private ReportTabularDto map(final ResultSet resultSet) throws SQLException {
+    @Override
+    @Transactional(readOnly = true)
+    public List<InconsistentCoverageResponseDto> getInconsistentCoverages() {
 
-        ResultSetMetaData metaData = resultSet.getMetaData();
-        int columnCount = metaData.getColumnCount();
+        List<ReportDataRepository.InconsistentCoverageProjection> coverages =
+                reportDataRepository.findInconsistentCoverages();
 
-        List<String> headers = new ArrayList<>(columnCount);
-        for (int index = 1; index <= columnCount; index++) {
-            headers.add(metaData.getColumnLabel(index));
-        }
-
-        List<String[]> rows = new ArrayList<>();
-        while (resultSet.next()) {
-            String[] row = new String[columnCount];
-            for (int index = 1; index <= columnCount; index++) {
-                row[index - 1] = readAsText(resultSet, index);
-            }
-            rows.add(row);
-        }
-
-        return new ReportTabularDto(headers, rows);
-    }
-
-    /**
-     * Todo se lee como texto para replicar el mso-number-format:@ del
-     * legacy y evitar la corrupcion de identificadores largos como
-     * Certificado. Los procedimientos ya devuelven fechas y valores
-     * formateados con CONVERT(varchar, ..., 103) y replace('.', ',').
-     */
-    private String readAsText(final ResultSet resultSet, final int index)
-            throws SQLException {
-
-        String value = resultSet.getString(index);
-
-        if (value == null) {
-            return "";
-        }
-        if (value.length() > EXCEL_MAX_CELL_LENGTH) {
-            return value.substring(0, EXCEL_MAX_CELL_LENGTH);
-        }
-        return value;
+        return ReportDataMapper.INSTANCE.projectionListToDtoList(coverages);
     }
 }
