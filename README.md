@@ -1,6 +1,7 @@
-DELETE FROM dbo.tbl_Archivo_socios
-WHERE idArchivosocios_cen IN (2, 3);
-
-INSERT INTO dbo.tbl_Archivo_socios (nombredatos, nombremov, fechaproceso, estado, id)
-VALUES ('', '', GETDATE(), 'PENDIENTE', 1),
-       ('', '', GETDATE(), 'PENDIENTE', 1);
+SELECT 'SiniestrosWp' AS BD,
+       OBJECT_ID('SiniestrosWp.dbo.historicomovimientos')      AS historicomovimientos,
+       OBJECT_ID('SiniestrosWp.dbo.novedadhistoricoindividual') AS novedades
+UNION ALL
+SELECT 'CardifWP',
+       OBJECT_ID('CardifWP.dbo.historicomovimientos'),
+       OBJECT_ID('CardifWP.dbo.novedadhistoricoindividual');
