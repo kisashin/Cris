@@ -1,217 +1,234 @@
-package co.com.bnpparibas.cardif.closingclaims.api;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.ClaimMovementResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsDeleteRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.IIndividualNewsService;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ClaimMovementHistory;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.IndividualNewsHistory;
 import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsStatus;
 import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
-@ExtendWith(MockitoExtension.class)
-class IndividualNewsControllerTest {
+class IndividualNewsMapperTest {
 
-    private static final String P_HEADER = "p-header";
-    private static final String CORRELATION_ID = "correlation-id";
-    private static final String REQUEST_ID = "request-id";
-    private static final String USER = "f93141";
-    private static final String CLAIM_NUMBER = "SIN-0001";
-    private static final Long ID_CARVAJAL = 100L;
-    private static final Long CODE = 55L;
+    private static final LocalDateTime BIRTH_DATE = LocalDateTime.of(1980, 1, 1, 0, 0);
+    private static final LocalDateTime OCCURRENCE_DATE = LocalDateTime.of(2026, 1, 5, 0, 0);
 
-    @Mock
-    private IIndividualNewsService individualNewsService;
-
-    @InjectMocks
-    private IndividualNewsController individualNewsController;
-
-    private ClaimMovementResponseDTO buildMovementResponse() {
-        return ClaimMovementResponseDTO.builder()
-                .idCarvajal(ID_CARVAJAL)
-                .claimNumber(CLAIM_NUMBER)
-                .movementType("PAGO")
+    @Test
+    @DisplayName("toMovementResponseDTO traduce todos los campos del movimiento")
+    void toMovementResponseDTOMapsAllFields() {
+        ClaimMovementHistory entity = ClaimMovementHistory.builder()
+                .idCarvajal(100L)
+                .socio("SOCIO")
+                .numeroSiniestro("SIN-1")
+                .nroIdentificacion("123")
+                .codProducto("2011")
+                .codPlan("PLAN")
+                .cobertura("COBERTURA")
+                .ramo("0001")
+                .vrMovimiento(new BigDecimal("10.25"))
+                .fechaMovimiento2(OCCURRENCE_DATE)
+                .tipoMovimiento("PAGO")
+                .fechaNacimiento(BIRTH_DATE)
+                .fechaOcurrencia(OCCURRENCE_DATE)
+                .fechaAvisoSocio(OCCURRENCE_DATE)
+                .fechaAvisoCardif(OCCURRENCE_DATE)
+                .beneficiarioPago("BENEFICIARIO")
+                .codSocio(10)
+                .idCardif("IDC")
+                .llaveSiniestro("LLAVE")
+                .estadoSiniestro("ABIERTO")
+                .estadoMayor("ANALISIS")
+                .canal("CANAL")
+                .pandemia("NO")
+                .tipoCoaseguro(1)
+                .vrCoaseguroRetenido(5.0)
+                .vrCoaseguroCedido(2.0)
                 .build();
+
+        ClaimMovementResponseDTO dto = IndividualNewsMapper.INSTANCE
+                .toMovementResponseDTO(entity);
+
+        assertEquals(100L, dto.getIdCarvajal());
+        assertEquals("SIN-1", dto.getClaimNumber());
+        assertEquals("123", dto.getIdentificationNumber());
+        assertEquals("2011", dto.getProductCode());
+        assertEquals("PLAN", dto.getPlanCode());
+        assertEquals("COBERTURA", dto.getCoverage());
+        assertEquals("0001", dto.getBranchCode());
+        assertEquals(new BigDecimal("10.25"), dto.getMovementValue());
+        assertEquals(OCCURRENCE_DATE, dto.getMovementDate());
+        assertEquals("PAGO", dto.getMovementType());
+        assertEquals("SOCIO", dto.getPartner());
+        assertEquals("IDC", dto.getCardifId());
+        assertEquals("LLAVE", dto.getClaimKey());
+        assertEquals(Integer.valueOf(10), dto.getPartnerCode());
+        assertEquals("ABIERTO", dto.getClaimStatus());
+        assertEquals("ANALISIS", dto.getMajorStatus());
+        assertEquals("CANAL", dto.getChannel());
+        assertEquals("NO", dto.getPandemic());
+        assertEquals("BENEFICIARIO", dto.getPaymentBeneficiary());
+        assertEquals(Integer.valueOf(1), dto.getCoinsuranceType());
+        assertEquals(Double.valueOf(5.0), dto.getRetainedCoinsuranceValue());
+        assertEquals(Double.valueOf(2.0), dto.getCededCoinsuranceValue());
+        assertEquals(BIRTH_DATE, dto.getBirthDate());
     }
 
-    private IndividualNewsResponseDTO buildNewsResponse(NewsStatus status) {
-        return IndividualNewsResponseDTO.builder()
-                .code(CODE)
-                .idCarvajal(ID_CARVAJAL)
-                .claimNumber(CLAIM_NUMBER)
-                .newsType(NewsType.ACTUALIZA.name())
-                .status(status.name())
-                .justification("Corrige socio")
-                .requestUser(USER)
+    @Test
+    @DisplayName("toMovementResponseDTO retorna nulo cuando la entidad es nula")
+    void toMovementResponseDTOReturnsNullForNullEntity() {
+        assertNull(IndividualNewsMapper.INSTANCE.toMovementResponseDTO(null));
+    }
+
+    @Test
+    @DisplayName("toMovementResponseDTOList traduce la coleccion completa")
+    void toMovementResponseDTOListMapsCollection() {
+        ClaimMovementHistory entity = ClaimMovementHistory.builder()
+                .idCarvajal(100L)
+                .numeroSiniestro("SIN-1")
                 .build();
+
+        List<ClaimMovementResponseDTO> result = IndividualNewsMapper.INSTANCE
+                .toMovementResponseDTOList(Collections.singletonList(entity));
+
+        assertEquals(1, result.size());
+        assertEquals("SIN-1", result.get(0).getClaimNumber());
     }
 
     @Test
-    @DisplayName("findMovements responde OK con los movimientos disponibles")
-    void findMovementsReturnsOk() {
-        when(individualNewsService.findMovementsByClaimNumber(
-                anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(Collections.singletonList(buildMovementResponse()));
-
-        ResponseEntity<ResponseModel<List<ClaimMovementResponseDTO>>> response =
-                individualNewsController.findMovements(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, CLAIM_NUMBER);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(CORRELATION_ID, response.getBody().getCorrelationId());
-        assertEquals(HttpStatus.OK.value(),
-                response.getBody().getResponseHeader().getReturnCode());
-        assertEquals(1, response.getBody().getBodyResponse().size());
-        verify(individualNewsService).findMovementsByClaimNumber(
-                P_HEADER, CORRELATION_ID, REQUEST_ID, CLAIM_NUMBER);
+    @DisplayName("toMovementResponseDTOList retorna nulo cuando la lista es nula")
+    void toMovementResponseDTOListReturnsNullForNullList() {
+        assertNull(IndividualNewsMapper.INSTANCE.toMovementResponseDTOList(null));
     }
 
     @Test
-    @DisplayName("findMovementById responde OK con el movimiento consultado")
-    void findMovementByIdReturnsOk() {
-        when(individualNewsService.findMovementById(
-                anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(buildMovementResponse());
+    @DisplayName("toNewsResponseDTO traduce los enums a texto")
+    void toNewsResponseDTOMapsEnumsToText() {
+        IndividualNewsHistory entity = IndividualNewsHistory.builder()
+                .codigo(55L)
+                .idCarvajal(100L)
+                .numeroSiniestro("SIN-1")
+                .observacion("Justificacion")
+                .estado(NewsStatus.PENDIENTE)
+                .tipoNovedad(NewsType.ELIMINA)
+                .fechaProceso(OCCURRENCE_DATE)
+                .idUsuario("f93141")
+                .idAutorizador("f00999")
+                .build();
 
-        ResponseEntity<ResponseModel<ClaimMovementResponseDTO>> response =
-                individualNewsController.findMovementById(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, ID_CARVAJAL);
+        IndividualNewsResponseDTO dto = IndividualNewsMapper.INSTANCE
+                .toNewsResponseDTO(entity);
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(ID_CARVAJAL, response.getBody().getBodyResponse().getIdCarvajal());
+        assertEquals(55L, dto.getCode());
+        assertEquals(100L, dto.getIdCarvajal());
+        assertEquals("SIN-1", dto.getClaimNumber());
+        assertEquals(NewsStatus.PENDIENTE.name(), dto.getStatus());
+        assertEquals(NewsType.ELIMINA.name(), dto.getNewsType());
+        assertEquals("Justificacion", dto.getJustification());
+        assertEquals(OCCURRENCE_DATE, dto.getProcessDate());
+        assertEquals("f93141", dto.getRequestUser());
+        assertEquals("f00999", dto.getAuthorizerUser());
     }
 
     @Test
-    @DisplayName("createUpdateRequest responde CREATED con la novedad creada")
-    void createUpdateRequestReturnsCreated() {
-        when(individualNewsService.createUpdateRequest(anyString(), anyString(),
-                anyString(), anyString(), any(IndividualNewsRequestDTO.class)))
-                .thenReturn(buildNewsResponse(NewsStatus.PENDIENTE));
+    @DisplayName("toNewsResponseDTO retorna nulo cuando la entidad es nula")
+    void toNewsResponseDTOReturnsNullForNullEntity() {
+        assertNull(IndividualNewsMapper.INSTANCE.toNewsResponseDTO(null));
+    }
 
+    @Test
+    @DisplayName("toNewsResponseDTOList traduce la coleccion completa")
+    void toNewsResponseDTOListMapsCollection() {
+        IndividualNewsHistory entity = IndividualNewsHistory.builder()
+                .codigo(55L)
+                .estado(NewsStatus.CANCELADO)
+                .build();
+
+        List<IndividualNewsResponseDTO> result = IndividualNewsMapper.INSTANCE
+                .toNewsResponseDTOList(Collections.singletonList(entity));
+
+        assertEquals(1, result.size());
+        assertEquals(NewsStatus.CANCELADO.name(), result.get(0).getStatus());
+    }
+
+    @Test
+    @DisplayName("toNewsResponseDTOList retorna nulo cuando la lista es nula")
+    void toNewsResponseDTOListReturnsNullForNullList() {
+        assertNull(IndividualNewsMapper.INSTANCE.toNewsResponseDTOList(null));
+    }
+
+    @Test
+    @DisplayName("toEntity traduce la solicitud y deja los campos de control sin asignar")
+    void toEntityMapsRequestAndIgnoresControlFields() {
         IndividualNewsRequestDTO request = IndividualNewsRequestDTO.builder()
-                .idCarvajal(ID_CARVAJAL)
+                .idCarvajal(100L)
+                .movementType("AJUSTE")
+                .partner("SOCIO")
+                .coverage("COBERTURA")
+                .cardifId("IDC")
+                .claimKey("LLAVE")
+                .branchCode("0002")
+                .claimNumber("SIN-1")
+                .partnerCode(20)
+                .claimStatus("CERRADO")
+                .majorStatus("PAGADO")
+                .channel("CANAL")
+                .pandemic("SI")
+                .justification("Justificacion")
+                .paymentBeneficiary("BENEFICIARIO")
+                .coinsuranceType(2)
+                .retainedCoinsuranceValue(200.0)
+                .cededCoinsuranceValue(75.0)
+                .birthDate(BIRTH_DATE)
+                .occurrenceDate(OCCURRENCE_DATE)
+                .partnerNoticeDate(OCCURRENCE_DATE)
+                .cardifNoticeDate(OCCURRENCE_DATE)
                 .build();
 
-        ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> response =
-                individualNewsController.createUpdateRequest(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, USER, request);
+        IndividualNewsHistory entity = IndividualNewsMapper.INSTANCE.toEntity(request);
 
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(HttpStatus.CREATED.value(),
-                response.getBody().getResponseHeader().getReturnCode());
-        assertEquals(NewsStatus.PENDIENTE.name(),
-                response.getBody().getBodyResponse().getStatus());
+        assertNotNull(entity);
+        assertEquals(100L, entity.getIdCarvajal());
+        assertEquals("SOCIO", entity.getSocio());
+        assertEquals("SIN-1", entity.getNumeroSiniestro());
+        assertEquals("COBERTURA", entity.getCobertura());
+        assertEquals("0002", entity.getRamo());
+        assertEquals("IDC", entity.getIdCardif());
+        assertEquals("LLAVE", entity.getLlaveSiniestro());
+        assertEquals(Integer.valueOf(20), entity.getCodSocio());
+        assertEquals("CERRADO", entity.getEstadoSiniestro());
+        assertEquals("PAGADO", entity.getEstadoMayor());
+        assertEquals("AJUSTE", entity.getTipoMovimiento());
+        assertEquals("CANAL", entity.getCanal());
+        assertEquals("SI", entity.getPandemia());
+        assertEquals("BENEFICIARIO", entity.getBeneficiarioPago());
+        assertEquals(Integer.valueOf(2), entity.getTipoCoaseguro());
+        assertEquals(Double.valueOf(200.0), entity.getVrCoaseguroRetenido());
+        assertEquals(Double.valueOf(75.0), entity.getVrCoaseguroCedido());
+        assertEquals("Justificacion", entity.getObservacion());
+        assertEquals(BIRTH_DATE, entity.getFechaNacimiento());
+        assertEquals(OCCURRENCE_DATE, entity.getFechaOcurrencia());
+        assertNull(entity.getCodigo());
+        assertNull(entity.getEstado());
+        assertNull(entity.getTipoNovedad());
+        assertNull(entity.getFechaProceso());
+        assertNull(entity.getIdUsuario());
+        assertNull(entity.getIdAutorizador());
     }
 
     @Test
-    @DisplayName("createDeleteRequest responde CREATED con la novedad creada")
-    void createDeleteRequestReturnsCreated() {
-        when(individualNewsService.createDeleteRequest(anyString(), anyString(),
-                anyString(), anyString(), any(IndividualNewsDeleteRequestDTO.class)))
-                .thenReturn(buildNewsResponse(NewsStatus.PENDIENTE));
-
-        IndividualNewsDeleteRequestDTO request = IndividualNewsDeleteRequestDTO.builder()
-                .idCarvajal(ID_CARVAJAL)
-                .justification("Movimiento duplicado")
-                .build();
-
-        ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> response =
-                individualNewsController.createDeleteRequest(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, USER, request);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(CODE, response.getBody().getBodyResponse().getCode());
-    }
-
-    @Test
-    @DisplayName("findPendingNews responde OK con las novedades pendientes")
-    void findPendingNewsReturnsOk() {
-        when(individualNewsService.findPendingNews(anyString(), anyString(), anyString()))
-                .thenReturn(Collections.singletonList(buildNewsResponse(NewsStatus.PENDIENTE)));
-
-        ResponseEntity<ResponseModel<List<IndividualNewsResponseDTO>>> response =
-                individualNewsController.findPendingNews(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().getBodyResponse().size());
-    }
-
-    @Test
-    @DisplayName("findPendingNewsByCode responde OK con el detalle de la novedad")
-    void findPendingNewsByCodeReturnsOk() {
-        when(individualNewsService.findPendingNewsByCode(
-                anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(buildNewsResponse(NewsStatus.PENDIENTE));
-
-        ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> response =
-                individualNewsController.findPendingNewsByCode(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, CODE);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(CODE, response.getBody().getBodyResponse().getCode());
-    }
-
-    @Test
-    @DisplayName("approveNews responde OK con la novedad procesada")
-    void approveNewsReturnsOk() {
-        when(individualNewsService.approveNews(
-                anyString(), anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(buildNewsResponse(NewsStatus.PROCESADO));
-
-        ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> response =
-                individualNewsController.approveNews(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, USER, CODE);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(NewsStatus.PROCESADO.name(),
-                response.getBody().getBodyResponse().getStatus());
-        verify(individualNewsService).approveNews(
-                P_HEADER, CORRELATION_ID, REQUEST_ID, USER, CODE);
-    }
-
-    @Test
-    @DisplayName("cancelNews responde OK con la novedad cancelada")
-    void cancelNewsReturnsOk() {
-        when(individualNewsService.cancelNews(
-                anyString(), anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(buildNewsResponse(NewsStatus.CANCELADO));
-
-        ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> response =
-                individualNewsController.cancelNews(
-                        P_HEADER, CORRELATION_ID, REQUEST_ID, USER, CODE);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals(NewsStatus.CANCELADO.name(),
-                response.getBody().getBodyResponse().getStatus());
-        verify(individualNewsService).cancelNews(
-                P_HEADER, CORRELATION_ID, REQUEST_ID, USER, CODE);
+    @DisplayName("toEntity retorna nulo cuando la solicitud es nula")
+    void toEntityReturnsNullForNullRequest() {
+        assertNull(IndividualNewsMapper.INSTANCE.toEntity(null));
     }
 }
