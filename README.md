@@ -1,26 +1,31 @@
 package co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class IndividualNewsDeleteRequestDTO {
+public class IndividualNewsResponseDTO {
 
-    @NotNull(message = "Carvajal identifier is required")
+    private Long code;
     private Long idCarvajal;
-
-    @NotBlank(message = "Justification is required")
-    @Size(max = 255, message = "Justification must not exceed 255 characters")
+    private String claimNumber;
+    private String newsType;
+    private String status;
     private String justification;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime processDate;
+
+    private String requestUser;
+    private String authorizerUser;
 }
