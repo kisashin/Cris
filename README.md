@@ -1,5 +1,7 @@
 package co.com.bnpparibas.cardif.closingclaims.domain.entity;
 
+import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsStatus;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -8,22 +10,29 @@ import lombok.Setter;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "historicomovimientos", schema = "dbo")
+@Table(name = "novedadhistoricoindividual", schema = "dbo")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ClaimMovementHistory {
+public class IndividualNewsHistory {
 
     @Id
-    @Column(name = "idcarvajal")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "codigo")
+    private Long codigo;
+
+    @Column(name = "id", nullable = false)
     private Long idCarvajal;
 
     @Column(name = "socio")
@@ -32,32 +41,14 @@ public class ClaimMovementHistory {
     @Column(name = "numerosiniestro")
     private String numeroSiniestro;
 
-    @Column(name = "nroidentificacion")
-    private String nroIdentificacion;
-
-    @Column(name = "codproducto")
-    private String codProducto;
-
-    @Column(name = "codplan")
-    private String codPlan;
+    @Column(name = "fechanacimiento")
+    private LocalDateTime fechaNacimiento;
 
     @Column(name = "cobertura")
     private String cobertura;
 
     @Column(name = "ramo")
     private String ramo;
-
-    @Column(name = "vrmovimiento")
-    private BigDecimal vrMovimiento;
-
-    @Column(name = "fechamovimiento2")
-    private LocalDateTime fechaMovimiento2;
-
-    @Column(name = "tipomovimiento")
-    private String tipoMovimiento;
-
-    @Column(name = "fechanacimiento")
-    private LocalDateTime fechaNacimiento;
 
     @Column(name = "fechaocurrencia")
     private LocalDateTime fechaOcurrencia;
@@ -86,6 +77,9 @@ public class ClaimMovementHistory {
     @Column(name = "estadomayor")
     private String estadoMayor;
 
+    @Column(name = "tipomovimiento")
+    private String tipoMovimiento;
+
     @Column(name = "canal")
     private String canal;
 
@@ -100,4 +94,24 @@ public class ClaimMovementHistory {
 
     @Column(name = "vrcoasegurocedido")
     private Double vrCoaseguroCedido;
+
+    @Column(name = "observacion")
+    private String observacion;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado")
+    private NewsStatus estado;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tiponovedad")
+    private NewsType tipoNovedad;
+
+    @Column(name = "fechaproceso")
+    private LocalDateTime fechaProceso;
+
+    @Column(name = "idusuario")
+    private String idUsuario;
+
+    @Column(name = "idautorizador")
+    private String idAutorizador;
 }
