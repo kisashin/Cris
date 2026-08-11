@@ -1,77 +1,103 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.anums;
+package co.com.bnpparibas.cardif.closingclaims.domain.entity;
 
-/**
- * Tipos de novedad que se pueden solicitar sobre un movimiento.
- */
-public enum NewsType {
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-    /** Solicitud de actualización de los campos del movimiento. */
-    ACTUALIZA,
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
-    /** Solicitud de eliminación del movimiento. */
-    ELIMINA
-}
+@Entity
+@Table(name = "historicomovimientos", schema = "dbo")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ClaimMovementHistory {
 
+    @Id
+    @Column(name = "idcarvajal")
+    private Long idCarvajal;
 
-package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
+    @Column(name = "socio")
+    private String socio;
 
-/**
- * Catálogo centralizado de los errores controlados del módulo de novedades
- * individuales de movimientos.
- *
- * <p>Reúne en un único lugar los errores que el módulo sabe de antemano que
- * pueden ocurrir y maneja de forma controlada (se capturan y se devuelven como
- * {@link co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException}
- * con su {@code HttpStatus}).</p>
- *
- * <p>No incluye mensajes de flujo normal (éxito o informativos), que viven en
- * el servicio, ni los textos de log.</p>
- */
-public enum IndividualNewsMessage {
+    @Column(name = "numerosiniestro")
+    private String numeroSiniestro;
 
-    /** El movimiento referenciado no existe en el histórico. */
-    MOVEMENT_NOT_FOUND("No se encontró el movimiento solicitado"),
+    @Column(name = "nroidentificacion")
+    private String nroIdentificacion;
 
-    /** La novedad no existe o ya no está pendiente de autorización. */
-    NEWS_NOT_PENDING("La novedad no existe o ya fue procesada o cancelada"),
+    @Column(name = "codproducto")
+    private String codProducto;
 
-    /** El movimiento ya tiene una novedad sin resolver. */
-    PENDING_NEWS_EXISTS(
-            "El movimiento ya tiene una novedad pendiente de autorización"),
+    @Column(name = "codplan")
+    private String codPlan;
 
-    /** El solicitante de la novedad no puede autorizarla. */
-    SAME_USER_APPROVAL(
-            "El usuario que solicita la novedad no puede autorizarla"),
+    @Column(name = "cobertura")
+    private String cobertura;
 
-    /** Falla al acceder a la base de datos de novedades. */
-    DATABASE_ACCESS_ERROR(
-            "Error al acceder a la información de novedades de movimientos");
+    @Column(name = "ramo")
+    private String ramo;
 
-    private final String message;
+    @Column(name = "vrmovimiento")
+    private BigDecimal vrMovimiento;
 
-    IndividualNewsMessage(String message) {
-        this.message = message;
-    }
+    @Column(name = "fechamovimiento2")
+    private LocalDateTime fechaMovimiento2;
 
-    public String getMessage() {
-        return message;
-    }
-}
+    @Column(name = "tipomovimiento")
+    private String tipoMovimiento;
 
+    @Column(name = "fechanacimiento")
+    private LocalDateTime fechaNacimiento;
 
-package co.com.bnpparibas.cardif.closingclaims.domain.util.anums;
+    @Column(name = "fechaocurrencia")
+    private LocalDateTime fechaOcurrencia;
 
-/**
- * Estados posibles de una novedad individual de movimientos.
- */
-public enum NewsStatus {
+    @Column(name = "fechaavisosocio")
+    private LocalDateTime fechaAvisoSocio;
 
-    /** La novedad está pendiente de autorización. */
-    PENDIENTE,
+    @Column(name = "fechaavisocardif")
+    private LocalDateTime fechaAvisoCardif;
 
-    /** La novedad fue aplicada sobre el histórico de movimientos. */
-    PROCESADO,
+    @Column(name = "beneficiariopago")
+    private String beneficiarioPago;
 
-    /** La novedad fue cancelada y no se aplicará. */
-    CANCELADO
+    @Column(name = "codsocio")
+    private Integer codSocio;
+
+    @Column(name = "idcardif")
+    private String idCardif;
+
+    @Column(name = "llavesiniestro")
+    private String llaveSiniestro;
+
+    @Column(name = "estadosiniestro")
+    private String estadoSiniestro;
+
+    @Column(name = "estadomayor")
+    private String estadoMayor;
+
+    @Column(name = "canal")
+    private String canal;
+
+    @Column(name = "pandemia")
+    private String pandemia;
+
+    @Column(name = "tipocoaseguro")
+    private Integer tipoCoaseguro;
+
+    @Column(name = "vrcoaseguroretenido")
+    private Double vrCoaseguroRetenido;
+
+    @Column(name = "vrcoasegurocedido")
+    private Double vrCoaseguroCedido;
 }
