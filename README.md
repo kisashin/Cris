@@ -1,20 +1,57 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.IndividualNewsHistory;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsStatus;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.util.List;
-import java.util.Optional;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
-@Repository
-public interface IndividualNewsHistoryRepository
-        extends JpaRepository<IndividualNewsHistory, Long> {
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ClaimMovementResponseDTO {
 
-    List<IndividualNewsHistory> findByEstadoOrderByCodigoAsc(NewsStatus estado);
+    private Long idCarvajal;
+    private String claimNumber;
+    private String identificationNumber;
+    private String productCode;
+    private String planCode;
+    private String coverage;
+    private String branchCode;
+    private BigDecimal movementValue;
 
-    Optional<IndividualNewsHistory> findByCodigoAndEstado(Long codigo, NewsStatus estado);
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDateTime movementDate;
 
-    boolean existsByIdCarvajalAndEstado(Long idCarvajal, NewsStatus estado);
+    private String movementType;
+    private String partner;
+    private String cardifId;
+    private String claimKey;
+    private Integer partnerCode;
+    private String claimStatus;
+    private String majorStatus;
+    private String channel;
+    private String pandemic;
+    private String paymentBeneficiary;
+    private Integer coinsuranceType;
+    private Double retainedCoinsuranceValue;
+    private Double cededCoinsuranceValue;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDateTime birthDate;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDateTime occurrenceDate;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDateTime partnerNoticeDate;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDateTime cardifNoticeDate;
 }
