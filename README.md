@@ -1,99 +1,114 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+package co.com.bnpparibas.cardif.closingclaims.domain.services;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.ClaimMovementResponseDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsDeleteRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ClaimMovementHistory;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.IndividualNewsHistory;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 
-@Mapper
-public interface IndividualNewsMapper {
+public interface IIndividualNewsService {
 
-    IndividualNewsMapper INSTANCE = Mappers.getMapper(IndividualNewsMapper.class);
-
-    /*
-     * ClaimMovementHistory -> ClaimMovementResponseDTO
+    /**
+     * Busca los movimientos de un siniestro que no tienen novedad pendiente.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param claimNumber   número de siniestro a consultar.
+     * @return lista de movimientos disponibles.
      */
-    @Mapping(target = "claimNumber", source = "numeroSiniestro")
-    @Mapping(target = "identificationNumber", source = "nroIdentificacion")
-    @Mapping(target = "productCode", source = "codProducto")
-    @Mapping(target = "planCode", source = "codPlan")
-    @Mapping(target = "coverage", source = "cobertura")
-    @Mapping(target = "branchCode", source = "ramo")
-    @Mapping(target = "movementValue", source = "vrMovimiento")
-    @Mapping(target = "movementDate", source = "fechaMovimiento2")
-    @Mapping(target = "movementType", source = "tipoMovimiento")
-    @Mapping(target = "partner", source = "socio")
-    @Mapping(target = "cardifId", source = "idCardif")
-    @Mapping(target = "claimKey", source = "llaveSiniestro")
-    @Mapping(target = "partnerCode", source = "codSocio")
-    @Mapping(target = "claimStatus", source = "estadoSiniestro")
-    @Mapping(target = "majorStatus", source = "estadoMayor")
-    @Mapping(target = "channel", source = "canal")
-    @Mapping(target = "pandemic", source = "pandemia")
-    @Mapping(target = "paymentBeneficiary", source = "beneficiarioPago")
-    @Mapping(target = "coinsuranceType", source = "tipoCoaseguro")
-    @Mapping(target = "retainedCoinsuranceValue", source = "vrCoaseguroRetenido")
-    @Mapping(target = "cededCoinsuranceValue", source = "vrCoaseguroCedido")
-    @Mapping(target = "birthDate", source = "fechaNacimiento")
-    @Mapping(target = "occurrenceDate", source = "fechaOcurrencia")
-    @Mapping(target = "partnerNoticeDate", source = "fechaAvisoSocio")
-    @Mapping(target = "cardifNoticeDate", source = "fechaAvisoCardif")
-    ClaimMovementResponseDTO toMovementResponseDTO(ClaimMovementHistory entity);
+    List<ClaimMovementResponseDTO> findMovementsByClaimNumber(String pHeader,
+                                                              String correlationId,
+                                                              String requestId,
+                                                              String claimNumber);
 
-    List<ClaimMovementResponseDTO> toMovementResponseDTOList(
-            List<ClaimMovementHistory> entities);
-
-    /*
-     * IndividualNewsHistory -> IndividualNewsResponseDTO
+    /**
+     * Obtiene un movimiento por su identificador Carvajal.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param idCarvajal    identificador del movimiento.
+     * @return el movimiento consultado.
      */
-    @Mapping(target = "code", source = "codigo")
-    @Mapping(target = "claimNumber", source = "numeroSiniestro")
-    @Mapping(target = "newsType", source = "tipoNovedad")
-    @Mapping(target = "status", source = "estado")
-    @Mapping(target = "justification", source = "observacion")
-    @Mapping(target = "processDate", source = "fechaProceso")
-    @Mapping(target = "requestUser", source = "idUsuario")
-    @Mapping(target = "authorizerUser", source = "idAutorizador")
-    IndividualNewsResponseDTO toNewsResponseDTO(IndividualNewsHistory entity);
+    ClaimMovementResponseDTO findMovementById(String pHeader, String correlationId,
+                                              String requestId, Long idCarvajal);
 
-    List<IndividualNewsResponseDTO> toNewsResponseDTOList(
-            List<IndividualNewsHistory> entities);
-
-    /*
-     * IndividualNewsRequestDTO -> IndividualNewsHistory
+    /**
+     * Registra una solicitud de actualización sobre un movimiento.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario que solicita el cambio.
+     * @param request       nuevos valores del movimiento.
+     * @return la novedad creada.
      */
-    @Mapping(target = "codigo", ignore = true)
-    @Mapping(target = "estado", ignore = true)
-    @Mapping(target = "tipoNovedad", ignore = true)
-    @Mapping(target = "fechaProceso", ignore = true)
-    @Mapping(target = "idUsuario", ignore = true)
-    @Mapping(target = "idAutorizador", ignore = true)
-    @Mapping(target = "socio", source = "partner")
-    @Mapping(target = "numeroSiniestro", source = "claimNumber")
-    @Mapping(target = "fechaNacimiento", source = "birthDate")
-    @Mapping(target = "cobertura", source = "coverage")
-    @Mapping(target = "ramo", source = "branchCode")
-    @Mapping(target = "fechaOcurrencia", source = "occurrenceDate")
-    @Mapping(target = "fechaAvisoSocio", source = "partnerNoticeDate")
-    @Mapping(target = "fechaAvisoCardif", source = "cardifNoticeDate")
-    @Mapping(target = "beneficiarioPago", source = "paymentBeneficiary")
-    @Mapping(target = "codSocio", source = "partnerCode")
-    @Mapping(target = "idCardif", source = "cardifId")
-    @Mapping(target = "llaveSiniestro", source = "claimKey")
-    @Mapping(target = "estadoSiniestro", source = "claimStatus")
-    @Mapping(target = "estadoMayor", source = "majorStatus")
-    @Mapping(target = "tipoMovimiento", source = "movementType")
-    @Mapping(target = "canal", source = "channel")
-    @Mapping(target = "pandemia", source = "pandemic")
-    @Mapping(target = "tipoCoaseguro", source = "coinsuranceType")
-    @Mapping(target = "vrCoaseguroRetenido", source = "retainedCoinsuranceValue")
-    @Mapping(target = "vrCoaseguroCedido", source = "cededCoinsuranceValue")
-    @Mapping(target = "observacion", source = "justification")
-    IndividualNewsHistory toEntity(IndividualNewsRequestDTO request);
+    IndividualNewsResponseDTO createUpdateRequest(String pHeader, String correlationId,
+                                                  String requestId, String user,
+                                                  IndividualNewsRequestDTO request);
+
+    /**
+     * Registra una solicitud de eliminación sobre un movimiento.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario que solicita la eliminación.
+     * @param request       identificador y justificación.
+     * @return la novedad creada.
+     */
+    IndividualNewsResponseDTO createDeleteRequest(String pHeader, String correlationId,
+                                                  String requestId, String user,
+                                                  IndividualNewsDeleteRequestDTO request);
+
+    /**
+     * Obtiene las novedades pendientes de autorización.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @return lista de novedades pendientes.
+     */
+    List<IndividualNewsResponseDTO> findPendingNews(String pHeader, String correlationId,
+                                                    String requestId);
+
+    /**
+     * Obtiene el detalle de una novedad pendiente para su revisión.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param code          identificador de la novedad.
+     * @return la novedad consultada.
+     */
+    IndividualNewsResponseDTO findPendingNewsByCode(String pHeader, String correlationId,
+                                                    String requestId, Long code);
+
+    /**
+     * Aplica una novedad pendiente sobre el histórico de movimientos.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario que autoriza el cambio.
+     * @param code          identificador de la novedad.
+     * @return la novedad procesada.
+     */
+    IndividualNewsResponseDTO approveNews(String pHeader, String correlationId,
+                                          String requestId, String user, Long code);
+
+    /**
+     * Cancela una novedad pendiente.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario que cancela la novedad.
+     * @param code          identificador de la novedad.
+     * @return la novedad cancelada.
+     */
+    IndividualNewsResponseDTO cancelNews(String pHeader, String correlationId,
+                                         String requestId, String user, Long code);
 }
