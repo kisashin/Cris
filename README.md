@@ -1,335 +1,277 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+package co.com.bnpparibas.cardif.closingclaims.api;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.ClaimMovementResponseDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsDeleteRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsRequestDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.individualnews.IndividualNewsResponseDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ClaimMovementHistory;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.IndividualNewsHistory;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseHeader;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
 import co.com.bnpparibas.cardif.closingclaims.domain.services.IIndividualNewsService;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsStatus;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.anums.NewsType;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.IndividualNewsMapper;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.messages.IndividualNewsMessage;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ClaimMovementHistoryRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.IndividualNewsHistoryRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
+import javax.validation.Valid;
 import java.util.List;
 
-@Service
-public class IndividualNewsServiceImpl implements IIndividualNewsService {
+/**
+ * API REST para la gestión de novedades individuales de movimientos.
+ *
+ * <p>Expone los endpoints necesarios para:</p>
+ * <ul>
+ *   <li>Consultar los movimientos de un siniestro sin novedad pendiente.</li>
+ *   <li>Solicitar la actualización o la eliminación de un movimiento.</li>
+ *   <li>Consultar las novedades pendientes de autorización.</li>
+ *   <li>Aprobar o cancelar una novedad pendiente.</li>
+ * </ul>
+ */
+@RestController
+@RequestMapping("/v1")
+@Tag(name = "Novedades individuales de movimientos")
+@CrossOrigin("*")
+public class IndividualNewsController {
 
-    private static final Logger logger =
-            LoggerFactory.getLogger(IndividualNewsServiceImpl.class);
+    private final IIndividualNewsService individualNewsService;
 
-    private static final int USER_MAX_LENGTH = 20;
-
-    private final ClaimMovementHistoryRepository claimMovementHistoryRepository;
-    private final IndividualNewsHistoryRepository individualNewsHistoryRepository;
-
-    public IndividualNewsServiceImpl(
-            ClaimMovementHistoryRepository claimMovementHistoryRepository,
-            IndividualNewsHistoryRepository individualNewsHistoryRepository) {
-
-        this.claimMovementHistoryRepository = claimMovementHistoryRepository;
-        this.individualNewsHistoryRepository = individualNewsHistoryRepository;
+    public IndividualNewsController(IIndividualNewsService individualNewsService) {
+        this.individualNewsService = individualNewsService;
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<ClaimMovementResponseDTO> findMovementsByClaimNumber(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            String claimNumber) {
+    /**
+     * Consulta los movimientos de un siniestro que no tienen novedad pendiente.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param claimNumber   número de siniestro a consultar.
+     * @return respuesta con los movimientos disponibles.
+     */
+    @GetMapping("/novedades-individuales/movimientos")
+    public ResponseEntity<ResponseModel<List<ClaimMovementResponseDTO>>> findMovements(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @RequestParam(value = "numeroSiniestro") final String claimNumber) {
 
-        try {
-            List<ClaimMovementHistory> movements = claimMovementHistoryRepository
-                    .findAvailableByClaimNumber(claimNumber, NewsStatus.PENDIENTE);
+        List<ClaimMovementResponseDTO> result =
+                individualNewsService.findMovementsByClaimNumber(
+                        pHeader, correlationId, requestId, claimNumber);
 
-            return IndividualNewsMapper.INSTANCE.toMovementResponseDTOList(movements);
+        ResponseModel<List<ClaimMovementResponseDTO>> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
+                        result);
 
-        } catch (Exception e) {
-            logger.error("Error finding movements by claimNumber={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    claimNumber, correlationId, requestId, e);
-
-            throw new BusinessException(e, null,
-                    IndividualNewsMessage.DATABASE_ACCESS_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public ClaimMovementResponseDTO findMovementById(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Long idCarvajal) {
+    /**
+     * Consulta un movimiento por su identificador Carvajal.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param idCarvajal    identificador del movimiento.
+     * @return respuesta con el movimiento consultado.
+     */
+    @GetMapping("/novedades-individuales/movimientos/{idCarvajal}")
+    public ResponseEntity<ResponseModel<ClaimMovementResponseDTO>> findMovementById(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @PathVariable final Long idCarvajal) {
 
-        ClaimMovementHistory movement = findMovementOrFail(idCarvajal);
+        ClaimMovementResponseDTO result =
+                individualNewsService.findMovementById(
+                        pHeader, correlationId, requestId, idCarvajal);
 
-        return IndividualNewsMapper.INSTANCE.toMovementResponseDTO(movement);
+        ResponseModel<ClaimMovementResponseDTO> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
+                        result);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @Override
-    @Transactional
-    public IndividualNewsResponseDTO createUpdateRequest(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            String user,
-            IndividualNewsRequestDTO request) {
+    /**
+     * Registra una solicitud de actualización sobre un movimiento.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario autenticado que realiza la solicitud.
+     * @param request       nuevos valores del movimiento.
+     * @return respuesta con la novedad creada.
+     */
+    @PostMapping("/novedades-individuales/actualizaciones")
+    public ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> createUpdateRequest(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @RequestHeader(value = "UID_USER", required = false) final String user,
+            @Valid @RequestBody final IndividualNewsRequestDTO request) {
 
-        validateMovementExists(request.getIdCarvajal());
-        validateNoPendingNews(request.getIdCarvajal());
+        IndividualNewsResponseDTO created =
+                individualNewsService.createUpdateRequest(
+                        pHeader, correlationId, requestId, user, request);
 
-        try {
-            IndividualNewsHistory entity = IndividualNewsMapper.INSTANCE.toEntity(request);
-            entity.setTipoNovedad(NewsType.ACTUALIZA);
-            entity.setEstado(NewsStatus.PENDIENTE);
-            entity.setFechaProceso(LocalDateTime.now());
-            entity.setIdUsuario(truncateUser(user));
+        ResponseModel<IndividualNewsResponseDTO> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.CREATED.value()).build(),
+                        created);
 
-            IndividualNewsHistory saved = individualNewsHistoryRepository.save(entity);
-
-            return IndividualNewsMapper.INSTANCE.toNewsResponseDTO(saved);
-
-        } catch (Exception e) {
-            logger.error("Error creating update request for idCarvajal={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    request.getIdCarvajal(), correlationId, requestId, e);
-
-            throw new BusinessException(e, null,
-                    IndividualNewsMessage.DATABASE_ACCESS_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    @Override
-    @Transactional
-    public IndividualNewsResponseDTO createDeleteRequest(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            String user,
-            IndividualNewsDeleteRequestDTO request) {
+    /**
+     * Registra una solicitud de eliminación sobre un movimiento.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario autenticado que realiza la solicitud.
+     * @param request       identificador y justificación.
+     * @return respuesta con la novedad creada.
+     */
+    @PostMapping("/novedades-individuales/eliminaciones")
+    public ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> createDeleteRequest(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @RequestHeader(value = "UID_USER", required = false) final String user,
+            @Valid @RequestBody final IndividualNewsDeleteRequestDTO request) {
 
-        ClaimMovementHistory movement = findMovementOrFail(request.getIdCarvajal());
-        validateNoPendingNews(request.getIdCarvajal());
+        IndividualNewsResponseDTO created =
+                individualNewsService.createDeleteRequest(
+                        pHeader, correlationId, requestId, user, request);
 
-        try {
-            IndividualNewsHistory entity = IndividualNewsHistory.builder()
-                    .idCarvajal(request.getIdCarvajal())
-                    .numeroSiniestro(movement.getNumeroSiniestro())
-                    .socio(movement.getSocio())
-                    .cobertura(movement.getCobertura())
-                    .ramo(movement.getRamo())
-                    .tipoMovimiento(movement.getTipoMovimiento())
-                    .observacion(request.getJustification())
-                    .tipoNovedad(NewsType.ELIMINA)
-                    .estado(NewsStatus.PENDIENTE)
-                    .fechaProceso(LocalDateTime.now())
-                    .idUsuario(truncateUser(user))
-                    .build();
+        ResponseModel<IndividualNewsResponseDTO> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.CREATED.value()).build(),
+                        created);
 
-            IndividualNewsHistory saved = individualNewsHistoryRepository.save(entity);
-
-            return IndividualNewsMapper.INSTANCE.toNewsResponseDTO(saved);
-
-        } catch (Exception e) {
-            logger.error("Error creating delete request for idCarvajal={}. "
-                            + "CorrelationId={}, RequestId={}",
-                    request.getIdCarvajal(), correlationId, requestId, e);
-
-            throw new BusinessException(e, null,
-                    IndividualNewsMessage.DATABASE_ACCESS_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<IndividualNewsResponseDTO> findPendingNews(
-            String pHeader,
-            String correlationId,
-            String requestId) {
+    /**
+     * Consulta las novedades pendientes de autorización.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @return respuesta con las novedades pendientes.
+     */
+    @GetMapping("/novedades-individuales")
+    public ResponseEntity<ResponseModel<List<IndividualNewsResponseDTO>>> findPendingNews(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId) {
 
-        try {
-            List<IndividualNewsHistory> pending = individualNewsHistoryRepository
-                    .findByEstadoOrderByCodigoAsc(NewsStatus.PENDIENTE);
+        List<IndividualNewsResponseDTO> result =
+                individualNewsService.findPendingNews(pHeader, correlationId, requestId);
 
-            return IndividualNewsMapper.INSTANCE.toNewsResponseDTOList(pending);
+        ResponseModel<List<IndividualNewsResponseDTO>> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
+                        result);
 
-        } catch (Exception e) {
-            logger.error("Error finding pending news. CorrelationId={}, RequestId={}",
-                    correlationId, requestId, e);
-
-            throw new BusinessException(e, null,
-                    IndividualNewsMessage.DATABASE_ACCESS_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public IndividualNewsResponseDTO findPendingNewsByCode(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            Long code) {
+    /**
+     * Consulta el detalle de una novedad pendiente.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param code          identificador de la novedad.
+     * @return respuesta con la novedad consultada.
+     */
+    @GetMapping("/novedades-individuales/{code}")
+    public ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> findPendingNewsByCode(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @PathVariable final Long code) {
 
-        IndividualNewsHistory news = findPendingByCode(code);
+        IndividualNewsResponseDTO result =
+                individualNewsService.findPendingNewsByCode(
+                        pHeader, correlationId, requestId, code);
 
-        return IndividualNewsMapper.INSTANCE.toNewsResponseDTO(news);
+        ResponseModel<IndividualNewsResponseDTO> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
+                        result);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @Override
-    @Transactional
-    public IndividualNewsResponseDTO approveNews(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            String user,
-            Long code) {
+    /**
+     * Aplica una novedad pendiente sobre el histórico de movimientos.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario autenticado que autoriza.
+     * @param code          identificador de la novedad.
+     * @return respuesta con la novedad procesada.
+     */
+    @PostMapping("/novedades-individuales/{code}/aprobar")
+    public ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> approveNews(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @RequestHeader(value = "UID_USER", required = false) final String user,
+            @PathVariable final Long code) {
 
-        IndividualNewsHistory news = findPendingByCode(code);
-        validateDifferentUser(news, user);
+        IndividualNewsResponseDTO processed =
+                individualNewsService.approveNews(
+                        pHeader, correlationId, requestId, user, code);
 
-        ClaimMovementHistory movement = findMovementOrFail(news.getIdCarvajal());
+        ResponseModel<IndividualNewsResponseDTO> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
+                        processed);
 
-        try {
-            if (NewsType.ELIMINA.equals(news.getTipoNovedad())) {
-                claimMovementHistoryRepository.delete(movement);
-            } else {
-                applyChanges(movement, news);
-                claimMovementHistoryRepository.save(movement);
-            }
-
-            news.setEstado(NewsStatus.PROCESADO);
-            news.setIdAutorizador(truncateUser(user));
-
-            IndividualNewsHistory processed = individualNewsHistoryRepository.save(news);
-
-            return IndividualNewsMapper.INSTANCE.toNewsResponseDTO(processed);
-
-        } catch (Exception e) {
-            logger.error("Error approving news code={}. CorrelationId={}, RequestId={}",
-                    code, correlationId, requestId, e);
-
-            throw new BusinessException(e, null,
-                    IndividualNewsMessage.DATABASE_ACCESS_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @Override
-    @Transactional
-    public IndividualNewsResponseDTO cancelNews(
-            String pHeader,
-            String correlationId,
-            String requestId,
-            String user,
-            Long code) {
+    /**
+     * Cancela una novedad pendiente.
+     *
+     * @param pHeader       encabezado opcional de seguridad.
+     * @param correlationId identificador de correlación.
+     * @param requestId     identificador de la petición.
+     * @param user          usuario autenticado que cancela.
+     * @param code          identificador de la novedad.
+     * @return respuesta con la novedad cancelada.
+     */
+    @PostMapping("/novedades-individuales/{code}/cancelar")
+    public ResponseEntity<ResponseModel<IndividualNewsResponseDTO>> cancelNews(
+            @RequestHeader(value = "_p", required = false) final String pHeader,
+            @RequestHeader(value = "correlation_id", required = false) final String correlationId,
+            @RequestHeader(value = "request_id", required = false) final String requestId,
+            @RequestHeader(value = "UID_USER", required = false) final String user,
+            @PathVariable final Long code) {
 
-        IndividualNewsHistory news = findPendingByCode(code);
+        IndividualNewsResponseDTO cancelled =
+                individualNewsService.cancelNews(
+                        pHeader, correlationId, requestId, user, code);
 
-        try {
-            news.setEstado(NewsStatus.CANCELADO);
-            news.setIdAutorizador(truncateUser(user));
+        ResponseModel<IndividualNewsResponseDTO> response =
+                new ResponseModel<>(correlationId,
+                        ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
+                        cancelled);
 
-            IndividualNewsHistory cancelled = individualNewsHistoryRepository.save(news);
-
-            return IndividualNewsMapper.INSTANCE.toNewsResponseDTO(cancelled);
-
-        } catch (Exception e) {
-            logger.error("Error cancelling news code={}. CorrelationId={}, RequestId={}",
-                    code, correlationId, requestId, e);
-
-            throw new BusinessException(e, null,
-                    IndividualNewsMessage.DATABASE_ACCESS_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private ClaimMovementHistory findMovementOrFail(Long idCarvajal) {
-        return claimMovementHistoryRepository.findById(idCarvajal)
-                .orElseThrow(() -> new BusinessException(null,
-                        IndividualNewsMessage.MOVEMENT_NOT_FOUND.getMessage(),
-                        HttpStatus.NOT_FOUND));
-    }
-
-    private IndividualNewsHistory findPendingByCode(Long code) {
-        return individualNewsHistoryRepository
-                .findByCodigoAndEstado(code, NewsStatus.PENDIENTE)
-                .orElseThrow(() -> new BusinessException(null,
-                        IndividualNewsMessage.NEWS_NOT_PENDING.getMessage(),
-                        HttpStatus.CONFLICT));
-    }
-
-    private void validateMovementExists(Long idCarvajal) {
-        if (!claimMovementHistoryRepository.existsById(idCarvajal)) {
-            throw new BusinessException(null,
-                    IndividualNewsMessage.MOVEMENT_NOT_FOUND.getMessage(),
-                    HttpStatus.NOT_FOUND);
-        }
-    }
-
-    private void validateNoPendingNews(Long idCarvajal) {
-        if (individualNewsHistoryRepository
-                .existsByIdCarvajalAndEstado(idCarvajal, NewsStatus.PENDIENTE)) {
-            throw new BusinessException(null,
-                    IndividualNewsMessage.PENDING_NEWS_EXISTS.getMessage(),
-                    HttpStatus.CONFLICT);
-        }
-    }
-
-    private void validateDifferentUser(IndividualNewsHistory news, String user) {
-        String authorizer = truncateUser(user);
-        if (news.getIdUsuario() != null && authorizer != null
-                && news.getIdUsuario().equalsIgnoreCase(authorizer)) {
-            throw new BusinessException(null,
-                    IndividualNewsMessage.SAME_USER_APPROVAL.getMessage(),
-                    HttpStatus.FORBIDDEN);
-        }
-    }
-
-    private void applyChanges(ClaimMovementHistory movement, IndividualNewsHistory news) {
-        movement.setSocio(news.getSocio());
-        movement.setNumeroSiniestro(news.getNumeroSiniestro());
-        movement.setFechaNacimiento(news.getFechaNacimiento());
-        movement.setCobertura(news.getCobertura());
-        movement.setRamo(news.getRamo());
-        movement.setFechaOcurrencia(news.getFechaOcurrencia());
-        movement.setFechaAvisoSocio(news.getFechaAvisoSocio());
-        movement.setFechaAvisoCardif(news.getFechaAvisoCardif());
-        movement.setBeneficiarioPago(news.getBeneficiarioPago());
-        movement.setCodSocio(news.getCodSocio());
-        movement.setIdCardif(news.getIdCardif());
-        movement.setLlaveSiniestro(news.getLlaveSiniestro());
-        movement.setEstadoSiniestro(news.getEstadoSiniestro());
-        movement.setEstadoMayor(news.getEstadoMayor());
-        movement.setTipoMovimiento(news.getTipoMovimiento());
-        movement.setCanal(news.getCanal());
-        movement.setPandemia(news.getPandemia());
-        movement.setTipoCoaseguro(news.getTipoCoaseguro());
-        movement.setVrCoaseguroRetenido(news.getVrCoaseguroRetenido());
-        movement.setVrCoaseguroCedido(news.getVrCoaseguroCedido());
-    }
-
-    private String truncateUser(String user) {
-        if (user == null || user.trim().isEmpty()) {
-            return null;
-        }
-        return user.length() > USER_MAX_LENGTH
-                ? user.substring(0, USER_MAX_LENGTH) : user;
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
