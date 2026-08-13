@@ -1,14 +1,75 @@
-select count(*) from Cardifwp.dbo.x100Grupo;
-select grupo, orden, SubGrupo, count(*) 
-from Cardifwp.dbo.x100Grupo group by grupo, orden, SubGrupo order by 1,2,3;
+USE CardifWP;
+GO
+INSERT INTO dbo.x100Grupo (Grupo, SubGrupo, Descripcion, Nit_Compania, x100_Participa, Fecha_Desde, Orden, AfectadoX, Valor, basex100)
+VALUES
+ ('RC','CSV','CV Agricola','900200435-3',1,'2022-02-05',0,'9001',1,NULL),
+ ('RC','CSV','CV Agricola','900200435-3',1,'2022-02-05',0,'9002',1,NULL),
+ ('RC','CSV','CV Agricola','900200435-3',1,'2022-02-05',0,'9004',1,NULL),
+ ('RC','BNT','CV Banitsmo','633197-1-456744',1,'2023-01-05',0,'8901',1,NULL),
+ ('RC','BNT','CV Banitsmo','633197-1-456744',1,'2023-01-05',0,'8902',1,NULL),
+ ('RC','BNT','CV Banitsmo','633197-1-456744',1,'2023-01-05',0,'8905',1,NULL);
+GO
 
--- correr en PROD o en el ambiente donde el legacy sí funciona
-select * from Cardifwp.dbo.x100Grupo 
-where grupo='RC' and orden=0 and SubGrupo in ('CSV','BNT');
+USE SiniestrosWp;
+GO
+UPDATE dbo.TBL_Archivo_Cargue SET estado='ELIMINADO' WHERE id_archivo_cargue = 706;
+TRUNCATE TABLE dbo.TBL_Tmp_Valida_Cargue_Onbase;
+TRUNCATE TABLE dbo.TBL_Tmp_Onbase;
+GO
+
+select tipoasenda, tipocardif from homologatipomov
+where tipoasenda in ('APERTURA INICIAL','AUMENTO','PAGO DE CUOTA','REVERSA DE CUOTA');
+
+select estado_onbase, estado_cardif, subestado_cardif from homologatipoestados
+where estado_onbase in ('ANALISIS','REVISION DE PAGO','OBJECION RATIFICADA TERMINADA','SUSPENSO','PAGO ACEPTADO TERMINADO','PAGO CUOTAS POR PROGRAMAR');
+
+select tipomovimiento, agrupacion from Agrupamovimiento
+where tipomovimiento in ('APERTURA INICIAL','AUMENTO','PAGO DE CUOTA','REVERSA DE CUOTA');
 
 
-select top 20 * from TBL_Error order by Id_Error desc;
-select id_archivo_cargue, nombre, estado, registros, errores, cargadosanterior, porcargar, Id_Modulo 
-from TBL_Archivo_Cargue order by 1 desc;
-select Des_Error, count(*) from TBL_Tmp_Valida_Cargue_Onbase where Error=1 group by Des_Error;
-select count(*) from Cardifwp.dbo.x100Grupo where grupo='RC' and orden=0 and SubGrupo in ('CSV','BNT');
+
+
+
+package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+
+import lombok.*;
+
+import javax.persistence.Column;
+import javax.persistence.EmbeddedId;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import java.io.Serializable;
+
+@Entity
+@Table(name = "TBL_Archivo_Cargue")
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class ArchivoCargueTBL implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @EmbeddedId
+    private FileLoadId id;
+
+    @Column(name = "estado", length = 500)
+    private String estado;
+
+    @Column(name = "registros")
+    private Integer registros;
+
+    @Column(name = "errores")
+    private Integer errores;
+
+    @Column(name = "cargadosanterior")
+    private Integer cargadosanterior;
+
+    @Column(name = "porcargar")
+    private Integer porcargar;
+
+    @Column(name = "id_Modulo")
+    private Integer idModulo;
+
+}
