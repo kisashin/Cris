@@ -1,75 +1,131 @@
-USE CardifWP;
-GO
-INSERT INTO dbo.x100Grupo (Grupo, SubGrupo, Descripcion, Nit_Compania, x100_Participa, Fecha_Desde, Orden, AfectadoX, Valor, basex100)
-VALUES
- ('RC','CSV','CV Agricola','900200435-3',1,'2022-02-05',0,'9001',1,NULL),
- ('RC','CSV','CV Agricola','900200435-3',1,'2022-02-05',0,'9002',1,NULL),
- ('RC','CSV','CV Agricola','900200435-3',1,'2022-02-05',0,'9004',1,NULL),
- ('RC','BNT','CV Banitsmo','633197-1-456744',1,'2023-01-05',0,'8901',1,NULL),
- ('RC','BNT','CV Banitsmo','633197-1-456744',1,'2023-01-05',0,'8902',1,NULL),
- ('RC','BNT','CV Banitsmo','633197-1-456744',1,'2023-01-05',0,'8905',1,NULL);
-GO
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-USE SiniestrosWp;
-GO
-UPDATE dbo.TBL_Archivo_Cargue SET estado='ELIMINADO' WHERE id_archivo_cargue = 706;
-TRUNCATE TABLE dbo.TBL_Tmp_Valida_Cargue_Onbase;
-TRUNCATE TABLE dbo.TBL_Tmp_Onbase;
-GO
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoCargueTBL;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.FileLoadId;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.query.Procedure;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
-select tipoasenda, tipocardif from homologatipomov
-where tipoasenda in ('APERTURA INICIAL','AUMENTO','PAGO DE CUOTA','REVERSA DE CUOTA');
+import java.util.List;
 
-select estado_onbase, estado_cardif, subestado_cardif from homologatipoestados
-where estado_onbase in ('ANALISIS','REVISION DE PAGO','OBJECION RATIFICADA TERMINADA','SUSPENSO','PAGO ACEPTADO TERMINADO','PAGO CUOTAS POR PROGRAMAR');
+public interface FileUploadTBLRepository extends JpaRepository<ArchivoCargueTBL, FileLoadId> {
 
-select tipomovimiento, agrupacion from Agrupamovimiento
-where tipomovimiento in ('APERTURA INICIAL','AUMENTO','PAGO DE CUOTA','REVERSA DE CUOTA');
+    @Query(value = "SELECT id_modulo FROM dbo.TBL_Modulo WHERE codigo = :codigo", nativeQuery = true)
+    Integer findModuleIdByCode(@Param("codigo") String codigo);
 
+    @Query(value = "SELECT nombre, fechaproceso, estado, registros, errores, cargadosanterior, porcargar, id_Modulo "
+            + "FROM dbo.TBL_Archivo_Cargue WHERE estado = :estado AND id_Modulo = :idModulo", nativeQuery = true)
+    List<ArchivoCargueTBL> findByEstadoAndModule(@Param("estado") String estado,
+                                                 @Param("idModulo") Integer idModulo);
 
+    @Procedure(procedureName = "dbo.SP_Valida_Movimientos_Siniestros")
+    void executeMovementValidation(@Param("codigo_modulo") String codigoModulo);
 
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE dbo.TBL_Archivo_Cargue SET estado = 'ELIMINADO' "
+            + "WHERE estado = 'PENDIENTE' AND nombre = :nombreArchivo AND id_Modulo = :idModulo",
+            nativeQuery = true)
+    int markAsDeletedByFileName(@Param("nombreArchivo") String fileName,
+                                @Param("idModulo") Integer idModulo);
 
+    @Procedure(procedureName = "dbo.SP_Inserta_Movimientos_Siniestros")
+    void insertMovements(@Param("nombrearchivo") String fileName,
+                         @Param("codigo_modulo") String codigoModulo);
 
-package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+    @Query(value = "SELECT count(*) FROM dbo.TBL_Archivo_Cargue "
+            + "WHERE estado = 'PENDIENTE' AND id_Modulo = :idModulo", nativeQuery = true)
+    int getFilePending(@Param("idModulo") Integer idModulo);
 
-import lombok.*;
+    @Query(value = "SELECT count(*) FROM dbo.TBL_Error "
+            + "WHERE campo2 = 'VALIDANDO_CARGUE' AND campo1 = "
+            + "(SELECT MAX(id_archivo_cargue) FROM dbo.TBL_Archivo_Cargue "
+            + " WHERE id_Modulo = :idModulo AND estado = 'PENDIENTE')", nativeQuery = true)
+    int countValidationErrors(@Param("idModulo") Integer idModulo);
 
-import javax.persistence.Column;
-import javax.persistence.EmbeddedId;
-import javax.persistence.Entity;
-import javax.persistence.Table;
-import java.io.Serializable;
-
-@Entity
-@Table(name = "TBL_Archivo_Cargue")
-@Getter
-@Setter
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public class ArchivoCargueTBL implements Serializable {
-
-    private static final long serialVersionUID = 1L;
-
-    @EmbeddedId
-    private FileLoadId id;
-
-    @Column(name = "estado", length = 500)
-    private String estado;
-
-    @Column(name = "registros")
-    private Integer registros;
-
-    @Column(name = "errores")
-    private Integer errores;
-
-    @Column(name = "cargadosanterior")
-    private Integer cargadosanterior;
-
-    @Column(name = "porcargar")
-    private Integer porcargar;
-
-    @Column(name = "id_Modulo")
-    private Integer idModulo;
-
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM dbo.TBL_Archivo_Cargue WHERE id_archivo_cargue = "
+            + "(SELECT MAX(id_archivo_cargue) FROM dbo.TBL_Archivo_Cargue "
+            + " WHERE id_Modulo = :idModulo AND estado = 'PENDIENTE')", nativeQuery = true)
+    void deleteLastPending(@Param("idModulo") Integer idModulo);
 }
+
+
+
+
+
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.TBLTmpValidaCargueOnbase;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.TmpOnbaseId;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+@Repository
+public interface TBLTmpValidaCargueOnbaseRepository extends JpaRepository<TBLTmpValidaCargueOnbase, TmpOnbaseId> {
+
+    Page<TBLTmpValidaCargueOnbase> findByError(Integer error, Pageable pageable);
+
+    @Modifying
+    @Transactional
+    @Query(value = "TRUNCATE TABLE dbo.TBL_Tmp_Valida_Cargue_Onbase", nativeQuery = true)
+    void truncateTable();
+}
+
+private static final String MODULE_CODE = "centro_america";
+
+    @Override
+    public String uploadMovements(String pHeader, String correlationId, String requestId, MultipartFile file, String user, String flagCountry) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(null, "El archivo es requerido y no puede estar vacío.", HttpStatus.BAD_REQUEST);
+        }
+
+        String filename = extractFileName(file);
+        if (!(filename.endsWith(".xlsx") || filename.endsWith(".xls"))) {
+            throw new BusinessException(null, "Error: Debe Seleccionar un Archivo Valido (.xlsx o .xls).", HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        }
+
+        Integer moduleId = fileUploadRepository.findModuleIdByCode(MODULE_CODE);
+        if (moduleId == null) {
+            throw new BusinessException(null, "Error: Modulo no configurado.", HttpStatus.PRECONDITION_FAILED);
+        }
+
+        if (fileUploadRepository.getFilePending(moduleId) != 0) {
+            throw new BusinessException(null, "Error: Debe primero gestionar el archivo pendiente.", HttpStatus.PRECONDITION_FAILED);
+        }
+
+        tmpValidaCargueOnbaseRepository.truncateTable();
+
+        savePendingLoadFile(filename, moduleId);
+
+        readExcelFile.processExcel(file, flagCountry);
+
+        fileUploadRepository.executeMovementValidation(MODULE_CODE);
+
+        if (fileUploadRepository.countValidationErrors(moduleId) > 0) {
+            fileUploadRepository.deleteLastPending(moduleId);
+            throw new BusinessException(null, "Error validando el archivo cargado.", HttpStatus.PRECONDITION_FAILED);
+        }
+
+        saveLogApplication(user);
+
+        return "Cargado...";
+    }
+
+    @Transactional
+    public void savePendingLoadFile(String filename, Integer moduleId) {
+        fileUploadRepository.save(ArchivoCargueTBL.builder()
+                .estado(StatusFileLoad.PENDIENTE.name())
+                .idModulo(moduleId)
+                .id(FileLoadId.builder().nombre(filename).fechaproceso(new Date()).build())
+                .build());
+    }
+
+    
