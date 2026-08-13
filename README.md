@@ -1,8 +1,15 @@
-select AfectadoX, SubGrupo from Cardifwp.dbo.x100Grupo 
-where grupo='RC' and orden=0 and SubGrupo in ('CSV','BNT');
+select Valoraseguradototal, Vrmovimiento, Valordeuda 
+from TBL_Datos_reporte where NumeroSiniestro = '0892026A192647';
 
-select Id_Modulo, count(*) from TBL_Archivo_Cargue 
-where nombre like 'Cargue CA%' group by Id_Modulo;
+select Valoraseguradototal, Vrmovimiento 
+from TBL_Historico_Movimientos where id_historico_movimiento = 50578735;
 
 
-Esto en TEST
+select Certificado from TBL_Datos_reporte where NumeroSiniestro = '0892026A192647';
+
+
+
+select c.name, t.name as tipo, c.precision, c.scale
+from sys.columns c join sys.types t on t.user_type_id = c.user_type_id
+where c.object_id = object_id('dbo.TBL_Datos_reporte')
+and c.name in ('Valoraseguradototal','Vrmovimiento','Valordeuda','Certificado');
