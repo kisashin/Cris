@@ -1,2 +1,5 @@
-select count(*), max(Fechamovimiento2) from TBL_Historico_Movimientos;
-select top 20 * from TBL_Error order by 1 desc;
+select h.id_archivo_cargue, a.nombre, a.estado, count(*) as filas
+from TBL_Historico_Movimientos h
+left join TBL_Archivo_Cargue a on a.id_archivo_cargue = h.id_archivo_cargue
+group by h.id_archivo_cargue, a.nombre, a.estado
+order by h.id_archivo_cargue desc;
