@@ -1,10 +1,5 @@
-Select-String -Path "src\main\java\**\*.java" -Pattern "\x27\x27" -List
+,replace(convert(varchar(30),cast(A.Valordeuda as DECIMAL(18,2))),'.',',') as Valordeuda  
+,replace(convert(varchar(30),cast(A.Valoraseguradototal as DECIMAL(18,2))),'.',',') as Valoraseguradototal
 
-
--- ¿el SP lo agrega al armar el result set?
-select object_definition(object_id('dbo.SP_Reporte_Datos_Siniestros'));
-
-select c.name, t.name as tipo
-from sys.columns c join sys.types t on t.user_type_id = c.user_type_id
-where c.object_id = object_id('dbo.TBL_Historico_Movimientos') and t.name in ('float','real')
-order by c.column_id;
+,replace(convert(varchar(30),cast(A.vrReaseguroRetenido as DECIMAL(18,2))),'.',',') as vrReaseguroRetenido  
+,replace(convert(varchar(30),cast(A.vrReaseguroCedido as DECIMAL(18,2))),'.',',') as vrReaseguroCedido
