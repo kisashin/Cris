@@ -1,21 +1,22 @@
-SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH
+-- 1. El ancho de la columna que revienta (LA CLAVE)
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE COLUMN_NAME LIKE 'Cobertura%'
-  AND TABLE_NAME IN ('tmpsiniestros_ext','historicomovimientos_ext',
-                     'TBL_Asientos_siniestro','TBL_Historico_Movimientos');
+WHERE TABLE_NAME = 'tmpsiniestros_ext'
+ORDER BY ORDINAL_POSITION;
 
+-- 2. Compara con el origen
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'historicomovimientos_ext'
+  AND COLUMN_NAME IN ('Cobertura','Nombreasegurado','NumeroSiniestro','NroIdentificacion');
 
+-- 3. ¿Existe allá la cobertura larga?
+SELECT max(len(Cobertura)) largo_max, count(distinct Cobertura) variantes
+FROM historicomovimientos_ext;
 
- SELECT count(*) total, max(len(Cobertura)) largo_max,
-       sum(case when len(Cobertura) > 50 then 1 else 0 end) sobre_50
-FROM historicomovimientos_ext
-WHERE fechacontabilizacion is null
-  AND llavesiniestro in (select llavesiniestro from historico_inicial_ext);
-
-
-BEGIN TRY
-  EXEC sp_contabiliza_cardif_ext;
-END TRY
-BEGIN CATCH
-  SELECT ERROR_NUMBER(), ERROR_MESSAGE(), ERROR_LINE();
-END CATCH  
+-- 4. ¿El SP es el mismo?
+SELECT OBJECT_NAME(m.object_id) sp, LEN(m.definition) tam, o.modify_date
+FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id
+WHERE OBJECT_NAME(m.object_id) IN
+  ('sp_Gen_Xml_Siniestros_Reaseg_Ext','sp_contabiliza_cardif_ext',
+   'sp_Gen_Xml_Siniestros_ReasegCentro','sp_contabiliza_cardifCentro');
