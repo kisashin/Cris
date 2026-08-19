@@ -1,4 +1,3 @@
-SELECT count(*) total,
-       sum(case when isnull(vrReaseguroRetenido,0)=0 then 1 else 0 end) en_cero,
-       min(FechaMovimiento2) desde, max(FechaMovimiento2) hasta
-FROM TBL_Historico_Movimientos;
+SELECT BulkColumn
+FROM OPENROWSET(BULK 'd:\Carguesocios\Salida\XML\Sinie_ReasegCentro_Constitucion20260813.xml',
+                SINGLE_CLOB) x;
