@@ -1,16 +1,6 @@
--- El generador (la pieza que falta)
-EXEC sp_helptext 'sp_Gen_Xml_Siniestros_ReasegCentro';
-
--- Su equivalente Perú y el SP de contabilización Perú
-EXEC sp_helptext 'sp_contabiliza_cardif_ext';
-
--- ¿Quién más toca el buffer? Confirma o descarta la contaminación cross-país
-SELECT OBJECT_NAME(object_id), definition
-FROM sys.sql_modules
-WHERE definition LIKE '%TBL_Asientos_siniestro%';
-
--- ¿Hay escritura a disco?
-SELECT OBJECT_NAME(object_id)
-FROM sys.sql_modules
-WHERE definition LIKE '%xp_cmdshell%' OR definition LIKE '%bcp %'
-   OR definition LIKE '%OPENROWSET%';
+SELECT convert(nvarchar(6),FechaMovimiento2,112) periodo, tipoMovimiento, count(*), sum(vrmovimiento)
+FROM TBL_Historico_Movimientos
+WHERE fechacontabilizacion is null
+  AND llavesiniestro in (select llavesiniestro from TBL_historico_inicial)
+GROUP BY convert(nvarchar(6),FechaMovimiento2,112), tipoMovimiento
+ORDER BY 1;
