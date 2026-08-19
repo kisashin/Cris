@@ -1,3 +1,2 @@
-SELECT BulkColumn
-FROM OPENROWSET(BULK 'd:\Carguesocios\Salida\XML\Sinie_ReasegCentro_Constitucion20260813.xml',
-                SINGLE_CLOB) x;
+EXEC xp_cmdshell 'bcp "select top 1 name from SiniestrosWp.sys.objects" queryout "d:\Carguesocios\Salida\XML\_test.txt" -dSiniestrosWp -T -S BOGS005DVSQL02 -CRAW -c';
+EXEC xp_cmdshell 'dir d:\Carguesocios\Salida\XML\_test.txt';
