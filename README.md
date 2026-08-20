@@ -1,6 +1,4 @@
-SELECT Identificacion, COUNT(*) AS veces, COUNT(DISTINCT Nombre) AS nombres_distintos
+SELECT Identificacion, Nombre, Estado, Fecha, Proceso
 FROM dbo.historicoterceros WITH (NOLOCK)
-WHERE Proceso = 'PERU'
-GROUP BY Identificacion
-HAVING COUNT(*) > 1
-ORDER BY veces DESC;
+WHERE Identificacion IN ('47031846','48267407','70882062','16166025','30677354')
+ORDER BY Identificacion, Nombre;
