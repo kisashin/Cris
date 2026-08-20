@@ -1,5 +1,6 @@
 SELECT c.name, t.name AS tipo, c.max_length, c.precision, c.scale
-FROM sys.columns c
-JOIN sys.types t ON t.user_type_id = c.user_type_id
-WHERE c.object_id = OBJECT_ID('cardifwp.dbo.CUENTAS_CONTABLES_PROD')
-  AND c.name IN ('TIPODIARIO','CUENTA','NATURALEZA','REF_TRANSACCION','Formula','Iva','id');
+FROM cardifwp.sys.columns c
+JOIN cardifwp.sys.types t ON t.user_type_id = c.user_type_id
+WHERE c.object_id = (SELECT object_id FROM cardifwp.sys.objects
+                     WHERE name = 'CUENTAS_CONTABLES_PROD' AND type = 'U')
+ORDER BY c.column_id;
