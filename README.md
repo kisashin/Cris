@@ -1,10 +1,9 @@
--- ¿IDCARVAJAL es identity en historicomovimientos_ext? Si no lo es, hay que darle valor
-SELECT c.name, c.is_identity, c.is_nullable, t.name AS tipo
-FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id
-WHERE c.object_id = OBJECT_ID('dbo.historicomovimientos_ext')
-  AND c.name IN ('IDCARVAJAL','id','Fechamovimiento2','Ramo','Vrmovimiento');
+-- 1. ¿Hay unique/PK sobre IDCARVAJAL? Define si puedo generar valores libremente
+SELECT i.name, i.is_unique, i.is_primary_key, c.name AS columna
+FROM sys.indexes i
+JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+WHERE i.object_id = OBJECT_ID('dbo.historicomovimientos_ext');
 
--- ¿Qué valores de IVA tienen las 14 cuentas? Define qué Ramo sirve
-SELECT IVA, COUNT(*) FROM cardifwp.dbo.CUENTAS_CONTABLES_PROD
-WHERE GRUPO='RE' AND TIPODIARIO IN ('CRVSI','LRVSI','SINIE') GROUP BY IVA;
-
+-- 2. Rango actual, para elegir valores que no choquen
+SELECT MAX(IDCARVAJAL) AS max_idcarvajal FROM dbo.historicomovimientos_ext WITH (NOLOCK);
