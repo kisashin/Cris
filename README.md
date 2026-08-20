@@ -1,5 +1,2 @@
-SELECT convert(nvarchar(6), Fechamovimiento2, 112) AS periodo, COUNT(*)
-FROM dbo.historicomovimientos_ext WITH (NOLOCK)
-WHERE fechacontabilizacion IS NULL
-GROUP BY convert(nvarchar(6), Fechamovimiento2, 112)
-ORDER BY 1 DESC;
+ /** DEV: sin copia al file server. Descomentarear para TEST/PROD. */
+ exec xp_cmdshell 'Move d:\Carguesocios\Salida\XML\Prueba_Sinie_ReasegExt*.xml d:\Carguesocios\Salida\XML\bk\',no_output;
