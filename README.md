@@ -1,5 +1,6 @@
-USE SiniestrosWp;
-GO
-SET LOCK_TIMEOUT 5000;
-ALTER TABLE dbo.tmpsiniestros_ext ALTER COLUMN [Cobertura_afectada ] nvarchar(255) NULL;
-GO
+SELECT Identificacion, COUNT(*) AS veces, COUNT(DISTINCT Nombre) AS nombres_distintos
+FROM dbo.historicoterceros WITH (NOLOCK)
+WHERE Proceso = 'PERU'
+GROUP BY Identificacion
+HAVING COUNT(*) > 1
+ORDER BY veces DESC;
