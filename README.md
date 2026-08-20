@@ -1,10 +1,8 @@
-ALTER procedure  [dbo].[sp_Gen_Xml_Siniestros_Reaseg_Ext](@FC nvarchar(6)) as   
-BEGIN
-	SET ARITHABORT ON;
-	
-	declare @corte datetime=@FC+'01';
-	...
-
-  SET ARITHABORT OFF;
+USE [SiniestrosWp];
 GO
-EXEC dbo.sp_contabiliza_cardif_ext;
+SET ARITHABORT ON;
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SELECT SESSIONPROPERTY('ARITHABORT') AS arithabort;
