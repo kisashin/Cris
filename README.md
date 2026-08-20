@@ -1,15 +1,21 @@
-SELECT ISNULL(a.name, b.name) AS columna,
-       ta.name + '(' + CAST(a.max_length/2 AS varchar) + ')' AS colombia,
-       tb.name + '(' + CAST(b.max_length/2 AS varchar) + ')' AS peru
-FROM sys.columns a
-FULL JOIN sys.columns b
-       ON b.object_id = OBJECT_ID('dbo.tmpsiniestros_ext')
-      AND LTRIM(RTRIM(b.name)) = LTRIM(RTRIM(a.name))
-LEFT JOIN sys.types ta ON ta.user_type_id = a.user_type_id
-LEFT JOIN sys.types tb ON tb.user_type_id = b.user_type_id
-WHERE a.object_id = OBJECT_ID('dbo.tmpsiniestros')
-   OR b.object_id = OBJECT_ID('dbo.tmpsiniestros_ext');
-
-
-SELECT '[' + name + ']' AS nombre_exacto, LEN(name) AS largo
-FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tmpsiniestros_ext') AND name LIKE 'Cobertura%';   
+WITH col AS (
+    SELECT c.object_id,
+           LTRIM(RTRIM(c.name)) AS columna,
+           t.name AS tipo,
+           CASE WHEN c.max_length = -1 THEN -1
+                WHEN t.name LIKE 'n[cv]%' THEN c.max_length / 2
+                ELSE c.max_length END AS largo
+    FROM sys.columns c
+    JOIN sys.types t ON t.user_type_id = c.user_type_id
+)
+SELECT ISNULL(co.columna, pe.columna) AS columna,
+       ISNULL(co.tipo + '(' + CAST(co.largo AS varchar) + ')', '-- NO EXISTE --') AS colombia,
+       ISNULL(pe.tipo + '(' + CAST(pe.largo AS varchar) + ')', '-- NO EXISTE --') AS peru
+FROM       (SELECT * FROM col WHERE object_id = OBJECT_ID('dbo.tmpsiniestros'))     co
+FULL JOIN  (SELECT * FROM col WHERE object_id = OBJECT_ID('dbo.tmpsiniestros_ext')) pe
+       ON pe.columna = co.columna
+WHERE co.columna IS NULL
+   OR pe.columna IS NULL
+   OR co.tipo <> pe.tipo
+   OR co.largo <> pe.largo
+ORDER BY 1;
