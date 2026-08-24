@@ -1,330 +1,164 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
+package co.com.bnpparibas.cardif.closingclaims.api;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFile;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.CenterAccountingResultDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseHeader;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
 import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCentro;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
 import co.com.bnpparibas.cardif.closingclaims.domain.services.ICardifCenterClosingService;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterAccountingXmlHelper;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterClosingExcelHelper;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.messages.CardifCenterClosingMessage;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ArchivoAsientoCentroRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.CardifCenterClosingRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.StoredProcedureExecutor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
- * Implementacion del servicio de cierre de movimientos Cardif Centroamerica.
+ * API REST del cierre de movimientos Cardif Centroamerica.
  */
-@Slf4j
-@Service
-public class CardifCenterClosingServiceImpl
-        implements ICardifCenterClosingService {
+@RestController
+@RequestMapping("/v1")
+@Tag(name = "Cardif Center Closing")
+@CrossOrigin("*")
+public class CardifCenterClosingController {
 
-    private static final String PROCEDURE_CALL =
-            "EXEC dbo.sp_contabiliza_cardifCentro";
+    private static final String EXCEL_CONTENT_TYPE =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final String XML_CONTENT_TYPE = "application/xml";
 
-    private static final String SUCCESS_MESSAGE =
-            "Asientos generados con éxito.";
-    private static final String GENERATED_STATUS = "GENERADO";
+    @Value("${cardif.center.closing.report-filename:ReporteMovimientosCentro.xlsx}")
+    private String fileName;
 
-    private static final DateTimeFormatter PROCESS_DATE_FORMAT =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm:ss a");
+    private final ICardifCenterClosingService service;
 
-    private final CardifCenterClosingRepository repository;
-    private final ArchivoAsientoCentroRepository fileRepository;
-    private final CardifCenterClosingExcelHelper excelHelper;
-    private final CardifCenterAccountingXmlHelper xmlHelper;
-    private final StoredProcedureExecutor storedProcedureExecutor;
-
-    public CardifCenterClosingServiceImpl(
-            CardifCenterClosingRepository repository,
-            ArchivoAsientoCentroRepository fileRepository,
-            CardifCenterClosingExcelHelper excelHelper,
-            CardifCenterAccountingXmlHelper xmlHelper,
-            StoredProcedureExecutor storedProcedureExecutor) {
-        this.repository = repository;
-        this.fileRepository = fileRepository;
-        this.excelHelper = excelHelper;
-        this.xmlHelper = xmlHelper;
-        this.storedProcedureExecutor = storedProcedureExecutor;
+    public CardifCenterClosingController(
+            ICardifCenterClosingService service) {
+        this.service = service;
     }
 
-    @Override
-    @Transactional
-    public CenterAccountingResultDTO generateAccountingEntries(
+    /**
+     * Ejecuta la contabilizacion y persiste los XML generados.
+     */
+    @PutMapping(
+            path = "/cardif-center-closing/generate",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ResponseModel<CenterAccountingResultDTO>>
+            generateAccountingEntries(
+            @RequestHeader(value = "_p", required = false)
             String pHeader,
+            @RequestHeader(value = "correlation_id", required = false)
             String correlationId,
+            @RequestHeader(value = "request_id", required = false)
             String requestId) {
 
-        List<AccountingXmlLine> lines =
-                executeProcedure(correlationId, requestId);
-
-        List<AccountingXmlFile> files =
-                buildFiles(lines, correlationId, requestId);
-
-        if (files.isEmpty()) {
-            throw new BusinessException(
-                    null,
-                    CardifCenterClosingMessage
-                            .NO_ACCOUNTING_ENTRIES_GENERATED.getMessage(),
-                    HttpStatus.NOT_FOUND);
-        }
-
-        String period = lines.get(0).getPeriod();
-        List<ArchivoAsientoCentro> saved =
-                saveFiles(files, period, correlationId, requestId);
-
-        return CenterAccountingResultDTO.builder()
-                .message(SUCCESS_MESSAGE)
-                .period(period)
-                .files(toDto(saved))
-                .build();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<AccountingXmlFileDTO> findGeneratedFiles(
-            String correlationId,
-            String requestId) {
-        try {
-            return toDto(fileRepository.findLatest());
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error consultando los archivos generados",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ArchivoAsientoCentro findXmlFile(
-            Integer id,
-            String correlationId,
-            String requestId) {
-
-        ArchivoAsientoCentro file;
-
-        try {
-            file = fileRepository.findById(id).orElse(null);
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error consultando el archivo XML",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-
-        if (file == null || file.getContenido() == null) {
-            throw new BusinessException(
-                    null,
-                    CardifCenterClosingMessage
-                            .XML_FILE_NOT_FOUND.getMessage(),
-                    HttpStatus.NOT_FOUND);
-        }
-
-        return file;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public byte[] downloadMovementsReport(
-            String pHeader,
-            String correlationId,
-            String requestId) {
-
-        List<CardifCenterClosing> movements =
-                findMovements(correlationId, requestId);
-
-        validateMovements(movements);
-        return generateExcel(movements, correlationId, requestId);
-    }
-
-    private List<AccountingXmlLine> executeProcedure(
-            String correlationId,
-            String requestId) {
-        try {
-            return storedProcedureExecutor.query(
-                    PROCEDURE_CALL,
-                    resultSet -> AccountingXmlLine.builder()
-                            .period(resultSet.getString("Periodo"))
-                            .pass(resultSet.getInt("Pasada"))
-                            .lineType(resultSet.getInt("id"))
-                            .movementType(resultSet.getString("Mv"))
-                            .sequence(resultSet.getLong("Secuencia"))
-                            .content(resultSet.getString("Line"))
-                            .build());
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error ejecutando la contabilización",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-    }
-
-    private List<AccountingXmlFile> buildFiles(
-            List<AccountingXmlLine> lines,
-            String correlationId,
-            String requestId) {
-        try {
-            return xmlHelper.buildFiles(lines);
-        } catch (RuntimeException exception) {
-            log.error(
-                    "Error generando archivos XML. correlationId={}, requestId={}",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw new BusinessException(
-                    exception,
-                    null,
-                    CardifCenterClosingMessage
-                            .XML_GENERATION_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private List<ArchivoAsientoCentro> saveFiles(
-            List<AccountingXmlFile> files,
-            String period,
-            String correlationId,
-            String requestId) {
-
-        String batchId = UUID.randomUUID().toString();
-        LocalDateTime processDate = LocalDateTime.now();
-        List<ArchivoAsientoCentro> entities = new ArrayList<>();
-
-        for (AccountingXmlFile file : files) {
-            entities.add(ArchivoAsientoCentro.builder()
-                    .idLote(batchId)
-                    .periodo(period)
-                    .tipoMovimiento(file.getMovementType())
-                    .nombreArchivo(file.getFileName())
-                    .contenido(file.getContent())
-                    .cantidadLineas(file.getLineCount())
-                    .fechaproceso(processDate)
-                    .estado(GENERATED_STATUS)
-                    .build());
-        }
-
-        try {
-            return fileRepository.saveAll(entities);
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error guardando los archivos XML",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-    }
-
-    private List<AccountingXmlFileDTO> toDto(
-            List<ArchivoAsientoCentro> files) {
-
-        return files.stream()
-                .map(file -> AccountingXmlFileDTO.builder()
-                        .id(file.getId())
-                        .period(file.getPeriodo())
-                        .movementType(file.getTipoMovimiento())
-                        .fileName(file.getNombreArchivo())
-                        .lineCount(file.getCantidadLineas())
-                        .processDate(file.getFechaproceso() == null
-                                ? null
-                                : file.getFechaproceso()
-                                        .format(PROCESS_DATE_FORMAT))
-                        .status(file.getEstado())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    private List<CardifCenterClosing> findMovements(
-            String correlationId,
-            String requestId) {
-        try {
-            return repository.findAllForExport();
-        } catch (DataAccessException exception) {
-            logDatabaseError(
-                    "Error consultando los movimientos del reporte",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw databaseException(exception);
-        }
-    }
-
-    private byte[] generateExcel(
-            List<CardifCenterClosing> movements,
-            String correlationId,
-            String requestId) {
-        try {
-            return excelHelper.generateExcel(movements);
-        } catch (IOException exception) {
-            log.error(
-                    "Error generando Excel. correlationId={}, requestId={}",
-                    correlationId,
-                    requestId,
-                    exception);
-            throw new BusinessException(
-                    exception,
-                    null,
-                    CardifCenterClosingMessage
-                            .EXCEL_GENERATION_ERROR.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private void validateMovements(
-            List<CardifCenterClosing> movements) {
-        if (movements == null || movements.isEmpty()) {
-            throw new BusinessException(
-                    null,
-                    CardifCenterClosingMessage
-                            .NO_MOVEMENTS_TO_EXPORT.getMessage(),
-                    HttpStatus.NOT_FOUND);
-        }
-    }
-
-    private void logDatabaseError(
-            String message,
-            String correlationId,
-            String requestId,
-            DataAccessException exception) {
-        log.error(
-                "{}. correlationId={}, requestId={}",
-                message,
+        CenterAccountingResultDTO result = service.generateAccountingEntries(
+                pHeader,
                 correlationId,
-                requestId,
-                exception);
+                requestId);
+
+        return buildResponse(correlationId, result);
     }
 
-    private BusinessException databaseException(
-            DataAccessException exception) {
-        return new BusinessException(
-                exception,
-                null,
-                CardifCenterClosingMessage
-                        .DATABASE_ACCESS_ERROR.getMessage(),
-                HttpStatus.INTERNAL_SERVER_ERROR);
+    /**
+     * Consulta los archivos XML generados en procesos anteriores.
+     */
+    @GetMapping(
+            path = "/cardif-center-closing/files",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ResponseModel<List<AccountingXmlFileDTO>>>
+            findGeneratedFiles(
+            @RequestHeader(value = "correlation_id", required = false)
+            String correlationId,
+            @RequestHeader(value = "request_id", required = false)
+            String requestId) {
+
+        List<AccountingXmlFileDTO> files = service.findGeneratedFiles(
+                correlationId,
+                requestId);
+
+        return buildResponse(correlationId, files);
+    }
+
+    /**
+     * Descarga un archivo XML persistido.
+     */
+    @GetMapping(
+            path = "/cardif-center-closing/files/{id}/download",
+            produces = XML_CONTENT_TYPE)
+    public ResponseEntity<byte[]> downloadXmlFile(
+            @PathVariable("id") Integer id,
+            @RequestHeader(value = "correlation_id", required = false)
+            String correlationId,
+            @RequestHeader(value = "request_id", required = false)
+            String requestId) {
+
+        ArchivoAsientoCentro file = service.findXmlFile(
+                id,
+                correlationId,
+                requestId);
+
+        byte[] content = file.getContenido()
+                .getBytes(StandardCharsets.UTF_8);
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\""
+                                + file.getNombreArchivo() + "\"")
+                .contentType(MediaType.parseMediaType(XML_CONTENT_TYPE))
+                .contentLength(content.length)
+                .body(content);
+    }
+
+    /**
+     * Descarga el reporte de movimientos en formato Excel.
+     */
+    @GetMapping(
+            path = "/cardif-center-closing/download",
+            produces = EXCEL_CONTENT_TYPE)
+    public ResponseEntity<byte[]> downloadMovementsReport(
+            @RequestHeader(value = "_p", required = false)
+            String pHeader,
+            @RequestHeader(value = "correlation_id", required = false)
+            String correlationId,
+            @RequestHeader(value = "request_id", required = false)
+            String requestId) {
+
+        byte[] file = service.downloadMovementsReport(
+                pHeader,
+                correlationId,
+                requestId);
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.parseMediaType(EXCEL_CONTENT_TYPE))
+                .contentLength(file.length)
+                .body(file);
+    }
+
+    private <T> ResponseEntity<ResponseModel<T>> buildResponse(
+            String correlationId,
+            T data) {
+
+        ResponseModel<T> response = new ResponseModel<>(
+                correlationId,
+                ResponseHeader.builder()
+                        .returnCode(HttpStatus.OK.value())
+                        .build(),
+                data);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
