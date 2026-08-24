@@ -1,34 +1,79 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * Errores controlados del cierre de movimientos Cardif Centroamerica.
+ * Linea del XML contable devuelta por el procedimiento de contabilizacion.
  */
-public enum CardifCenterClosingMessage {
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AccountingXmlLine {
 
-    /** La vista no devolvio movimientos para exportar a Excel. */
-    NO_MOVEMENTS_TO_EXPORT("No existen movimientos para generar el archivo"),
-
-    /** Falla al construir el archivo Excel. */
-    EXCEL_GENERATION_ERROR("Error al generar el archivo Excel"),
-
-    /** El procedimiento no devolvio lineas contables para el periodo. */
-    NO_ACCOUNTING_ENTRIES_GENERATED(
-            "No se generaron asientos contables para el periodo"),
-
-    /** Falla al construir los archivos XML contables. */
-    XML_GENERATION_ERROR("Error al generar los archivos XML contables"),
-
-    /** Falla al acceder a la base de datos del cierre. */
-    DATABASE_ACCESS_ERROR(
-            "Error al acceder a la informacion del cierre de movimientos");
-
-    private final String message;
-
-    CardifCenterClosingMessage(String message) {
-        this.message = message;
-    }
-
-    public String getMessage() {
-        return message;
-    }
+    private String period;
+    private Integer pass;
+    private Integer lineType;
+    private String movementType;
+    private Long sequence;
+    private String content;
 }
+
+
+
+
+
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Archivo XML generado para un tipo de movimiento, con su contenido en Base64.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AccountingXmlFileDTO {
+
+    private String movementType;
+    private String fileName;
+    private int lineCount;
+    private String content;
+}
+
+
+
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+/**
+ * Resultado de la generacion de asientos contables de Centroamerica.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CenterAccountingResultDTO {
+
+    private String message;
+    private String processDate;
+    private String status;
+    private String period;
+    private List<AccountingXmlFileDTO> files;
+}
+
+
+
