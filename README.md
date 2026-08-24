@@ -1,79 +1,174 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
+import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
+import { HttpResponse } from '@angular/common/http';
+import { ToastrService } from 'ngx-toastr';
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-/**
- * Linea del XML contable devuelta por el procedimiento de contabilizacion.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AccountingXmlLine {
-
-    private String period;
-    private Integer pass;
-    private Integer lineType;
-    private String movementType;
-    private Long sequence;
-    private String content;
-}
-
-
-
-
-
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import { AccountingClosingCaService } from '../../services/accounting-closing-ca.service';
+import {
+  IAccountingXmlFile,
+  ICenterAccountingResult
+} from '../../models/center-accounting-result.model';
 
 /**
- * Archivo XML generado para un tipo de movimiento, con su contenido en Base64.
+ * Pantalla Cierre Mensual (Centroamerica).
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AccountingXmlFileDTO {
+@Component({
+  selector: 'app-accounting-closing-ca',
+  imports: [CommonModule],
+  standalone: true,
+  templateUrl: './accounting-closing-ca.component.html',
+  styleUrl: './accounting-closing-ca.component.scss',
+})
+export class AccountingClosingCAComponent {
 
-    private String movementType;
-    private String fileName;
-    private int lineCount;
-    private String content;
+  private static readonly XML_CONTENT_TYPE = 'application/xml';
+
+  public isGenerating = false;
+  public isDownloading = false;
+  public result: ICenterAccountingResult | null = null;
+
+  constructor(
+    private readonly accountingClosingCaService: AccountingClosingCaService,
+    private readonly toastr: ToastrService
+  ) {}
+
+  /**
+   * Ejecuta la generacion de los asientos contables.
+   */
+  public generateAccountingEntries(): void {
+    if (this.isGenerating) {
+      return;
+    }
+
+    this.isGenerating = true;
+
+    this.accountingClosingCaService
+      .generateAccountingEntries()
+      .subscribe({
+        next: response => {
+          this.result = response?.bodyResponse ?? null;
+
+          this.toastr.success(
+            this.result?.message ?? 'Proceso ejecutado correctamente.'
+          );
+          this.isGenerating = false;
+        },
+        error: error => {
+          console.error(
+            'Error generating Centroamerica accounting entries:',
+            error
+          );
+
+          this.result = null;
+          this.toastr.error(
+            'No fue posible generar los asientos contables.'
+          );
+          this.isGenerating = false;
+        }
+      });
+  }
+
+  /**
+   * Descarga el XML de un tipo de movimiento.
+   */
+  public downloadXmlFile(file: IAccountingXmlFile): void {
+    if (!file?.content) {
+      this.toastr.warning(
+        'El archivo generado no contiene información.'
+      );
+      return;
+    }
+
+    const blob = this.decodeBase64(file.content);
+    this.saveFile(blob, file.fileName);
+  }
+
+  /**
+   * Descarga el reporte de movimientos en formato Excel.
+   */
+  public downloadReport(): void {
+    if (this.isDownloading) {
+      return;
+    }
+
+    this.isDownloading = true;
+
+    this.accountingClosingCaService
+      .downloadMovementsReport()
+      .subscribe({
+        next: response => {
+          this.saveExcelFile(response);
+          this.isDownloading = false;
+        },
+        error: error => {
+          console.error(
+            'Error downloading the Centroamerica movements report:',
+            error
+          );
+
+          this.toastr.error(
+            'No fue posible descargar el reporte de movimientos.'
+          );
+          this.isDownloading = false;
+        }
+      });
+  }
+
+  private decodeBase64(content: string): Blob {
+    const binary = window.atob(content);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index++) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return new Blob(
+      [bytes],
+      { type: AccountingClosingCAComponent.XML_CONTENT_TYPE }
+    );
+  }
+
+  private saveExcelFile(
+    response: HttpResponse<Blob>
+  ): void {
+    const file = response.body;
+
+    if (!file || file.size === 0) {
+      this.toastr.warning(
+        'El archivo generado no contiene información.'
+      );
+      return;
+    }
+
+    this.saveFile(file, this.getFileName(response));
+
+    this.toastr.success(
+      'Reporte descargado correctamente.'
+    );
+  }
+
+  private saveFile(file: Blob, fileName: string): void {
+    const objectUrl = window.URL.createObjectURL(file);
+    const anchor = document.createElement('a');
+
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    anchor.click();
+
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
+  private getFileName(
+    response: HttpResponse<Blob>
+  ): string {
+    const contentDisposition =
+      response.headers.get('Content-Disposition');
+
+    const fileNameMatch = contentDisposition?.match(
+      /filename="?([^"]+)"?/
+    );
+
+    return fileNameMatch?.[1] ??
+      'ReporteMovimientosCentro.xlsx';
+  }
 }
-
-
-
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.util.List;
-
-/**
- * Resultado de la generacion de asientos contables de Centroamerica.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class CenterAccountingResultDTO {
-
-    private String message;
-    private String processDate;
-    private String status;
-    private String period;
-    private List<AccountingXmlFileDTO> files;
-}
-
-
-
