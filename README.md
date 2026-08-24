@@ -1,178 +1,150 @@
-package co.com.bnpparibas.cardif.closingclaims.api;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.CenterAccountingResultDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCentro;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.ICardifCenterClosingService;
-import org.junit.jupiter.api.BeforeEach;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFile;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@ExtendWith(MockitoExtension.class)
-class CardifCenterClosingControllerTest {
+class CardifCenterAccountingXmlHelperTest {
 
-    private static final String P_HEADER = "test";
-    private static final String CORRELATION_ID = "correlation-id";
-    private static final String REQUEST_ID = "request-id";
-    private static final String FILE_NAME = "ReporteMovimientosCentro.xlsx";
-    private static final String XML_NAME =
-            "Sinie_ReasegCentro_Pago20260824.xml";
+    private static final String HEADER =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC><Payload><Ledger>";
+    private static final String FOOTER = "</Ledger></Payload></SSC>";
 
-    @Mock
-    private ICardifCenterClosingService service;
+    private final CardifCenterAccountingXmlHelper helper =
+            new CardifCenterAccountingXmlHelper();
 
-    @InjectMocks
-    private CardifCenterClosingController controller;
-
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(controller, "fileName", FILE_NAME);
+    @Test
+    @DisplayName("Should return empty list when there are no lines")
+    void shouldReturnEmptyListWhenThereAreNoLines() {
+        assertTrue(helper.buildFiles(null).isEmpty());
+        assertTrue(helper.buildFiles(Collections.emptyList()).isEmpty());
     }
 
-    private AccountingXmlFileDTO fileDto() {
-        return AccountingXmlFileDTO.builder()
-                .id(1)
+    @Test
+    @DisplayName("Should build one file per movement type")
+    void shouldBuildOneFilePerMovementType() {
+        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
+                envelope(0, "enc", HEADER),
+                detail("Pago", 1L, "<Line>PAGO-1</Line>"),
+                detail("Pago", 2L, "<Line>PAGO-2</Line>"),
+                detail("Constitucion", 3L, "<Line>CON-1</Line>"),
+                envelope(3, "pie", FOOTER)));
+
+        List<AccountingXmlFile> files = helper.buildFiles(lines);
+
+        assertEquals(2, files.size());
+        assertEquals("Constitucion", files.get(0).getMovementType());
+        assertEquals("Pago", files.get(1).getMovementType());
+        assertEquals(1, files.get(0).getLineCount());
+        assertEquals(2, files.get(1).getLineCount());
+    }
+
+    @Test
+    @DisplayName("Should wrap details with header and footer")
+    void shouldWrapDetailsWithHeaderAndFooter() {
+        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
+                envelope(0, "enc", HEADER),
+                detail("Liberacion", 1L, "<Line>LIB-1</Line>"),
+                envelope(3, "pie", FOOTER)));
+
+        assertEquals(
+                HEADER + "<Line>LIB-1</Line>" + FOOTER,
+                helper.buildFiles(lines).get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("Should name files using the legacy convention")
+    void shouldNameFilesUsingLegacyConvention() {
+        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
+                envelope(0, "enc", HEADER),
+                detail("RevPago", 1L, "<Line>REV-1</Line>"),
+                envelope(3, "pie", FOOTER)));
+
+        String fileName = helper.buildFiles(lines).get(0).getFileName();
+
+        assertTrue(fileName.startsWith("Sinie_ReasegCentro_RevPago"));
+        assertTrue(fileName.endsWith(".xml"));
+        assertEquals(
+                "Sinie_ReasegCentro_RevPago".length() + 12,
+                fileName.length());
+    }
+
+    @Test
+    @DisplayName("Should ignore detail lines without content or movement type")
+    void shouldIgnoreIncompleteDetailLines() {
+        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
+                envelope(0, "enc", HEADER),
+                detail(null, 1L, "<Line>NO-MV</Line>"),
+                detail("Pago", 2L, null),
+                detail("Pago", 3L, "<Line>PAGO-1</Line>"),
+                envelope(3, "pie", FOOTER)));
+
+        List<AccountingXmlFile> files = helper.buildFiles(lines);
+
+        assertEquals(1, files.size());
+        assertEquals(1, files.get(0).getLineCount());
+    }
+
+    @Test
+    @DisplayName("Should build files with empty envelopes when they are missing")
+    void shouldBuildFilesWhenEnvelopesAreMissing() {
+        List<AccountingXmlLine> lines = Collections.singletonList(
+                detail("Objecion", 1L, "<Line>OBJ-1</Line>"));
+
+        assertEquals(
+                "<Line>OBJ-1</Line>",
+                helper.buildFiles(lines).get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("Should place unknown movement types at the end")
+    void shouldPlaceUnknownMovementTypesAtTheEnd() {
+        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
+                detail("Otro", 1L, "<Line>OTRO-1</Line>"),
+                detail("Constitucion", 2L, "<Line>CON-1</Line>")));
+
+        List<AccountingXmlFile> files = helper.buildFiles(lines);
+
+        assertEquals("Constitucion", files.get(0).getMovementType());
+        assertEquals("Otro", files.get(1).getMovementType());
+    }
+
+    private AccountingXmlLine detail(
+            String movementType,
+            Long sequence,
+            String content) {
+
+        return AccountingXmlLine.builder()
                 .period("202608")
-                .movementType("Pago")
-                .fileName(XML_NAME)
-                .lineCount(2)
-                .processDate("24/08/2026 03:03:29 p. m.")
-                .status("GENERADO")
+                .pass(1)
+                .lineType(2)
+                .movementType(movementType)
+                .sequence(sequence)
+                .content(content)
                 .build();
     }
 
-    @Nested
-    @DisplayName("Generate accounting entries")
-    class GenerateAccountingEntries {
+    private AccountingXmlLine envelope(
+            int lineType,
+            String movementType,
+            String content) {
 
-        @Test
-        @DisplayName("Should return the generated files")
-        void shouldReturnGeneratedFiles() {
-            CenterAccountingResultDTO expected =
-                    CenterAccountingResultDTO.builder()
-                            .message("Asientos generados con éxito.")
-                            .period("202608")
-                            .files(Collections.singletonList(fileDto()))
-                            .build();
-
-            when(service.generateAccountingEntries(
-                    P_HEADER, CORRELATION_ID, REQUEST_ID))
-                    .thenReturn(expected);
-
-            ResponseEntity<ResponseModel<CenterAccountingResultDTO>> response =
-                    controller.generateAccountingEntries(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNotNull(response.getBody());
-            assertEquals(expected, response.getBody().getBodyResponse());
-
-            verify(service).generateAccountingEntries(
-                    P_HEADER, CORRELATION_ID, REQUEST_ID);
-        }
-    }
-
-    @Nested
-    @DisplayName("Find generated files")
-    class FindGeneratedFiles {
-
-        @Test
-        @DisplayName("Should return the persisted files")
-        void shouldReturnPersistedFiles() {
-            List<AccountingXmlFileDTO> expected =
-                    Collections.singletonList(fileDto());
-
-            when(service.findGeneratedFiles(CORRELATION_ID, REQUEST_ID))
-                    .thenReturn(expected);
-
-            ResponseEntity<ResponseModel<List<AccountingXmlFileDTO>>> response =
-                    controller.findGeneratedFiles(CORRELATION_ID, REQUEST_ID);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNotNull(response.getBody());
-            assertEquals(expected, response.getBody().getBodyResponse());
-        }
-    }
-
-    @Nested
-    @DisplayName("Download XML file")
-    class DownloadXmlFile {
-
-        @Test
-        @DisplayName("Should stream the XML content as an attachment")
-        void shouldStreamXmlContent() {
-            ArchivoAsientoCentro file = ArchivoAsientoCentro.builder()
-                    .id(1)
-                    .nombreArchivo(XML_NAME)
-                    .contenido("<SSC/>")
-                    .build();
-
-            when(service.findXmlFile(1, CORRELATION_ID, REQUEST_ID))
-                    .thenReturn(file);
-
-            ResponseEntity<byte[]> response = controller.downloadXmlFile(
-                    1, CORRELATION_ID, REQUEST_ID);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertArrayEquals(
-                    "<SSC/>".getBytes(StandardCharsets.UTF_8),
-                    response.getBody());
-            assertEquals(
-                    "attachment; filename=\"" + XML_NAME + "\"",
-                    response.getHeaders()
-                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-            assertEquals(
-                    "application/xml",
-                    response.getHeaders().getContentType().toString());
-        }
-    }
-
-    @Nested
-    @DisplayName("Download movements report")
-    class DownloadMovementsReport {
-
-        @Test
-        @DisplayName("Should download Excel report successfully")
-        void shouldDownloadExcelReportSuccessfully() {
-            byte[] expectedFile = new byte[]{1, 2, 3, 4};
-
-            when(service.downloadMovementsReport(
-                    P_HEADER, CORRELATION_ID, REQUEST_ID))
-                    .thenReturn(expectedFile);
-
-            ResponseEntity<byte[]> response =
-                    controller.downloadMovementsReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertArrayEquals(expectedFile, response.getBody());
-            assertEquals(
-                    "attachment; filename=\"" + FILE_NAME + "\"",
-                    response.getHeaders()
-                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-            assertEquals(
-                    expectedFile.length,
-                    response.getHeaders().getContentLength());
-        }
+        return AccountingXmlLine.builder()
+                .period("202608")
+                .pass(1)
+                .lineType(lineType)
+                .movementType(movementType)
+                .sequence(0L)
+                .content(content)
+                .build();
     }
 }
