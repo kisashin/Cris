@@ -1,163 +1,277 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpResponse, HttpHeaders } from '@angular/common/http';
-import { ToastrService } from 'ngx-toastr';
-import { of, throwError } from 'rxjs';
+package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
 
-import { AccountingClosingCAComponent } from './accounting-closing-ca.component';
-import { AccountingClosingCaService } from '../../services/accounting-closing-ca.service';
-import { ICenterAccountingResult } from '../../models/center-accounting-result.model';
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFileDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.CenterAccountingResultDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterAccountingXmlHelper;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterClosingExcelHelper;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.CardifCenterClosingRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.StoredProcedureExecutor;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.StoredProcedureRowMapper;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
-describe('AccountingClosingCAComponent', () => {
-  let component: AccountingClosingCAComponent;
-  let fixture: ComponentFixture<AccountingClosingCAComponent>;
-  let service: jasmine.SpyObj<AccountingClosingCaService>;
-  let toastr: jasmine.SpyObj<ToastrService>;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
-  const result: ICenterAccountingResult = {
-    message: 'Asientos generados con éxito.',
-    processDate: '24/08/2026 03:03:29 p. m.',
-    status: 'PROCESADO',
-    period: '202608',
-    files: [
-      {
-        movementType: 'Pago',
-        fileName: 'Sinie_ReasegCentro_Pago20260824.xml',
-        lineCount: 2,
-        content: btoa('<SSC/>')
-      }
-    ]
-  };
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
-  beforeEach(async () => {
-    service = jasmine.createSpyObj('AccountingClosingCaService', [
-      'generateAccountingEntries',
-      'downloadMovementsReport'
-    ]);
+@ExtendWith(MockitoExtension.class)
+class CardifCenterClosingServiceImplTest {
 
-    toastr = jasmine.createSpyObj('ToastrService', [
-      'success',
-      'error',
-      'warning'
-    ]);
+    private static final String P_HEADER = "test";
+    private static final String CORRELATION_ID = "correlation-id";
+    private static final String REQUEST_ID = "request-id";
 
-    await TestBed.configureTestingModule({
-      imports: [AccountingClosingCAComponent],
-      providers: [
-        { provide: AccountingClosingCaService, useValue: service },
-        { provide: ToastrService, useValue: toastr }
-      ]
-    }).compileComponents();
+    @Mock
+    private CardifCenterClosingRepository repository;
 
-    fixture = TestBed.createComponent(AccountingClosingCAComponent);
-    component = fixture.componentInstance;
-  });
+    @Mock
+    private CardifCenterClosingExcelHelper excelHelper;
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
+    @Mock
+    private CardifCenterAccountingXmlHelper xmlHelper;
 
-  it('should store the generated files and show the success message', () => {
-    service.generateAccountingEntries.and.returnValue(
-      of({ bodyResponse: result } as any)
-    );
+    @Mock
+    private StoredProcedureExecutor storedProcedureExecutor;
 
-    component.generateAccountingEntries();
+    @InjectMocks
+    private CardifCenterClosingServiceImpl service;
 
-    expect(component.result).toEqual(result);
-    expect(component.isGenerating).toBeFalse();
-    expect(toastr.success).toHaveBeenCalledWith(result.message);
-  });
+    @Nested
+    @DisplayName("Generate accounting entries")
+    class GenerateAccountingEntries {
 
-  it('should not launch a second generation while one is running', () => {
-    component.isGenerating = true;
+        @Test
+        @DisplayName("Should return generated files when pending exist")
+        void shouldReturnGeneratedFilesWhenPendingExist() {
+            List<AccountingXmlLine> lines = Collections.singletonList(
+                    AccountingXmlLine.builder()
+                            .period("202608")
+                            .pass(1)
+                            .lineType(2)
+                            .movementType("Pago")
+                            .sequence(1L)
+                            .content("<Line>PAGO-1</Line>")
+                            .build());
 
-    component.generateAccountingEntries();
+            List<AccountingXmlFileDTO> files = Collections.singletonList(
+                    AccountingXmlFileDTO.builder()
+                            .movementType("Pago")
+                            .fileName("Sinie_ReasegCentro_Pago20260824.xml")
+                            .lineCount(1)
+                            .content("Y29udGVudA==")
+                            .build());
 
-    expect(service.generateAccountingEntries).not.toHaveBeenCalled();
-  });
+            when(repository.countPendingMovements()).thenReturn(2L);
+            when(storedProcedureExecutor.query(
+                    anyString(), any(StoredProcedureRowMapper.class)))
+                    .thenReturn(lines);
+            when(xmlHelper.buildFiles(lines)).thenReturn(files);
 
-  it('should clear the result when the generation fails', () => {
-    component.result = result;
-    service.generateAccountingEntries.and.returnValue(
-      throwError(() => new Error('error'))
-    );
+            CenterAccountingResultDTO result =
+                    service.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID);
 
-    component.generateAccountingEntries();
+            assertEquals("Asientos generados con éxito.", result.getMessage());
+            assertEquals("PROCESADO", result.getStatus());
+            assertEquals("202608", result.getPeriod());
+            assertEquals(1, result.getFiles().size());
+            assertNotNull(result.getProcessDate());
 
-    expect(component.result).toBeNull();
-    expect(component.isGenerating).toBeFalse();
-    expect(toastr.error).toHaveBeenCalled();
-  });
+            verify(repository).countPendingMovements();
+            verify(xmlHelper).buildFiles(lines);
+        }
 
-  it('should download the XML file of a movement type', () => {
-    const anchor = document.createElement('a');
-    spyOn(document, 'createElement').and.returnValue(anchor);
-    spyOn(anchor, 'click');
-    spyOn(window.URL, 'createObjectURL').and.returnValue('blob:xml');
-    spyOn(window.URL, 'revokeObjectURL');
+        @Test
+        @DisplayName("Should not execute procedure when there are no pending")
+        void shouldNotExecuteProcedureWhenNoPending() {
+            when(repository.countPendingMovements()).thenReturn(0L);
 
-    component.downloadXmlFile(result.files[0]);
+            CenterAccountingResultDTO result =
+                    service.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID);
 
-    expect(anchor.download).toBe(result.files[0].fileName);
-    expect(anchor.click).toHaveBeenCalled();
-    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:xml');
-  });
+            assertEquals(
+                    "No hay movimientos para contabilizar.",
+                    result.getMessage());
+            assertEquals("SIN MOVIMIENTOS", result.getStatus());
+            assertTrue(result.getFiles().isEmpty());
 
-  it('should warn when the XML file has no content', () => {
-    component.downloadXmlFile({
-      movementType: 'Pago',
-      fileName: 'Sinie_ReasegCentro_Pago20260824.xml',
-      lineCount: 0,
-      content: ''
-    });
+            verifyNoInteractions(storedProcedureExecutor);
+            verifyNoInteractions(xmlHelper);
+        }
 
-    expect(toastr.warning).toHaveBeenCalled();
-  });
+        @Test
+        @DisplayName("Should throw BusinessException when no files are built")
+        void shouldThrowWhenNoFilesAreBuilt() {
+            when(repository.countPendingMovements()).thenReturn(5L);
+            when(storedProcedureExecutor.query(
+                    anyString(), any(StoredProcedureRowMapper.class)))
+                    .thenReturn(Collections.emptyList());
+            when(xmlHelper.buildFiles(Collections.emptyList()))
+                    .thenReturn(Collections.emptyList());
 
-  it('should download the Excel report', () => {
-    const anchor = document.createElement('a');
-    spyOn(document, 'createElement').and.returnValue(anchor);
-    spyOn(anchor, 'click');
-    spyOn(window.URL, 'createObjectURL').and.returnValue('blob:xlsx');
-    spyOn(window.URL, 'revokeObjectURL');
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+        }
 
-    const response = new HttpResponse<Blob>({
-      body: new Blob(['data']),
-      headers: new HttpHeaders({
-        'Content-Disposition': 'attachment; filename="Reporte.xlsx"'
-      })
-    });
+        @Test
+        @DisplayName("Should throw BusinessException when counting fails")
+        void shouldThrowWhenCountingFails() {
+            when(repository.countPendingMovements())
+                    .thenThrow(new DataAccessResourceFailureException("DB error"));
 
-    service.downloadMovementsReport.and.returnValue(of(response));
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
 
-    component.downloadReport();
+            verifyNoInteractions(storedProcedureExecutor);
+        }
 
-    expect(anchor.download).toBe('Reporte.xlsx');
-    expect(component.isDownloading).toBeFalse();
-    expect(toastr.success).toHaveBeenCalled();
-  });
+        @Test
+        @DisplayName("Should throw BusinessException when procedure fails")
+        void shouldThrowWhenProcedureFails() {
+            when(repository.countPendingMovements()).thenReturn(1L);
+            when(storedProcedureExecutor.query(
+                    anyString(), any(StoredProcedureRowMapper.class)))
+                    .thenThrow(new DataAccessResourceFailureException("SP error"));
 
-  it('should warn when the Excel report is empty', () => {
-    const response = new HttpResponse<Blob>({
-      body: new Blob([]),
-      headers: new HttpHeaders()
-    });
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
 
-    service.downloadMovementsReport.and.returnValue(of(response));
+            verifyNoInteractions(xmlHelper);
+        }
 
-    component.downloadReport();
+        @Test
+        @DisplayName("Should throw BusinessException when XML building fails")
+        void shouldThrowWhenXmlBuildingFails() {
+            List<AccountingXmlLine> lines = Collections.singletonList(
+                    AccountingXmlLine.builder().lineType(2).build());
 
-    expect(toastr.warning).toHaveBeenCalled();
-  });
+            when(repository.countPendingMovements()).thenReturn(1L);
+            when(storedProcedureExecutor.query(
+                    anyString(), any(StoredProcedureRowMapper.class)))
+                    .thenReturn(lines);
+            when(xmlHelper.buildFiles(lines))
+                    .thenThrow(new IllegalStateException("XML error"));
 
-  it('should show an error when the Excel download fails', () => {
-    service.downloadMovementsReport.and.returnValue(
-      throwError(() => new Error('error'))
-    );
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.generateAccountingEntries(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+        }
+    }
 
-    component.downloadReport();
+    @Nested
+    @DisplayName("Download movements report")
+    class DownloadMovementsReport {
 
-    expect(component.isDownloading).toBeFalse();
-    expect(toastr.error).toHaveBeenCalled();
-  });
-});
+        @Test
+        @DisplayName("Should generate Excel successfully")
+        void shouldGenerateExcelSuccessfully() throws IOException {
+            List<CardifCenterClosing> movements =
+                    Collections.singletonList(
+                            CardifCenterClosing.builder().build());
+            byte[] expectedFile = new byte[]{1, 2, 3};
+
+            when(repository.findAllForExport()).thenReturn(movements);
+            when(excelHelper.generateExcel(movements)).thenReturn(expectedFile);
+
+            byte[] result = service.downloadMovementsReport(
+                    P_HEADER, CORRELATION_ID, REQUEST_ID);
+
+            assertArrayEquals(expectedFile, result);
+            verify(repository).findAllForExport();
+            verify(excelHelper).generateExcel(movements);
+        }
+
+        @Test
+        @DisplayName("Should throw BusinessException when movement list is empty")
+        void shouldThrowWhenListIsEmpty() {
+            when(repository.findAllForExport())
+                    .thenReturn(Collections.emptyList());
+
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.downloadMovementsReport(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+
+            verify(repository).findAllForExport();
+            verifyNoInteractions(excelHelper);
+        }
+
+        @Test
+        @DisplayName("Should throw BusinessException when movement list is null")
+        void shouldThrowWhenListIsNull() {
+            when(repository.findAllForExport()).thenReturn(null);
+
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.downloadMovementsReport(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+
+            verify(repository).findAllForExport();
+            verifyNoInteractions(excelHelper);
+        }
+
+        @Test
+        @DisplayName("Should throw BusinessException when query fails")
+        void shouldThrowWhenQueryFails() {
+            when(repository.findAllForExport())
+                    .thenThrow(new DataAccessResourceFailureException("DB error"));
+
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.downloadMovementsReport(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+
+            verify(repository).findAllForExport();
+            verifyNoInteractions(excelHelper);
+        }
+
+        @Test
+        @DisplayName("Should throw BusinessException when Excel generation fails")
+        void shouldThrowWhenExcelGenerationFails() throws IOException {
+            List<CardifCenterClosing> movements =
+                    Collections.singletonList(
+                            CardifCenterClosing.builder().build());
+
+            when(repository.findAllForExport()).thenReturn(movements);
+            when(excelHelper.generateExcel(movements))
+                    .thenThrow(new IOException("Excel error"));
+
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.downloadMovementsReport(
+                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+
+            verify(excelHelper).generateExcel(movements);
+            verify(repository, never()).countPendingMovements();
+        }
+    }
+}
