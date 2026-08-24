@@ -1,37 +1,64 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
+package co.com.bnpparibas.cardif.closingclaims.domain.services;
+
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFileDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.CenterAccountingResultDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCentro;
+
+import java.util.List;
 
 /**
- * Errores controlados del cierre de movimientos Cardif Centroamerica.
+ * Servicio para el cierre de movimientos Cardif Centroamerica.
  */
-public enum CardifCenterClosingMessage {
+public interface ICardifCenterClosingService {
 
-    /** La vista no devolvio movimientos para exportar a Excel. */
-    NO_MOVEMENTS_TO_EXPORT("No existen movimientos para generar el archivo"),
+    /**
+     * Ejecuta la contabilizacion de los movimientos pendientes y persiste los
+     * archivos XML generados por tipo de movimiento.
+     *
+     * @param pHeader encabezado de seguridad.
+     * @param correlationId identificador de correlacion.
+     * @param requestId identificador de la solicitud.
+     * @return resultado del proceso con los archivos generados.
+     */
+    CenterAccountingResultDTO generateAccountingEntries(
+            String pHeader,
+            String correlationId,
+            String requestId);
 
-    /** Falla al construir el archivo Excel. */
-    EXCEL_GENERATION_ERROR("Error al generar el archivo Excel"),
+    /**
+     * Consulta los archivos XML generados en procesos anteriores.
+     *
+     * @param correlationId identificador de correlacion.
+     * @param requestId identificador de la solicitud.
+     * @return archivos disponibles para descarga.
+     */
+    List<AccountingXmlFileDTO> findGeneratedFiles(
+            String correlationId,
+            String requestId);
 
-    /** El procedimiento no devolvio lineas contables para el periodo. */
-    NO_ACCOUNTING_ENTRIES_GENERATED(
-            "No se generaron asientos contables para el periodo"),
+    /**
+     * Consulta un archivo XML persistido por su identificador.
+     *
+     * @param id identificador del archivo.
+     * @param correlationId identificador de correlacion.
+     * @param requestId identificador de la solicitud.
+     * @return archivo con su contenido.
+     */
+    ArchivoAsientoCentro findXmlFile(
+            Integer id,
+            String correlationId,
+            String requestId);
 
-    /** Falla al construir los archivos XML contables. */
-    XML_GENERATION_ERROR("Error al generar los archivos XML contables"),
-
-    /** El archivo solicitado no existe o no tiene contenido. */
-    XML_FILE_NOT_FOUND("El archivo XML solicitado no existe"),
-
-    /** Falla al acceder a la base de datos del cierre. */
-    DATABASE_ACCESS_ERROR(
-            "Error al acceder a la informacion del cierre de movimientos");
-
-    private final String message;
-
-    CardifCenterClosingMessage(String message) {
-        this.message = message;
-    }
-
-    public String getMessage() {
-        return message;
-    }
+    /**
+     * Genera el archivo Excel del reporte de movimientos.
+     *
+     * @param pHeader encabezado de seguridad.
+     * @param correlationId identificador de correlacion.
+     * @param requestId identificador de la solicitud.
+     * @return contenido binario del archivo Excel.
+     */
+    byte[] downloadMovementsReport(
+            String pHeader,
+            String correlationId,
+            String requestId);
 }
