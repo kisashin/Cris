@@ -1,150 +1,124 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFile;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
+import org.hibernate.Session;
+import org.hibernate.jdbc.ReturningWork;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.ArrayList;
+import javax.persistence.EntityManager;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-class CardifCenterAccountingXmlHelperTest {
+@ExtendWith(MockitoExtension.class)
+class StoredProcedureExecutorTest {
 
-    private static final String HEADER =
-            "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC><Payload><Ledger>";
-    private static final String FOOTER = "</Ledger></Payload></SSC>";
+    private static final String CALL = "EXEC dbo.sp_test";
+    private static final int TIMEOUT = 180;
 
-    private final CardifCenterAccountingXmlHelper helper =
-            new CardifCenterAccountingXmlHelper();
+    @Mock
+    private EntityManager entityManager;
 
-    @Test
-    @DisplayName("Should return empty list when there are no lines")
-    void shouldReturnEmptyListWhenThereAreNoLines() {
-        assertTrue(helper.buildFiles(null).isEmpty());
-        assertTrue(helper.buildFiles(Collections.emptyList()).isEmpty());
+    @Mock
+    private Session session;
+
+    @Mock
+    private Connection connection;
+
+    @Mock
+    private CallableStatement statement;
+
+    private StoredProcedureExecutor executor;
+
+    @BeforeEach
+    void setUp() throws SQLException {
+        executor = new StoredProcedureExecutor();
+        ReflectionTestUtils.setField(
+                executor, "entityManager", entityManager);
+        executor.setTimeoutSeconds(TIMEOUT);
+
+        when(entityManager.unwrap(Session.class)).thenReturn(session);
+        when(connection.prepareCall(anyString())).thenReturn(statement);
     }
 
     @Test
-    @DisplayName("Should build one file per movement type")
-    void shouldBuildOneFilePerMovementType() {
-        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
-                envelope(0, "enc", HEADER),
-                detail("Pago", 1L, "<Line>PAGO-1</Line>"),
-                detail("Pago", 2L, "<Line>PAGO-2</Line>"),
-                detail("Constitucion", 3L, "<Line>CON-1</Line>"),
-                envelope(3, "pie", FOOTER)));
+    @DisplayName("Should map every row and close the result set")
+    void shouldMapEveryRowAndCloseResultSet() throws SQLException {
+        ResultSet resultSet = mock(ResultSet.class);
 
-        List<AccountingXmlFile> files = helper.buildFiles(lines);
+        when(statement.execute()).thenReturn(true);
+        when(statement.getResultSet()).thenReturn(resultSet);
+        when(statement.getUpdateCount()).thenReturn(-1);
+        when(statement.getMoreResults()).thenReturn(false);
+        when(resultSet.next()).thenReturn(true, true, false);
+        when(resultSet.getString("Line"))
+                .thenReturn("<Line>1</Line>", "<Line>2</Line>");
 
-        assertEquals(2, files.size());
-        assertEquals("Constitucion", files.get(0).getMovementType());
-        assertEquals("Pago", files.get(1).getMovementType());
-        assertEquals(1, files.get(0).getLineCount());
-        assertEquals(2, files.get(1).getLineCount());
-    }
+        mockReturningWork();
 
-    @Test
-    @DisplayName("Should wrap details with header and footer")
-    void shouldWrapDetailsWithHeaderAndFooter() {
-        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
-                envelope(0, "enc", HEADER),
-                detail("Liberacion", 1L, "<Line>LIB-1</Line>"),
-                envelope(3, "pie", FOOTER)));
+        List<String> rows = executor.query(
+                CALL, row -> row.getString("Line"));
 
         assertEquals(
-                HEADER + "<Line>LIB-1</Line>" + FOOTER,
-                helper.buildFiles(lines).get(0).getContent());
+                Arrays.asList("<Line>1</Line>", "<Line>2</Line>"), rows);
+
+        verify(statement).setQueryTimeout(TIMEOUT);
+        verify(resultSet).close();
+        verify(statement).close();
     }
 
     @Test
-    @DisplayName("Should name files using the legacy convention")
-    void shouldNameFilesUsingLegacyConvention() {
-        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
-                envelope(0, "enc", HEADER),
-                detail("RevPago", 1L, "<Line>REV-1</Line>"),
-                envelope(3, "pie", FOOTER)));
+    @DisplayName("Should return an empty list when there is no result set")
+    void shouldReturnEmptyListWhenThereIsNoResultSet() throws SQLException {
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
 
-        String fileName = helper.buildFiles(lines).get(0).getFileName();
+        mockReturningWork();
 
-        assertTrue(fileName.startsWith("Sinie_ReasegCentro_RevPago"));
-        assertTrue(fileName.endsWith(".xml"));
-        assertEquals(
-                "Sinie_ReasegCentro_RevPago".length() + 12,
-                fileName.length());
+        assertTrue(executor.query(CALL, row -> row.getString("Line")).isEmpty());
+        verify(statement).close();
     }
 
     @Test
-    @DisplayName("Should ignore detail lines without content or movement type")
-    void shouldIgnoreIncompleteDetailLines() {
-        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
-                envelope(0, "enc", HEADER),
-                detail(null, 1L, "<Line>NO-MV</Line>"),
-                detail("Pago", 2L, null),
-                detail("Pago", 3L, "<Line>PAGO-1</Line>"),
-                envelope(3, "pie", FOOTER)));
+    @DisplayName("Should propagate errors raised by the mapper")
+    void shouldPropagateMapperErrors() throws SQLException {
+        ResultSet resultSet = mock(ResultSet.class);
 
-        List<AccountingXmlFile> files = helper.buildFiles(lines);
+        when(statement.execute()).thenReturn(true);
+        when(statement.getResultSet()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
 
-        assertEquals(1, files.size());
-        assertEquals(1, files.get(0).getLineCount());
+        mockReturningWork();
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> executor.query(CALL, row -> {
+                    throw new IllegalStateException("mapper error");
+                }));
     }
 
-    @Test
-    @DisplayName("Should build files with empty envelopes when they are missing")
-    void shouldBuildFilesWhenEnvelopesAreMissing() {
-        List<AccountingXmlLine> lines = Collections.singletonList(
-                detail("Objecion", 1L, "<Line>OBJ-1</Line>"));
-
-        assertEquals(
-                "<Line>OBJ-1</Line>",
-                helper.buildFiles(lines).get(0).getContent());
-    }
-
-    @Test
-    @DisplayName("Should place unknown movement types at the end")
-    void shouldPlaceUnknownMovementTypesAtTheEnd() {
-        List<AccountingXmlLine> lines = new ArrayList<>(Arrays.asList(
-                detail("Otro", 1L, "<Line>OTRO-1</Line>"),
-                detail("Constitucion", 2L, "<Line>CON-1</Line>")));
-
-        List<AccountingXmlFile> files = helper.buildFiles(lines);
-
-        assertEquals("Constitucion", files.get(0).getMovementType());
-        assertEquals("Otro", files.get(1).getMovementType());
-    }
-
-    private AccountingXmlLine detail(
-            String movementType,
-            Long sequence,
-            String content) {
-
-        return AccountingXmlLine.builder()
-                .period("202608")
-                .pass(1)
-                .lineType(2)
-                .movementType(movementType)
-                .sequence(sequence)
-                .content(content)
-                .build();
-    }
-
-    private AccountingXmlLine envelope(
-            int lineType,
-            String movementType,
-            String content) {
-
-        return AccountingXmlLine.builder()
-                .period("202608")
-                .pass(1)
-                .lineType(lineType)
-                .movementType(movementType)
-                .sequence(0L)
-                .content(content)
-                .build();
+    @SuppressWarnings("unchecked")
+    private void mockReturningWork() {
+        when(session.doReturningWork(any(ReturningWork.class)))
+                .thenAnswer(invocation -> invocation
+                        .getArgument(0, ReturningWork.class)
+                        .execute(connection));
     }
 }
