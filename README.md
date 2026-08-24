@@ -6,16 +6,19 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Archivo XML armado en memoria antes de persistirse.
+ * Archivo XML contable disponible para descarga.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AccountingXmlFile {
+public class AccountingXmlFileDTO {
 
+    private Integer id;
+    private String period;
     private String movementType;
     private String fileName;
-    private int lineCount;
-    private String content;
+    private Integer lineCount;
+    private String processDate;
+    private String status;
 }
