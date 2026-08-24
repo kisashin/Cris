@@ -1,28 +1,21 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCentro;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * Repositorio de los archivos XML contables de Centroamerica.
+ * Archivo XML armado en memoria antes de persistirse.
  */
-@Repository
-public interface ArchivoAsientoCentroRepository
-        extends JpaRepository<ArchivoAsientoCentro, Integer> {
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AccountingXmlFile {
 
-    /**
-     * Consulta los archivos generados mas recientes.
-     *
-     * @return archivos ordenados del mas reciente al mas antiguo.
-     */
-    @Query(
-            value = "SELECT TOP 50 * "
-                    + "FROM dbo.archivoAsientoCentro "
-                    + "ORDER BY fechaproceso DESC, id DESC",
-            nativeQuery = true)
-    List<ArchivoAsientoCentro> findLatest();
+    private String movementType;
+    private String fileName;
+    private int lineCount;
+    private String content;
 }
