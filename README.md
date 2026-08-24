@@ -1,28 +1,80 @@
 package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+import org.hibernate.Session;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.sql.CallableStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Repositorio para el cierre de movimientos Cardif Centroamerica.
+ * Ejecuta procedimientos almacenados con timeout y cierre garantizado de
+ * statements y cursores. Disponible para cualquier modulo del servicio.
  */
-@Repository
-public interface CardifCenterClosingRepository
-        extends JpaRepository<CardifCenterClosing, Long> {
+@Component
+public class StoredProcedureExecutor {
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Value("${closing.stored-procedure.timeout-seconds:180}")
+    private int timeoutSeconds;
 
     /**
-     * Consulta todos los movimientos para generar el archivo Excel.
+     * Ejecuta un procedimiento y mapea todas las filas que devuelva.
      *
-     * @return registros de la vista del reporte.
+     * @param call sentencia de invocacion del procedimiento.
+     * @param mapper mapeo de cada fila del resultado.
+     * @param <T> tipo devuelto por el mapeo.
+     * @return filas mapeadas; lista vacia si el procedimiento no devuelve datos.
      */
-    @Query(
-            value = "SELECT * "
-                    + "FROM dbo.vw_mov_cardif_cen "
-                    + "ORDER BY IDCARVAJAL",
-            nativeQuery = true)
-    List<CardifCenterClosing> findAllForExport();
+    public <T> List<T> query(
+            String call,
+            StoredProcedureRowMapper<T> mapper) {
+
+        return entityManager.unwrap(Session.class)
+                .doReturningWork(connection -> {
+                    List<T> rows = new ArrayList<>();
+
+                    try (CallableStatement statement =
+                                 connection.prepareCall(call)) {
+
+                        statement.setQueryTimeout(timeoutSeconds);
+                        boolean hasResultSet = statement.execute();
+
+                        while (hasResultSet
+                                || statement.getUpdateCount() != -1) {
+
+                            if (hasResultSet) {
+                                readResultSet(statement, mapper, rows);
+                            }
+
+                            hasResultSet = statement.getMoreResults();
+                        }
+                    }
+
+                    return rows;
+                });
+    }
+
+    private <T> void readResultSet(
+            CallableStatement statement,
+            StoredProcedureRowMapper<T> mapper,
+            List<T> rows) throws SQLException {
+
+        try (ResultSet resultSet = statement.getResultSet()) {
+            while (resultSet.next()) {
+                rows.add(mapper.map(resultSet));
+            }
+        }
+    }
+
+    public void setTimeoutSeconds(int timeoutSeconds) {
+        this.timeoutSeconds = timeoutSeconds;
+    }
 }
