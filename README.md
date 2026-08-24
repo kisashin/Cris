@@ -1,41 +1,34 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
-
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
 
 /**
- * Repositorio para el cierre de movimientos Cardif Centroamerica.
+ * Errores controlados del cierre de movimientos Cardif Centroamerica.
  */
-@Repository
-public interface CardifCenterClosingRepository
-        extends JpaRepository<CardifCenterClosing, Long> {
+public enum CardifCenterClosingMessage {
 
-    /**
-     * Cuenta los movimientos pendientes por contabilizar.
-     *
-     * @return cantidad de movimientos pendientes.
-     */
-    @Query(
-            value = "SELECT COUNT(1) "
-                    + "FROM dbo.TBL_Historico_Movimientos "
-                    + "WHERE Fechacontabilizacion IS NULL "
-                    + "OR LTRIM(RTRIM(Fechacontabilizacion)) = ''",
-            nativeQuery = true)
-    long countPendingMovements();
+    /** La vista no devolvio movimientos para exportar a Excel. */
+    NO_MOVEMENTS_TO_EXPORT("No existen movimientos para generar el archivo"),
 
-    /**
-     * Consulta todos los movimientos para generar el archivo Excel.
-     *
-     * @return registros de la vista del reporte.
-     */
-    @Query(
-            value = "SELECT * "
-                    + "FROM dbo.vw_mov_cardif_cen "
-                    + "ORDER BY IDCARVAJAL",
-            nativeQuery = true)
-    List<CardifCenterClosing> findAllForExport();
+    /** Falla al construir el archivo Excel. */
+    EXCEL_GENERATION_ERROR("Error al generar el archivo Excel"),
+
+    /** El procedimiento no devolvio lineas contables para el periodo. */
+    NO_ACCOUNTING_ENTRIES_GENERATED(
+            "No se generaron asientos contables para el periodo"),
+
+    /** Falla al construir los archivos XML contables. */
+    XML_GENERATION_ERROR("Error al generar los archivos XML contables"),
+
+    /** Falla al acceder a la base de datos del cierre. */
+    DATABASE_ACCESS_ERROR(
+            "Error al acceder a la informacion del cierre de movimientos");
+
+    private final String message;
+
+    CardifCenterClosingMessage(String message) {
+        this.message = message;
+    }
+
+    public String getMessage() {
+        return message;
+    }
 }
