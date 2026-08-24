@@ -1,127 +1,135 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
-import org.hibernate.Session;
-import org.springframework.beans.factory.annotation.Value;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFileDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
 import org.springframework.stereotype.Component;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import java.sql.CallableStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Ejecuta procedimientos almacenados con timeout y cierre garantizado de
- * statements y cursores. Disponible para cualquier modulo del servicio.
+ * Arma los archivos XML contables a partir de las lineas devueltas por el
+ * procedimiento almacenado.
  */
 @Component
-public class StoredProcedureExecutor {
+public class CardifCenterAccountingXmlHelper {
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private static final int HEADER_TYPE = 0;
+    private static final int DETAIL_TYPE = 2;
+    private static final int FOOTER_TYPE = 3;
 
-    @Value("${closing.stored-procedure.timeout-seconds:180}")
-    private int timeoutSeconds;
+    private static final String FILE_PREFIX = "Sinie_ReasegCentro_";
+    private static final String FILE_EXTENSION = ".xml";
 
-    /**
-     * Ejecuta un procedimiento y mapea todas las filas que devuelva.
-     *
-     * @param call sentencia de invocacion del procedimiento.
-     * @param mapper mapeo de cada fila del resultado.
-     * @param <T> tipo devuelto por el mapeo.
-     * @return filas mapeadas; lista vacia si el procedimiento no devuelve datos.
-     */
-    public <T> List<T> query(
-            String call,
-            StoredProcedureRowMapper<T> mapper) {
+    private static final DateTimeFormatter FILE_DATE_FORMAT =
+            DateTimeFormatter.ofPattern("yyyyMMdd");
 
-        return entityManager.unwrap(Session.class)
-                .doReturningWork(connection -> {
-                    List<T> rows = new ArrayList<>();
-
-                    try (CallableStatement statement =
-                                 connection.prepareCall(call)) {
-
-                        statement.setQueryTimeout(timeoutSeconds);
-                        boolean hasResultSet = statement.execute();
-
-                        while (hasResultSet
-                                || statement.getUpdateCount() != -1) {
-
-                            if (hasResultSet) {
-                                readResultSet(statement, mapper, rows);
-                            }
-
-                            hasResultSet = statement.getMoreResults();
-                        }
-                    }
-
-                    return rows;
-                });
-    }
+    private static final List<String> MOVEMENT_ORDER = Arrays.asList(
+            "Constitucion", "Liberacion", "Objecion", "Pago", "RevPago");
 
     /**
-     * Ejecuta un procedimiento y descarta cualquier resultado que devuelva.
+     * Construye un archivo por cada tipo de movimiento con lineas de detalle.
      *
-     * @param call sentencia de invocacion del procedimiento.
+     * @param lines lineas devueltas por el procedimiento.
+     * @return archivos generados, con el contenido codificado en Base64.
      */
-    public void execute(String call) {
-        entityManager.unwrap(Session.class).doWork(connection -> {
-            try (CallableStatement statement =
-                         connection.prepareCall(call)) {
+    public List<AccountingXmlFileDTO> buildFiles(
+            List<AccountingXmlLine> lines) {
 
-                statement.setQueryTimeout(timeoutSeconds);
-                boolean hasResultSet = statement.execute();
+        List<AccountingXmlFileDTO> files = new ArrayList<>();
 
-                while (hasResultSet || statement.getUpdateCount() != -1) {
-                    if (hasResultSet) {
-                        statement.getResultSet().close();
-                    }
-                    hasResultSet = statement.getMoreResults();
-                }
-            }
-        });
+        if (lines == null || lines.isEmpty()) {
+            return files;
+        }
+
+        String header = findEnvelope(lines, HEADER_TYPE);
+        String footer = findEnvelope(lines, FOOTER_TYPE);
+        String fileDate = LocalDate.now().format(FILE_DATE_FORMAT);
+
+        for (Map.Entry<String, List<String>> entry
+                : groupDetails(lines).entrySet()) {
+
+            files.add(buildFile(
+                    entry.getKey(),
+                    entry.getValue(),
+                    header,
+                    footer,
+                    fileDate));
+        }
+
+        files.sort((first, second) -> Integer.compare(
+                movementOrder(first.getMovementType()),
+                movementOrder(second.getMovementType())));
+
+        return files;
     }
 
-    private <T> void readResultSet(
-            CallableStatement statement,
-            StoredProcedureRowMapper<T> mapper,
-            List<T> rows) throws SQLException {
+    private Map<String, List<String>> groupDetails(
+            List<AccountingXmlLine> lines) {
 
-        try (ResultSet resultSet = statement.getResultSet()) {
-            while (resultSet.next()) {
-                rows.add(mapper.map(resultSet));
+        Map<String, List<String>> details = new LinkedHashMap<>();
+
+        for (AccountingXmlLine line : lines) {
+            if (isDetail(line)) {
+                details.computeIfAbsent(
+                                line.getMovementType(),
+                                key -> new ArrayList<>())
+                        .add(line.getContent());
             }
         }
+
+        return details;
     }
 
-    public void setTimeoutSeconds(int timeoutSeconds) {
-        this.timeoutSeconds = timeoutSeconds;
+    private AccountingXmlFileDTO buildFile(
+            String movementType,
+            List<String> details,
+            String header,
+            String footer,
+            String fileDate) {
+
+        StringBuilder content = new StringBuilder(header);
+        details.forEach(content::append);
+        content.append(footer);
+
+        return AccountingXmlFileDTO.builder()
+                .movementType(movementType)
+                .fileName(FILE_PREFIX + movementType + fileDate
+                        + FILE_EXTENSION)
+                .lineCount(details.size())
+                .content(Base64.getEncoder().encodeToString(
+                        content.toString().getBytes(StandardCharsets.UTF_8)))
+                .build();
+    }
+
+    private String findEnvelope(
+            List<AccountingXmlLine> lines,
+            int lineType) {
+
+        return lines.stream()
+                .filter(line -> line.getLineType() != null
+                        && line.getLineType() == lineType)
+                .map(AccountingXmlLine::getContent)
+                .findFirst()
+                .orElse("");
+    }
+
+    private boolean isDetail(AccountingXmlLine line) {
+        return line.getLineType() != null
+                && line.getLineType() == DETAIL_TYPE
+                && line.getMovementType() != null
+                && line.getContent() != null;
+    }
+
+    private int movementOrder(String movementType) {
+        int index = MOVEMENT_ORDER.indexOf(movementType);
+        return index < 0 ? MOVEMENT_ORDER.size() : index;
     }
 }
-
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
-
-import java.sql.ResultSet;
-import java.sql.SQLException;
-
-/**
- * Convierte una fila de un ResultSet en un objeto de dominio.
- *
- * @param <T> tipo devuelto por el mapeo.
- */
-@FunctionalInterface
-public interface StoredProcedureRowMapper<T> {
-
-    /**
-     * Mapea la fila actual del ResultSet.
-     *
-     * @param resultSet cursor posicionado en la fila a mapear.
-     * @return objeto construido a partir de la fila.
-     * @throws SQLException si falla la lectura de una columna.
-     */
-    T map(ResultSet resultSet) throws SQLException;
-}
-
