@@ -1,174 +1,60 @@
-import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { HttpResponse } from '@angular/common/http';
-import { ToastrService } from 'ngx-toastr';
+import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
 
-import { AccountingClosingCaService } from '../../services/accounting-closing-ca.service';
-import {
-  IAccountingXmlFile,
-  ICenterAccountingResult
-} from '../../models/center-accounting-result.model';
+import { environment } from 'src/environments/environment';
+import { INewGeneralResponse } from '../models/new-general-response.interface';
+import { ICenterAccountingResult } from '../models/center-accounting-result.model';
 
 /**
- * Pantalla Cierre Mensual (Centroamerica).
+ * Servicio del cierre contable Centroamerica.
  */
-@Component({
-  selector: 'app-accounting-closing-ca',
-  imports: [CommonModule],
-  standalone: true,
-  templateUrl: './accounting-closing-ca.component.html',
-  styleUrl: './accounting-closing-ca.component.scss',
+@Injectable({
+  providedIn: 'root'
 })
-export class AccountingClosingCAComponent {
+export class AccountingClosingCaService {
 
-  private static readonly XML_CONTENT_TYPE = 'application/xml';
+  private readonly baseUrl =
+    `${environment.urlAPIClosingClaimsBackEnd}/v1/cardif-center-closing`;
 
-  public isGenerating = false;
-  public isDownloading = false;
-  public result: ICenterAccountingResult | null = null;
+  private readonly correlationId = crypto.randomUUID();
 
-  constructor(
-    private readonly accountingClosingCaService: AccountingClosingCaService,
-    private readonly toastr: ToastrService
-  ) {}
+  constructor(private readonly http: HttpClient) {}
 
   /**
-   * Ejecuta la generacion de los asientos contables.
+   * Ejecuta la generacion de los asientos contables y devuelve los XML.
    */
-  public generateAccountingEntries(): void {
-    if (this.isGenerating) {
-      return;
-    }
-
-    this.isGenerating = true;
-
-    this.accountingClosingCaService
-      .generateAccountingEntries()
-      .subscribe({
-        next: response => {
-          this.result = response?.bodyResponse ?? null;
-
-          this.toastr.success(
-            this.result?.message ?? 'Proceso ejecutado correctamente.'
-          );
-          this.isGenerating = false;
-        },
-        error: error => {
-          console.error(
-            'Error generating Centroamerica accounting entries:',
-            error
-          );
-
-          this.result = null;
-          this.toastr.error(
-            'No fue posible generar los asientos contables.'
-          );
-          this.isGenerating = false;
-        }
-      });
-  }
-
-  /**
-   * Descarga el XML de un tipo de movimiento.
-   */
-  public downloadXmlFile(file: IAccountingXmlFile): void {
-    if (!file?.content) {
-      this.toastr.warning(
-        'El archivo generado no contiene información.'
-      );
-      return;
-    }
-
-    const blob = this.decodeBase64(file.content);
-    this.saveFile(blob, file.fileName);
+  generateAccountingEntries(): Observable<INewGeneralResponse<ICenterAccountingResult>> {
+    return this.http.put<INewGeneralResponse<ICenterAccountingResult>>(
+      `${this.baseUrl}/generate`,
+      null,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
   }
 
   /**
    * Descarga el reporte de movimientos en formato Excel.
    */
-  public downloadReport(): void {
-    if (this.isDownloading) {
-      return;
-    }
-
-    this.isDownloading = true;
-
-    this.accountingClosingCaService
-      .downloadMovementsReport()
-      .subscribe({
-        next: response => {
-          this.saveExcelFile(response);
-          this.isDownloading = false;
-        },
-        error: error => {
-          console.error(
-            'Error downloading the Centroamerica movements report:',
-            error
-          );
-
-          this.toastr.error(
-            'No fue posible descargar el reporte de movimientos.'
-          );
-          this.isDownloading = false;
-        }
-      });
-  }
-
-  private decodeBase64(content: string): Blob {
-    const binary = window.atob(content);
-    const bytes = new Uint8Array(binary.length);
-
-    for (let index = 0; index < binary.length; index++) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-
-    return new Blob(
-      [bytes],
-      { type: AccountingClosingCAComponent.XML_CONTENT_TYPE }
+  downloadMovementsReport(): Observable<HttpResponse<Blob>> {
+    return this.http.get(
+      `${this.baseUrl}/download`,
+      {
+        headers: this.createHeaders(
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ),
+        observe: 'response',
+        responseType: 'blob'
+      }
     );
   }
 
-  private saveExcelFile(
-    response: HttpResponse<Blob>
-  ): void {
-    const file = response.body;
-
-    if (!file || file.size === 0) {
-      this.toastr.warning(
-        'El archivo generado no contiene información.'
-      );
-      return;
-    }
-
-    this.saveFile(file, this.getFileName(response));
-
-    this.toastr.success(
-      'Reporte descargado correctamente.'
-    );
-  }
-
-  private saveFile(file: Blob, fileName: string): void {
-    const objectUrl = window.URL.createObjectURL(file);
-    const anchor = document.createElement('a');
-
-    anchor.href = objectUrl;
-    anchor.download = fileName;
-    anchor.click();
-
-    window.URL.revokeObjectURL(objectUrl);
-  }
-
-  private getFileName(
-    response: HttpResponse<Blob>
-  ): string {
-    const contentDisposition =
-      response.headers.get('Content-Disposition');
-
-    const fileNameMatch = contentDisposition?.match(
-      /filename="?([^"]+)"?/
-    );
-
-    return fileNameMatch?.[1] ??
-      'ReporteMovimientosCentro.xlsx';
+  private createHeaders(accept: string): HttpHeaders {
+    return new HttpHeaders()
+      .set('correlation_id', this.correlationId)
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID())
+      .set('Accept', accept);
   }
 }
