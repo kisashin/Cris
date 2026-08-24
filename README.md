@@ -5,20 +5,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
- * Archivo XML contable disponible para descarga.
+ * Resultado de la generacion de asientos contables de Centroamerica.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AccountingXmlFileDTO {
+public class CenterAccountingResultDTO {
 
-    private Integer id;
+    private String message;
     private String period;
-    private String movementType;
-    private String fileName;
-    private Integer lineCount;
-    private String processDate;
-    private String status;
+    private List<AccountingXmlFileDTO> files;
 }
