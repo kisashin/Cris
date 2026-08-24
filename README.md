@@ -1,57 +1,28 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCentro;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.util.List;
 
-@Entity
-@Table(name = "archivoAsientoCentro")
-@Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class ArchivoAsientoCentro implements Serializable {
+/**
+ * Repositorio de los archivos XML contables de Centroamerica.
+ */
+@Repository
+public interface ArchivoAsientoCentroRepository
+        extends JpaRepository<ArchivoAsientoCentro, Integer> {
 
-    private static final long serialVersionUID = 1L;
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
-
-    @Column(name = "idLote", length = 36)
-    private String idLote;
-
-    @Column(name = "periodo", length = 6)
-    private String periodo;
-
-    @Column(name = "tipoMovimiento", length = 50)
-    private String tipoMovimiento;
-
-    @Column(name = "nombreArchivo", length = 500)
-    private String nombreArchivo;
-
-    @Column(name = "contenido", columnDefinition = "varchar(max)")
-    private String contenido;
-
-    @Column(name = "cantidadLineas")
-    private Integer cantidadLineas;
-
-    @Column(name = "fechaproceso")
-    private LocalDateTime fechaproceso;
-
-    @Column(name = "estado", length = 500)
-    private String estado;
+    /**
+     * Consulta los archivos generados mas recientes.
+     *
+     * @return archivos ordenados del mas reciente al mas antiguo.
+     */
+    @Query(
+            value = "SELECT TOP 50 * "
+                    + "FROM dbo.archivoAsientoCentro "
+                    + "ORDER BY fechaproceso DESC, id DESC",
+            nativeQuery = true)
+    List<ArchivoAsientoCentro> findLatest();
 }
