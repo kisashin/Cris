@@ -1,135 +1,258 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFileDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
-import org.springframework.stereotype.Component;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.CenterAccountingResultDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.CardifCenterClosing;
+import co.com.bnpparibas.cardif.closingclaims.domain.services.ICardifCenterClosingService;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterAccountingXmlHelper;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.CardifCenterClosingExcelHelper;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.messages.CardifCenterClosingMessage;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.CardifCenterClosingRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.StoredProcedureExecutor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
+import java.io.IOException;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Arma los archivos XML contables a partir de las lineas devueltas por el
- * procedimiento almacenado.
+ * Implementacion del servicio de cierre de movimientos Cardif Centroamerica.
  */
-@Component
-public class CardifCenterAccountingXmlHelper {
+@Slf4j
+@Service
+public class CardifCenterClosingServiceImpl
+        implements ICardifCenterClosingService {
 
-    private static final int HEADER_TYPE = 0;
-    private static final int DETAIL_TYPE = 2;
-    private static final int FOOTER_TYPE = 3;
+    private static final String PROCEDURE_CALL =
+            "EXEC dbo.sp_contabiliza_cardifCentro";
 
-    private static final String FILE_PREFIX = "Sinie_ReasegCentro_";
-    private static final String FILE_EXTENSION = ".xml";
+    private static final String SUCCESS_MESSAGE =
+            "Asientos generados con éxito.";
+    private static final String NO_PENDING_MESSAGE =
+            "No hay movimientos para contabilizar.";
 
-    private static final DateTimeFormatter FILE_DATE_FORMAT =
-            DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final String PROCESSED_STATUS = "PROCESADO";
+    private static final String PENDING_STATUS = "SIN MOVIMIENTOS";
 
-    private static final List<String> MOVEMENT_ORDER = Arrays.asList(
-            "Constitucion", "Liberacion", "Objecion", "Pago", "RevPago");
+    private static final DateTimeFormatter PROCESS_DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm:ss a");
 
-    /**
-     * Construye un archivo por cada tipo de movimiento con lineas de detalle.
-     *
-     * @param lines lineas devueltas por el procedimiento.
-     * @return archivos generados, con el contenido codificado en Base64.
-     */
-    public List<AccountingXmlFileDTO> buildFiles(
-            List<AccountingXmlLine> lines) {
+    private final CardifCenterClosingRepository repository;
+    private final CardifCenterClosingExcelHelper excelHelper;
+    private final CardifCenterAccountingXmlHelper xmlHelper;
+    private final StoredProcedureExecutor storedProcedureExecutor;
 
-        List<AccountingXmlFileDTO> files = new ArrayList<>();
-
-        if (lines == null || lines.isEmpty()) {
-            return files;
-        }
-
-        String header = findEnvelope(lines, HEADER_TYPE);
-        String footer = findEnvelope(lines, FOOTER_TYPE);
-        String fileDate = LocalDate.now().format(FILE_DATE_FORMAT);
-
-        for (Map.Entry<String, List<String>> entry
-                : groupDetails(lines).entrySet()) {
-
-            files.add(buildFile(
-                    entry.getKey(),
-                    entry.getValue(),
-                    header,
-                    footer,
-                    fileDate));
-        }
-
-        files.sort((first, second) -> Integer.compare(
-                movementOrder(first.getMovementType()),
-                movementOrder(second.getMovementType())));
-
-        return files;
+    public CardifCenterClosingServiceImpl(
+            CardifCenterClosingRepository repository,
+            CardifCenterClosingExcelHelper excelHelper,
+            CardifCenterAccountingXmlHelper xmlHelper,
+            StoredProcedureExecutor storedProcedureExecutor) {
+        this.repository = repository;
+        this.excelHelper = excelHelper;
+        this.xmlHelper = xmlHelper;
+        this.storedProcedureExecutor = storedProcedureExecutor;
     }
 
-    private Map<String, List<String>> groupDetails(
-            List<AccountingXmlLine> lines) {
+    @Override
+    @Transactional
+    public CenterAccountingResultDTO generateAccountingEntries(
+            String pHeader,
+            String correlationId,
+            String requestId) {
 
-        Map<String, List<String>> details = new LinkedHashMap<>();
-
-        for (AccountingXmlLine line : lines) {
-            if (isDetail(line)) {
-                details.computeIfAbsent(
-                                line.getMovementType(),
-                                key -> new ArrayList<>())
-                        .add(line.getContent());
-            }
+        if (countPending(correlationId, requestId) == 0) {
+            return buildResult(
+                    NO_PENDING_MESSAGE,
+                    PENDING_STATUS,
+                    null,
+                    Collections.emptyList());
         }
 
-        return details;
+        List<AccountingXmlLine> lines =
+                executeProcedure(correlationId, requestId);
+
+        List<AccountingXmlFileDTO> files = buildFiles(
+                lines, correlationId, requestId);
+
+        if (files.isEmpty()) {
+            throw new BusinessException(
+                    null,
+                    CardifCenterClosingMessage
+                            .NO_ACCOUNTING_ENTRIES_GENERATED.getMessage(),
+                    HttpStatus.NOT_FOUND);
+        }
+
+        return buildResult(
+                SUCCESS_MESSAGE,
+                PROCESSED_STATUS,
+                lines.get(0).getPeriod(),
+                files);
     }
 
-    private AccountingXmlFileDTO buildFile(
-            String movementType,
-            List<String> details,
-            String header,
-            String footer,
-            String fileDate) {
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] downloadMovementsReport(
+            String pHeader,
+            String correlationId,
+            String requestId) {
 
-        StringBuilder content = new StringBuilder(header);
-        details.forEach(content::append);
-        content.append(footer);
+        List<CardifCenterClosing> movements =
+                findMovements(correlationId, requestId);
 
-        return AccountingXmlFileDTO.builder()
-                .movementType(movementType)
-                .fileName(FILE_PREFIX + movementType + fileDate
-                        + FILE_EXTENSION)
-                .lineCount(details.size())
-                .content(Base64.getEncoder().encodeToString(
-                        content.toString().getBytes(StandardCharsets.UTF_8)))
+        validateMovements(movements);
+        return generateExcel(movements, correlationId, requestId);
+    }
+
+    private long countPending(
+            String correlationId,
+            String requestId) {
+        try {
+            return repository.countPendingMovements();
+        } catch (DataAccessException exception) {
+            logDatabaseError(
+                    "Error consultando movimientos pendientes",
+                    correlationId,
+                    requestId,
+                    exception);
+            throw databaseException(exception);
+        }
+    }
+
+    private List<AccountingXmlLine> executeProcedure(
+            String correlationId,
+            String requestId) {
+        try {
+            return storedProcedureExecutor.query(
+                    PROCEDURE_CALL,
+                    resultSet -> AccountingXmlLine.builder()
+                            .period(resultSet.getString("Periodo"))
+                            .pass(resultSet.getInt("Pasada"))
+                            .lineType(resultSet.getInt("id"))
+                            .movementType(resultSet.getString("Mv"))
+                            .sequence(resultSet.getLong("Secuencia"))
+                            .content(resultSet.getString("Line"))
+                            .build());
+        } catch (DataAccessException exception) {
+            logDatabaseError(
+                    "Error ejecutando la contabilización",
+                    correlationId,
+                    requestId,
+                    exception);
+            throw databaseException(exception);
+        }
+    }
+
+    private List<AccountingXmlFileDTO> buildFiles(
+            List<AccountingXmlLine> lines,
+            String correlationId,
+            String requestId) {
+        try {
+            return xmlHelper.buildFiles(lines);
+        } catch (RuntimeException exception) {
+            log.error(
+                    "Error generando archivos XML. correlationId={}, requestId={}",
+                    correlationId,
+                    requestId,
+                    exception);
+            throw new BusinessException(
+                    exception,
+                    null,
+                    CardifCenterClosingMessage
+                            .XML_GENERATION_ERROR.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private CenterAccountingResultDTO buildResult(
+            String message,
+            String status,
+            String period,
+            List<AccountingXmlFileDTO> files) {
+
+        return CenterAccountingResultDTO.builder()
+                .message(message)
+                .status(status)
+                .period(period)
+                .processDate(LocalDateTime.now().format(PROCESS_DATE_FORMAT))
+                .files(files)
                 .build();
     }
 
-    private String findEnvelope(
-            List<AccountingXmlLine> lines,
-            int lineType) {
-
-        return lines.stream()
-                .filter(line -> line.getLineType() != null
-                        && line.getLineType() == lineType)
-                .map(AccountingXmlLine::getContent)
-                .findFirst()
-                .orElse("");
+    private List<CardifCenterClosing> findMovements(
+            String correlationId,
+            String requestId) {
+        try {
+            return repository.findAllForExport();
+        } catch (DataAccessException exception) {
+            logDatabaseError(
+                    "Error consultando los movimientos del reporte",
+                    correlationId,
+                    requestId,
+                    exception);
+            throw databaseException(exception);
+        }
     }
 
-    private boolean isDetail(AccountingXmlLine line) {
-        return line.getLineType() != null
-                && line.getLineType() == DETAIL_TYPE
-                && line.getMovementType() != null
-                && line.getContent() != null;
+    private byte[] generateExcel(
+            List<CardifCenterClosing> movements,
+            String correlationId,
+            String requestId) {
+        try {
+            return excelHelper.generateExcel(movements);
+        } catch (IOException exception) {
+            log.error(
+                    "Error generando Excel. correlationId={}, requestId={}",
+                    correlationId,
+                    requestId,
+                    exception);
+            throw new BusinessException(
+                    exception,
+                    null,
+                    CardifCenterClosingMessage
+                            .EXCEL_GENERATION_ERROR.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
-    private int movementOrder(String movementType) {
-        int index = MOVEMENT_ORDER.indexOf(movementType);
-        return index < 0 ? MOVEMENT_ORDER.size() : index;
+    private void validateMovements(
+            List<CardifCenterClosing> movements) {
+        if (movements == null || movements.isEmpty()) {
+            throw new BusinessException(
+                    null,
+                    CardifCenterClosingMessage
+                            .NO_MOVEMENTS_TO_EXPORT.getMessage(),
+                    HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private void logDatabaseError(
+            String message,
+            String correlationId,
+            String requestId,
+            DataAccessException exception) {
+        log.error(
+                "{}. correlationId={}, requestId={}",
+                message,
+                correlationId,
+                requestId,
+                exception);
+    }
+
+    private BusinessException databaseException(
+            DataAccessException exception) {
+        return new BusinessException(
+                exception,
+                null,
+                CardifCenterClosingMessage
+                        .DATABASE_ACCESS_ERROR.getMessage(),
+                HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
