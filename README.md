@@ -1,131 +1,37 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
-
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlFile;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing.AccountingXmlLine;
-import org.springframework.stereotype.Component;
-
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
 
 /**
- * Arma los archivos XML contables a partir de las lineas devueltas por el
- * procedimiento almacenado.
+ * Errores controlados del cierre de movimientos Cardif Centroamerica.
  */
-@Component
-public class CardifCenterAccountingXmlHelper {
+public enum CardifCenterClosingMessage {
 
-    private static final int HEADER_TYPE = 0;
-    private static final int DETAIL_TYPE = 2;
-    private static final int FOOTER_TYPE = 3;
+    /** La vista no devolvio movimientos para exportar a Excel. */
+    NO_MOVEMENTS_TO_EXPORT("No existen movimientos para generar el archivo"),
 
-    private static final String FILE_PREFIX = "Sinie_ReasegCentro_";
-    private static final String FILE_EXTENSION = ".xml";
+    /** Falla al construir el archivo Excel. */
+    EXCEL_GENERATION_ERROR("Error al generar el archivo Excel"),
 
-    private static final DateTimeFormatter FILE_DATE_FORMAT =
-            DateTimeFormatter.ofPattern("yyyyMMdd");
+    /** El procedimiento no devolvio lineas contables para el periodo. */
+    NO_ACCOUNTING_ENTRIES_GENERATED(
+            "No se generaron asientos contables para el periodo"),
 
-    private static final List<String> MOVEMENT_ORDER = Arrays.asList(
-            "Constitucion", "Liberacion", "Objecion", "Pago", "RevPago");
+    /** Falla al construir los archivos XML contables. */
+    XML_GENERATION_ERROR("Error al generar los archivos XML contables"),
 
-    /**
-     * Construye un archivo por cada tipo de movimiento con lineas de detalle.
-     *
-     * @param lines lineas devueltas por el procedimiento.
-     * @return archivos generados con su contenido XML.
-     */
-    public List<AccountingXmlFile> buildFiles(List<AccountingXmlLine> lines) {
+    /** El archivo solicitado no existe o no tiene contenido. */
+    XML_FILE_NOT_FOUND("El archivo XML solicitado no existe"),
 
-        List<AccountingXmlFile> files = new ArrayList<>();
+    /** Falla al acceder a la base de datos del cierre. */
+    DATABASE_ACCESS_ERROR(
+            "Error al acceder a la informacion del cierre de movimientos");
 
-        if (lines == null || lines.isEmpty()) {
-            return files;
-        }
+    private final String message;
 
-        String header = findEnvelope(lines, HEADER_TYPE);
-        String footer = findEnvelope(lines, FOOTER_TYPE);
-        String fileDate = LocalDate.now().format(FILE_DATE_FORMAT);
-
-        for (Map.Entry<String, List<String>> entry
-                : groupDetails(lines).entrySet()) {
-
-            files.add(buildFile(
-                    entry.getKey(),
-                    entry.getValue(),
-                    header,
-                    footer,
-                    fileDate));
-        }
-
-        files.sort((first, second) -> Integer.compare(
-                movementOrder(first.getMovementType()),
-                movementOrder(second.getMovementType())));
-
-        return files;
+    CardifCenterClosingMessage(String message) {
+        this.message = message;
     }
 
-    private Map<String, List<String>> groupDetails(
-            List<AccountingXmlLine> lines) {
-
-        Map<String, List<String>> details = new LinkedHashMap<>();
-
-        for (AccountingXmlLine line : lines) {
-            if (isDetail(line)) {
-                details.computeIfAbsent(
-                                line.getMovementType(),
-                                key -> new ArrayList<>())
-                        .add(line.getContent());
-            }
-        }
-
-        return details;
-    }
-
-    private AccountingXmlFile buildFile(
-            String movementType,
-            List<String> details,
-            String header,
-            String footer,
-            String fileDate) {
-
-        StringBuilder content = new StringBuilder(header);
-        details.forEach(content::append);
-        content.append(footer);
-
-        return AccountingXmlFile.builder()
-                .movementType(movementType)
-                .fileName(FILE_PREFIX + movementType + fileDate
-                        + FILE_EXTENSION)
-                .lineCount(details.size())
-                .content(content.toString())
-                .build();
-    }
-
-    private String findEnvelope(
-            List<AccountingXmlLine> lines,
-            int lineType) {
-
-        return lines.stream()
-                .filter(line -> line.getLineType() != null
-                        && line.getLineType() == lineType)
-                .map(AccountingXmlLine::getContent)
-                .findFirst()
-                .orElse("");
-    }
-
-    private boolean isDetail(AccountingXmlLine line) {
-        return line.getLineType() != null
-                && line.getLineType() == DETAIL_TYPE
-                && line.getMovementType() != null
-                && line.getContent() != null;
-    }
-
-    private int movementOrder(String movementType) {
-        int index = MOVEMENT_ORDER.indexOf(movementType);
-        return index < 0 ? MOVEMENT_ORDER.size() : index;
+    public String getMessage() {
+        return message;
     }
 }
