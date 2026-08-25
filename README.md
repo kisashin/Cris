@@ -1,15 +1,15 @@
--- 1. Cómo tradujo las etiquetas
-SELECT tipoMovimiento, COUNT(*) FROM TBL_Historico_Movimientos
-WHERE fechacontabilizacion IS NULL GROUP BY tipoMovimiento;
+-- constituciones (Reserva Inicial + Aumento Reserva)
+and id_historico_movimiento in (select id_historico_movimiento from TBL_historico_inicial)
 
--- 2. El que de verdad importa
-SELECT COUNT(*) FROM TBL_Historico_Movimientos
-WHERE fechacontabilizacion IS NULL
-  AND llavesiniestro IN (SELECT llavesiniestro FROM TBL_historico_inicial);
+-- pagos y disminuciones
+and llavesiniestro in (select llavesiniestro from TBL_historico_inicial)
 
--- 3. Periodo
-SELECT CONVERT(nvarchar(6), FechaMovimiento2, 112) periodo, COUNT(*)
+SELECT tipoMovimiento,
+       COUNT(*) total,
+       SUM(CASE WHEN id_historico_movimiento IN
+           (SELECT id_historico_movimiento FROM TBL_historico_inicial)
+           THEN 1 ELSE 0 END) pasan_filtro_id
 FROM TBL_Historico_Movimientos
 WHERE fechacontabilizacion IS NULL
-GROUP BY CONVERT(nvarchar(6), FechaMovimiento2, 112);
-
+  AND tipoMovimiento IN ('Aumento Reserva','Reserva Inicial - Aseguradora')
+GROUP BY tipoMovimiento;
