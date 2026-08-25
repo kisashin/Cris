@@ -1,44 +1,68 @@
-.dialog-title {
-  align-items: center;
-  color: #006600;
-  display: flex;
-  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-  font-size: 16px;
-  font-weight: 600;
-  gap: 0.5rem;
-}
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-.dialog-icon {
-  color: #e6a700;
-}
+import { ConfirmDialogComponent } from './confirm-dialog.component';
+import { IConfirmDialogData } from './confirm-dialog.model';
 
-.dialog-content {
-  color: #333333;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  padding-top: 0.5rem;
-}
+describe('ConfirmDialogComponent', () => {
+  let component: ConfirmDialogComponent;
+  let fixture: ComponentFixture<ConfirmDialogComponent>;
+  let dialogRef: jasmine.SpyObj<MatDialogRef<ConfirmDialogComponent>>;
 
-.dialog-actions {
-  gap: 0.75rem;
-  justify-content: flex-end;
-  padding: 1rem 1.5rem;
-}
+  const createComponent = async (data: IConfirmDialogData) => {
+    dialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
 
-.cancel-button {
-  border-color: #006600;
-  color: #006600;
-  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-  min-width: 6rem;
-}
+    await TestBed.resetTestingModule()
+      .configureTestingModule({
+        imports: [ConfirmDialogComponent],
+        providers: [
+          { provide: MatDialogRef, useValue: dialogRef },
+          { provide: MAT_DIALOG_DATA, useValue: data }
+        ]
+      })
+      .compileComponents();
 
-.confirm-button {
-  background-color: #006600 !important;
-  color: #ffffff !important;
-  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-  min-width: 8rem;
+    fixture = TestBed.createComponent(ConfirmDialogComponent);
+    component = fixture.componentInstance;
+  };
 
-  &:hover {
-    background-color: #004d00 !important;
-  }
-}
+  it('should create with the provided data', async () => {
+    await createComponent({
+      title: 'Generar nuevo XML',
+      message: 'Se borrarán los registros anteriores.',
+      confirmText: 'SÍ, GENERAR',
+      cancelText: 'CANCELAR'
+    });
+
+    expect(component).toBeTruthy();
+    expect(component.data.title).toBe('Generar nuevo XML');
+    expect(component.confirmText).toBe('SÍ, GENERAR');
+    expect(component.cancelText).toBe('CANCELAR');
+  });
+
+  it('should fall back to the default button labels', async () => {
+    await createComponent({
+      title: 'Confirmar',
+      message: '¿Desea continuar?'
+    });
+
+    expect(component.confirmText).toBe('SÍ');
+    expect(component.cancelText).toBe('NO');
+  });
+
+  it('should close with true when confirmed', async () => {
+    await createComponent({ title: 'Confirmar', message: 'Mensaje' });
+
+    component.confirm();
+
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('should close with false when cancelled', async () => {
+    await createComponent({ title: 'Confirmar', message: 'Mensaje' });
+
+    component.cancel();
+
+    expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+});
