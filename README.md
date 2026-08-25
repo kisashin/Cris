@@ -1,78 +1,91 @@
-.text-primary-color {
-    color: #006600;
-    font-family: Franklin Gothic Medium;
-}
+<div class="accounting-report-container">
 
-.container-title {
-    padding-bottom: 3rem;
+  <div class="container-title">
+    <h1 class="title">
+      CIERRE MENSUAL (CENTROAMÉRICA)
+    </h1>
+  </div>
 
-    .title {
-        font-family: Franklin Gothic Medium;
-        color: #006600;
-        font-size: 14pt;
-    }
-}
+  <section class="action-section">
+    <span class="section-label">
+      Generación de asientos contables:
+    </span>
 
-.container-actions {
-    align-items: center;
-    display: flex;
-    padding-bottom: 1.5rem;
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      class="action-button"
+      [disabled]="isGenerating"
+      (click)="generateAccountingEntries()">
 
-    .text-primary-color {
-        min-width: 18rem;
-    }
-}
+      <mat-icon>refresh</mat-icon>
 
-.action-button {
-    background-color: #14532d;
-    border-radius: 2rem;
-    color: #ffffff;
-    font-family: Franklin Gothic Medium;
-    letter-spacing: 0.05rem;
-    padding: 0 1.75rem;
+      {{ isGenerating ? 'GENERANDO...' : 'GENERA XML' }}
+    </button>
+  </section>
 
-    mat-icon {
-        margin-right: 0.5rem;
-        vertical-align: middle;
-    }
+  <section class="action-section">
+    <span class="section-label">
+      Reporte de movimientos:
+    </span>
 
-    &:disabled {
-        background-color: #9e9e9e;
-        color: #ffffff;
-    }
-}
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      class="download-button"
+      [disabled]="isDownloading"
+      (click)="downloadReport()">
 
-.container-table {
-    padding-top: 1.5rem;
+      <mat-icon>download</mat-icon>
 
-    table {
-        width: 100%;
-    }
+      {{ isDownloading ? 'DESCARGANDO...' : 'CONSULTAR' }}
+    </button>
+  </section>
 
-    th.mat-mdc-header-cell {
-        background-color: #14532d;
-        color: #ffffff;
-        font-family: Franklin Gothic Medium;
-        font-size: 11pt;
-        font-weight: bold;
-        letter-spacing: 0.03rem;
-        padding: 0.9rem 0.75rem;
-        text-align: center;
-    }
+  @if (dataSource.length > 0) {
+    <div class="container-table">
+      <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
 
-    td.mat-mdc-cell {
-        border-bottom: 1px solid #e0e0e0;
-        padding: 0.75rem;
-        text-align: center;
-    }
-}
+        <ng-container matColumnDef="processDate">
+          <th mat-header-cell *matHeaderCellDef> FECHA PROCESO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.processDate }} </td>
+        </ng-container>
 
-.download-link {
-    color: #006600;
-    cursor: pointer;
-    text-decoration: none;
+        <ng-container matColumnDef="period">
+          <th mat-header-cell *matHeaderCellDef> PERIODO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.period }} </td>
+        </ng-container>
 
-    &:hover {
-        text-decoration: underline;
-    }
-}
+        <ng-container matColumnDef="movementType">
+          <th mat-header-cell *matHeaderCellDef> TIPO MOVIMIENTO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.movementType }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="lineCount">
+          <th mat-header-cell *matHeaderCellDef> LÍNEAS </th>
+          <td mat-cell *matCellDef="let element"> {{ element.lineCount }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> ESTADO PROCESO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.status }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef> REPORTES </th>
+          <td mat-cell *matCellDef="let element">
+            <a class="download-link" (click)="onDownloadXml(element)">
+              Descargar XML
+            </a>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+  }
+
+</div>
