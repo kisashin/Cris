@@ -1,40 +1,28 @@
-.container-table {
-  overflow-x: auto;
-  padding-top: 0.5rem;
+-- ¿Las líneas guardadas coinciden con lo que dice cantidadLineas?
+SELECT tipoMovimiento, cantidadLineas,
+       (LEN(contenido) - LEN(REPLACE(contenido, '<Line>', ''))) / 6 AS lineas_reales,
+       LEN(contenido) AS bytes
+FROM dbo.archivoAsientoCentro
+ORDER BY id;
 
-  table {
-    width: 100%;
-  }
+-- ¿Están tus siniestros de prueba?
+SELECT tipoMovimiento,
+       CASE WHEN contenido LIKE '%0902026A195167%' THEN 'SI' ELSE 'NO' END AS constitucion_967,
+       CASE WHEN contenido LIKE '%0892026A195311%' THEN 'SI' ELSE 'NO' END AS constitucion_728,
+       CASE WHEN contenido LIKE '%0902026A194891%' THEN 'SI' ELSE 'NO' END AS pago_cuatro_cuotas
+FROM dbo.archivoAsientoCentro
+ORDER BY id;
 
-  th.mat-mdc-header-cell,
-  th.mat-header-cell {
-    background-color: #14532d !important;
-    color: #ffffff !important;
-    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.03rem;
-    padding: 0.9rem 0.75rem;
-    text-align: center;
-  }
 
-  td.mat-mdc-cell,
-  td.mat-cell {
-    border-bottom: 1px solid #e0e0e0;
-    font-family: Arial, sans-serif;
-    font-size: 13px;
-    padding: 0.75rem;
-    text-align: center;
-  }
+-- El aumento de 1071 NO debe aparecer en ningún archivo
+SELECT tipoMovimiento,
+       CASE WHEN contenido LIKE '%1071.00%' THEN 'APARECE' ELSE 'no' END
+FROM dbo.archivoAsientoCentro;
 
-  .download-link {
-    color: #1976d2 !important;
-    cursor: pointer;
-    font-family: Arial, sans-serif;
-    text-decoration: underline;
+-- El Objetado debe estar dentro de Liberacion
+SELECT tipoMovimiento,
+       (LEN(contenido) - LEN(REPLACE(contenido, 'GeneralDescription13>Objecion', ''))) AS marcas_objecion
+FROM dbo.archivoAsientoCentro;
 
-    &:hover {
-      color: #0d47a1 !important;
-    }
-  }
-}
+
+SELECT COUNT(*) FROM dbo.archivoAsientoCentro;
