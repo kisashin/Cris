@@ -1,221 +1,277 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { HttpResponse } from '@angular/common/http';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatTableModule } from '@angular/material/table';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpHeaders, HttpResponse } from '@angular/common/http';
+import { MatDialog } from '@angular/material/dialog';
 import { ToastrService } from 'ngx-toastr';
-import { MatIconModule } from '@angular/material/icon';
+import { of, throwError } from 'rxjs';
 
+import { AccountingClosingCAComponent } from './accounting-closing-ca.component';
 import { AccountingClosingCaService } from '../../services/accounting-closing-ca.service';
-import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { IAccountingXmlFile } from '../../models/center-accounting-result.model';
 
-/**
- * Pantalla Cierre Mensual (Centroamerica).
- */
-@Component({
-  selector: 'app-accounting-closing-ca',
-  imports: [
-    CommonModule,
-    MatTableModule,
-    MatButtonModule,
-    MatIconModule,
-    MatDialogModule
-  ],
-  standalone: true,
-  templateUrl: './accounting-closing-ca.component.html',
-  styleUrl: './accounting-closing-ca.component.scss'
-})
-export class AccountingClosingCAComponent implements OnInit {
+describe('AccountingClosingCAComponent', () => {
+  let component: AccountingClosingCAComponent;
+  let fixture: ComponentFixture<AccountingClosingCAComponent>;
+  let service: jasmine.SpyObj<AccountingClosingCaService>;
+  let dialog: jasmine.SpyObj<MatDialog>;
+  let toastr: jasmine.SpyObj<ToastrService>;
 
-  public isGenerating = false;
-  public isDownloading = false;
-  public isLoading = false;
-  public dataSource: IAccountingXmlFile[] = [];
+  const xmlFile: IAccountingXmlFile = {
+    id: 1,
+    period: '202608',
+    movementType: 'Pago',
+    fileName: 'Sinie_ReasegCentro_Pago20260824.xml',
+    lineCount: 2,
+    processDate: '24/08/2026 03:03:29 PM',
+    status: 'GENERADO'
+  };
 
-  public readonly displayedColumns: string[] = [
-    'processDate',
-    'period',
-    'movementType',
-    'lineCount',
-    'status',
-    'action'
-  ];
+  const blobResponse = (body: Blob, disposition?: string) =>
+    new HttpResponse<Blob>({
+      body,
+      headers: disposition
+        ? new HttpHeaders({ 'Content-Disposition': disposition })
+        : new HttpHeaders()
+    });
 
-  constructor(
-    private readonly accountingClosingCaService: AccountingClosingCaService,
-    private readonly dialog: MatDialog,
-    private readonly toastr: ToastrService
-  ) {}
-
-  ngOnInit(): void {
-    this.loadGeneratedFiles();
-  }
-
-  /**
-   * Consulta los archivos generados en procesos anteriores.
-   */
-  public loadGeneratedFiles(): void {
-    this.isLoading = true;
-
-    this.accountingClosingCaService
-      .findGeneratedFiles()
-      .subscribe({
-        next: response => {
-          this.dataSource = response?.bodyResponse ?? [];
-          this.isLoading = false;
-        },
-        error: error => {
-          console.error(
-            'Error loading Centroamerica accounting files:',
-            error
-          );
-
-          this.dataSource = [];
-          this.isLoading = false;
-        }
-      });
-  }
-
-  /**
-   * Solicita confirmacion antes de generar los asientos contables.
-   */
-  public generateAccountingEntries(): void {
-    if (this.isGenerating) {
-      return;
-    }
-
-    this.dialog
-      .open(ConfirmDialogComponent, {
-        width: '440px',
-        disableClose: true,
-        data: {
-          title: 'Generar nuevo XML',
-          message: '¿Seguro que quiere generar un nuevo XML? Al hacerlo se '
-            + 'borrarán los registros anteriores.',
-          confirmText: 'SÍ, GENERAR',
-          cancelText: 'NO'
-        }
-      })
-      .afterClosed()
-      .subscribe(confirmed => {
-        if (confirmed) {
-          this.executeGeneration();
-        }
-      });
-  }
-
-  /**
-   * Descarga el XML de la fila seleccionada.
-   */
-  public onDownloadXml(row: IAccountingXmlFile): void {
-    this.accountingClosingCaService
-      .downloadXmlFile(row.id)
-      .subscribe({
-        next: response => this.saveBlobFile(response, row.fileName),
-        error: error => {
-          console.error('Error downloading the XML file:', error);
-
-          this.toastr.error(
-            'No fue posible descargar el archivo XML.'
-          );
-        }
-      });
-  }
-
-  /**
-   * Descarga el reporte de movimientos en formato Excel.
-   */
-  public downloadReport(): void {
-    if (this.isDownloading) {
-      return;
-    }
-
-    this.isDownloading = true;
-
-    this.accountingClosingCaService
-      .downloadMovementsReport()
-      .subscribe({
-        next: response => {
-          this.saveBlobFile(response, this.getFileName(response));
-          this.isDownloading = false;
-        },
-        error: error => {
-          console.error(
-            'Error downloading the Centroamerica movements report:',
-            error
-          );
-
-          this.toastr.error(
-            'No fue posible descargar el reporte de movimientos.'
-          );
-          this.isDownloading = false;
-        }
-      });
-  }
-
-  private executeGeneration(): void {
-    this.isGenerating = true;
-
-    this.accountingClosingCaService
-      .generateAccountingEntries()
-      .subscribe({
-        next: response => {
-          this.toastr.success(
-            response?.bodyResponse?.message ??
-            'Proceso ejecutado correctamente.'
-          );
-          this.isGenerating = false;
-          this.loadGeneratedFiles();
-        },
-        error: error => {
-          console.error(
-            'Error generating Centroamerica accounting entries:',
-            error
-          );
-
-          this.toastr.error(
-            error?.error?.errorHeader?.errorMessage ??
-            'No fue posible generar los asientos contables.'
-          );
-          this.isGenerating = false;
-          this.loadGeneratedFiles();
-        }
-      });
-  }
-
-  private saveBlobFile(
-    response: HttpResponse<Blob>,
-    fileName: string
-  ): void {
-    const file = response.body;
-
-    if (!file || file.size === 0) {
-      this.toastr.warning(
-        'El archivo generado no contiene información.'
-      );
-      return;
-    }
-
-    const objectUrl = window.URL.createObjectURL(file);
+  const mockAnchor = () => {
     const anchor = document.createElement('a');
+    spyOn(document, 'createElement').and.returnValue(anchor);
+    spyOn(anchor, 'click');
+    spyOn(window.URL, 'createObjectURL').and.returnValue('blob:test');
+    spyOn(window.URL, 'revokeObjectURL');
+    return anchor;
+  };
 
-    anchor.href = objectUrl;
-    anchor.download = fileName;
-    anchor.click();
+  const mockDialogResult = (confirmed: boolean) => {
+    dialog.open.and.returnValue({
+      afterClosed: () => of(confirmed)
+    } as any);
+  };
 
-    window.URL.revokeObjectURL(objectUrl);
-  }
+  beforeEach(async () => {
+    service = jasmine.createSpyObj('AccountingClosingCaService', [
+      'generateAccountingEntries',
+      'findGeneratedFiles',
+      'downloadXmlFile',
+      'downloadMovementsReport'
+    ]);
 
-  private getFileName(response: HttpResponse<Blob>): string {
-    const contentDisposition =
-      response.headers.get('Content-Disposition');
+    dialog = jasmine.createSpyObj('MatDialog', ['open']);
 
-    const fileNameMatch = contentDisposition?.match(
-      /filename="?([^"]+)"?/
+    toastr = jasmine.createSpyObj('ToastrService', [
+      'success',
+      'error',
+      'warning'
+    ]);
+
+    await TestBed.configureTestingModule({
+      imports: [AccountingClosingCAComponent],
+      providers: [
+        { provide: AccountingClosingCaService, useValue: service },
+        { provide: MatDialog, useValue: dialog },
+        { provide: ToastrService, useValue: toastr }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(AccountingClosingCAComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should load the generated files on init', () => {
+    service.findGeneratedFiles.and.returnValue(
+      of({ bodyResponse: [xmlFile] } as any)
     );
 
-    return fileNameMatch?.[1] ?? 'ReporteMovimientosCentro.xlsx';
-  }
-}
+    component.ngOnInit();
+
+    expect(component.dataSource).toEqual([xmlFile]);
+    expect(component.isLoading).toBeFalse();
+  });
+
+  it('should leave the table empty when there is no history', () => {
+    service.findGeneratedFiles.and.returnValue(
+      of({ bodyResponse: null } as any)
+    );
+
+    component.loadGeneratedFiles();
+
+    expect(component.dataSource).toEqual([]);
+  });
+
+  it('should clear the table when the history query fails', () => {
+    component.dataSource = [xmlFile];
+    service.findGeneratedFiles.and.returnValue(
+      throwError(() => new Error('error'))
+    );
+
+    component.loadGeneratedFiles();
+
+    expect(component.dataSource).toEqual([]);
+    expect(component.isLoading).toBeFalse();
+  });
+
+  it('should ask for confirmation before generating', () => {
+    mockDialogResult(false);
+
+    component.generateAccountingEntries();
+
+    expect(dialog.open).toHaveBeenCalled();
+    expect(service.generateAccountingEntries).not.toHaveBeenCalled();
+    expect(component.isGenerating).toBeFalse();
+  });
+
+  it('should generate and reload the table when confirmed', () => {
+    mockDialogResult(true);
+    service.generateAccountingEntries.and.returnValue(
+      of({ bodyResponse: { message: 'OK', period: '202608', files: [] } } as any)
+    );
+    service.findGeneratedFiles.and.returnValue(
+      of({ bodyResponse: [xmlFile] } as any)
+    );
+
+    component.generateAccountingEntries();
+
+    expect(service.generateAccountingEntries).toHaveBeenCalled();
+    expect(toastr.success).toHaveBeenCalledWith('OK');
+    expect(component.isGenerating).toBeFalse();
+    expect(component.dataSource).toEqual([xmlFile]);
+  });
+
+  it('should not open the dialog while a generation is running', () => {
+    component.isGenerating = true;
+
+    component.generateAccountingEntries();
+
+    expect(dialog.open).not.toHaveBeenCalled();
+  });
+
+  it('should show the backend message and reload when generation fails', () => {
+    mockDialogResult(true);
+    service.generateAccountingEntries.and.returnValue(
+      throwError(() => ({
+        error: { errorHeader: { errorMessage: 'Sin movimientos' } }
+      }))
+    );
+    service.findGeneratedFiles.and.returnValue(
+      of({ bodyResponse: [xmlFile] } as any)
+    );
+
+    component.generateAccountingEntries();
+
+    expect(toastr.error).toHaveBeenCalledWith('Sin movimientos');
+    expect(component.isGenerating).toBeFalse();
+    expect(component.dataSource).toEqual([xmlFile]);
+  });
+
+  it('should show a default message when the error has no body', () => {
+    mockDialogResult(true);
+    service.generateAccountingEntries.and.returnValue(
+      throwError(() => new Error('error'))
+    );
+    service.findGeneratedFiles.and.returnValue(
+      of({ bodyResponse: [] } as any)
+    );
+
+    component.generateAccountingEntries();
+
+    expect(toastr.error).toHaveBeenCalledWith(
+      'No fue posible generar los asientos contables.'
+    );
+  });
+
+  it('should download the XML of the selected row', () => {
+    const anchor = mockAnchor();
+    service.downloadXmlFile.and.returnValue(
+      of(blobResponse(new Blob(['<SSC/>'])))
+    );
+
+    component.onDownloadXml(xmlFile);
+
+    expect(service.downloadXmlFile).toHaveBeenCalledWith(1);
+    expect(anchor.download).toBe(xmlFile.fileName);
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:test');
+  });
+
+  it('should warn when the XML has no content', () => {
+    service.downloadXmlFile.and.returnValue(
+      of(blobResponse(new Blob([])))
+    );
+
+    component.onDownloadXml(xmlFile);
+
+    expect(toastr.warning).toHaveBeenCalled();
+  });
+
+  it('should show an error when the XML download fails', () => {
+    service.downloadXmlFile.and.returnValue(
+      throwError(() => new Error('error'))
+    );
+
+    component.onDownloadXml(xmlFile);
+
+    expect(toastr.error).toHaveBeenCalledWith(
+      'No fue posible descargar el archivo XML.'
+    );
+  });
+
+  it('should download the Excel report using the response file name', () => {
+    const anchor = mockAnchor();
+    service.downloadMovementsReport.and.returnValue(
+      of(blobResponse(
+        new Blob(['data']),
+        'attachment; filename="Reporte.xlsx"'))
+    );
+
+    component.downloadReport();
+
+    expect(anchor.download).toBe('Reporte.xlsx');
+    expect(component.isDownloading).toBeFalse();
+  });
+
+  it('should fall back to the default Excel file name', () => {
+    const anchor = mockAnchor();
+    service.downloadMovementsReport.and.returnValue(
+      of(blobResponse(new Blob(['data'])))
+    );
+
+    component.downloadReport();
+
+    expect(anchor.download).toBe('ReporteMovimientosCentro.xlsx');
+  });
+
+  it('should not launch a second Excel download while one is running', () => {
+    component.isDownloading = true;
+
+    component.downloadReport();
+
+    expect(service.downloadMovementsReport).not.toHaveBeenCalled();
+  });
+
+  it('should warn when the Excel report is empty', () => {
+    service.downloadMovementsReport.and.returnValue(
+      of(blobResponse(new Blob([])))
+    );
+
+    component.downloadReport();
+
+    expect(toastr.warning).toHaveBeenCalled();
+    expect(component.isDownloading).toBeFalse();
+  });
+
+  it('should show an error when the Excel download fails', () => {
+    service.downloadMovementsReport.and.returnValue(
+      throwError(() => new Error('error'))
+    );
+
+    component.downloadReport();
+
+    expect(component.isDownloading).toBeFalse();
+    expect(toastr.error).toHaveBeenCalledWith(
+      'No fue posible descargar el reporte de movimientos.'
+    );
+  });
+});
