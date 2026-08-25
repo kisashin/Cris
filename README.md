@@ -1,3 +1,3 @@
-SELECT NumeroSiniestro, vrmovimiento
-FROM TBL_Historico_Movimientos
-WHERE fechacontabilizacion IS NULL AND tipoMovimiento = 'Aumento Reserva';
+BEGIN TRAN;
+EXEC dbo.sp_contabiliza_cardifCentro;
+ROLLBACK;
