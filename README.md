@@ -1,2 +1,2 @@
-SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'archivoAsientoCentro' AND COLUMN_NAME = 'nombreArchivo';
+EXEC sp_helptext 'dbo.sp_Gen_Xml_Siniestros_ReasegCentro';
+EXEC sp_helptext 'dbo.sp_contabiliza_cardifCentro';
