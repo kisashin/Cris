@@ -1,21 +1,12 @@
-CREATE TABLE dbo.archivoAsientoCentro (
-    id              int IDENTITY(1,1) NOT NULL,
-    idLote          nvarchar(36) NOT NULL,
-    periodo         nvarchar(6) NULL,
-    tipoMovimiento  nvarchar(50) NULL,
-    nombreArchivo   nvarchar(500) NULL,
-    contenido       varchar(max) NULL,
-    cantidadLineas  int NULL,
-    fechaproceso    datetime NULL,
-    estado          nvarchar(500) NULL,
-    CONSTRAINT PK_archivoAsientoCentro PRIMARY KEY CLUSTERED (id)
-);
-GO
+SELECT OBJECT_NAME(object_id) AS objeto, type_desc
+FROM sys.sql_modules m JOIN sys.objects o USING... -- la que te pasé, con:
+--   definition LIKE '%archivoAsientoAval%' OR '%archivoAsientoCardif%'
 
-CREATE INDEX IX_archivoAsientoCentro_fechaproceso
-    ON dbo.archivoAsientoCentro (fechaproceso DESC, id DESC);
-GO
+SELECT OBJECT_NAME(object_id) FROM sys.sql_modules
+WHERE definition LIKE '%xp_cmdshell%' OR definition LIKE '%bcp %';
 
-CREATE INDEX IX_archivoAsientoCentro_lote
-    ON dbo.archivoAsientoCentro (idLote);
-GO
+SELECT j.name, s.step_name, s.command
+FROM msdb.dbo.sysjobs j JOIN msdb.dbo.sysjobsteps s ON s.job_id = j.job_id;
+
+SELECT * FROM dbo.archivoAsientoAval;
+SELECT * FROM dbo.archivoAsientoCardif;
