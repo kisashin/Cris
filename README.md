@@ -1,28 +1,9 @@
-export interface IColombiaXmlFile {
-  id: number;
-  period: string;
-  family: string;
-  movementType: string;
-  fileName: string;
-  lineCount: number;
-  processDate: string;
-  status: string;
-}
-
-export interface IColombiaAccountingResult {
-  message: string;
-  period: string;
-  files: IColombiaXmlFile[];
-}
-
-
-
-import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { INewGeneralResponse } from '../models/new-general-response.interface';
 import { catchError, map } from 'rxjs/operators'; 
-import { ReportStatus } from '../models/report-status.model';
+import { ClosingStatus } from '../models/closing-aval.model';
 import { environment } from 'src/environments/environment';
 import {
   IColombiaAccountingResult,
@@ -32,23 +13,23 @@ import {
 @Injectable({
   providedIn: 'root',
 })
-export class ClosingCardifService {
-
+export class ClosingAvalService {
+  
   private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
-  private readonly closingUrl = `${this.baseUrl}/v1/cardif-closing`;
+  private readonly closingUrl = `${this.baseUrl}/v1/aval-closing`;
   private readonly correlationId = crypto.randomUUID();
 
   constructor (private http: HttpClient){}
 
-  getAllReportsDetailsCardif(): Observable<ReportStatus[]> {
+  getAllReportsDetailsAval(): Observable<ClosingStatus[]> {
     const headers = new HttpHeaders()
       .set('correlation_id', crypto.randomUUID())
       .set('request_id', crypto.randomUUID())
       .set('_p', crypto.randomUUID());
 
     return this.http
-      .get<INewGeneralResponse<ReportStatus[]>>(
-        `${this.baseUrl}/v1/all-cardif-reports`,
+      .get<INewGeneralResponse<ClosingStatus[]>>(
+        `${this.baseUrl}/v1/all-aval-details-reports`,
         { headers }
       )
       .pipe(
@@ -63,14 +44,50 @@ export class ClosingCardifService {
       );
   }
 
-  updateReportsCardif(): Observable<INewGeneralResponse<string>> {
+  updateReportsAval(): Observable<INewGeneralResponse<string>> {
     const headers = new HttpHeaders()
       .set('correlation_id', crypto.randomUUID())
       .set('request_id', crypto.randomUUID())
       .set('_p', crypto.randomUUID());
 
     return this.http.put<string>(
-      `${this.baseUrl}/v1/update-cardif-report`,
+      `${this.baseUrl}/v1/update-aval-report`,
+      null,
+      { 
+        headers,
+        responseType: 'text' as 'json'
+      }
+    ).pipe(
+      map((txt: string) => ({
+        bodyResponse: txt
+      }) as INewGeneralResponse<string>)
+    );
+  }
+
+  getAllReportsSeatAval(): Observable<ClosingStatus[]> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
+
+    return this.http
+      .get<INewGeneralResponse<ClosingStatus[]>>(
+        `${this.baseUrl}/v1/all-seat-aval-details-reports`,
+        { headers }
+      )
+      .pipe(
+        map(resp => resp.bodyResponse ?? [])
+      );
+  }
+
+  updateReportsSeatAval(): Observable<INewGeneralResponse<string>> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
+
+    return this.http.put<string>(
+      `${this.baseUrl}/v1/update-seat-aval-report`,
       null,
       { 
         headers,
@@ -129,5 +146,4 @@ export class ClosingCardifService {
       .set('_p', crypto.randomUUID())
       .set('Accept', accept);
   }
-  
 }
