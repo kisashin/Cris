@@ -1,27 +1,23 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+    /**
+     * Ejecuta la generacion de los asientos contables.
+     */
+    ColombiaAccountingResultDTO generateAccountingEntries(
+            String pHeader, String correlationId, String requestId);
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoAvalXml;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+    /**
+     * Obtiene los archivos XML generados en procesos anteriores.
+     */
+    List<ColombiaXmlFileDTO> findGeneratedFiles(
+            String correlationId, String requestId);
 
-import java.util.List;
+    /**
+     * Obtiene un archivo XML persistido.
+     */
+    ArchivoAsientoAvalXml findXmlFile(
+            Integer id, String correlationId, String requestId);
 
-@Repository
-public interface ArchivoAsientoAvalXmlRepository
-        extends JpaRepository<ArchivoAsientoAvalXml, Integer> {
 
-    @Query(
-            value = "SELECT TOP 50 * "
-                    + "FROM dbo.archivoAsientoAvalXml "
-                    + "ORDER BY fechaproceso DESC, id DESC",
-            nativeQuery = true)
-    List<ArchivoAsientoAvalXml> findLatest();
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-            value = "DELETE FROM dbo.archivoAsientoAvalXml",
-            nativeQuery = true)
-    int deleteAllFiles();
-}
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingResultDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFileDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoAvalXml;            
