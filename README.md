@@ -1,3 +1,9 @@
+
+GO
+SET NOEXEC OFF
+GO
+
+
 --liquibase formatted sql
 --changeset j36147:HU_DDPT_566_sp_contabiliza_cardifCentro_20260826_01 splitStatements:true endDelimiter:\nGO stripComments:false dbms:mssql
 
