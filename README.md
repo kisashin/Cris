@@ -1,35 +1,30 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingResultDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFileDTO;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCardifXml;
 
-/**
- * Errores controlados del cierre contable de Colombia.
- */
-public enum ColombiaClosingMessage {
 
-    /** El cierre de Aval no ha sido ejecutado en el periodo. */
-    AVAL_CLOSING_NOT_EXECUTED(
-            "Debe ejecutar primero el cierre de Aval"),
+    /**
+     * Cuenta los registros de control del cierre de aval.
+     */
+    @Query(value = "SELECT COUNT(*) FROM controlcierreaval",
+            nativeQuery = true)
+    int countAvalClosingControl();
 
-    /** Los procedimientos no devolvieron lineas contables. */
-    NO_ACCOUNTING_ENTRIES_GENERATED(
-            "No se generaron asientos contables para el periodo"),
 
-    /** Falla al construir los archivos XML contables. */
-    XML_GENERATION_ERROR("Error al generar los archivos XML contables"),
+        /**
+     * Ejecuta la generacion de los asientos contables.
+     */
+    ColombiaAccountingResultDTO generateAccountingEntries(
+            String pHeader, String correlationId, String requestId);
 
-    /** El archivo solicitado no existe o no tiene contenido. */
-    XML_FILE_NOT_FOUND("El archivo XML solicitado no existe"),
+    /**
+     * Obtiene los archivos XML generados en procesos anteriores.
+     */
+    List<ColombiaXmlFileDTO> findGeneratedFiles(
+            String correlationId, String requestId);
 
-    /** Falla al acceder a la base de datos del cierre. */
-    DATABASE_ACCESS_ERROR(
-            "Error al acceder a la informacion del cierre de movimientos");
-
-    private final String message;
-
-    ColombiaClosingMessage(String message) {
-        this.message = message;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-}
+    /**
+     * Obtiene un archivo XML persistido.
+     */
+    ArchivoAsientoCardifXml findXmlFile(
+            Integer id, String correlationId, String requestId);
