@@ -1,116 +1,117 @@
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+--liquibase formatted sql
+--changeset j36147:HU_DDPT_566_sp_contabiliza_cardifCentro_20260826_01 splitStatements:true endDelimiter:\nGO stripComments:false dbms:mssql
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingResultDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoAvalXml;
-import org.junit.jupiter.api.Nested;
-import org.springframework.http.HttpHeaders;
+USE [SiniestrosWp]
+GO
 
-    @Nested
-    @DisplayName("PUT /v1/aval-closing/generate")
-    class GenerateAccountingEntries {
+SET ANSI_NULLS ON
+GO
 
-        @Test
-        @DisplayName("debe devolver el resultado del proceso y código 200")
-        void shouldReturnGenerationResult() {
-            ColombiaAccountingResultDTO serviceResult =
-                    ColombiaAccountingResultDTO.builder()
-                            .message("Asientos generados con éxito.")
-                            .period("202608")
-                            .files(Collections.emptyList())
-                            .build();
+SET QUOTED_IDENTIFIER ON
+GO
 
-            when(closingAvalService.generateAccountingEntries(
-                    pHeader, correlationId, requestId))
-                    .thenReturn(serviceResult);
+CREATE OR ALTER PROCEDURE [dbo].[sp_contabiliza_cardifCentro](@r int=null)
+AS
+Declare
+@fecha varchar(12),
+@periodo varchar(12),
+@periodo2 int;
+BEGIN
+	SET NOCOUNT ON;
 
-            ResponseEntity<ResponseModel<ColombiaAccountingResultDTO>> response =
-                    controller.generateAccountingEntries(
-                            pHeader, correlationId, requestId);
+	select @fecha = CONVERT(nvarchar(8),getdate()-7,112);
+	select @periodo = substring(@fecha,1,4) + substring(@fecha,5,2);
+	select @periodo2 = cast(@periodo as int);
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
+	DROP TABLE IF EXISTS #xmlOut;
+	create table #xmlOut(Pasada tinyint null, id int, Mv nvarchar(50), Secuencia bigint, Line nvarchar(max));
 
-            ResponseModel<ColombiaAccountingResultDTO> body = response.getBody();
-            assertNotNull(body);
-            assertEquals(correlationId, body.getCorrelationId());
-            assertEquals(
-                    HttpStatus.OK.value(),
-                    body.getResponseHeader().getReturnCode());
-            assertEquals(serviceResult, body.getBodyResponse());
+	truncate table SiniestrosWp.dbo.TBL_Asientos_siniestro;
 
-            verify(closingAvalService, times(1))
-                    .generateAccountingEntries(
-                            pHeader, correlationId, requestId);
-        }
-    }
+	insert into SiniestrosWp.dbo.TBL_Asientos_siniestro(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,Fecha_aviso_Cardif,Reserva_inicial_constituida,Nombre_asegurado,Poliza,id2,Participacion_Cardif, Moneda)
+	Select NumeroSiniestro,
+	NroIdentificacion,
+	Cobertura,
+	CodProducto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end,
+	Ramo,
+	FechaMovimiento2,
+	vrmovimiento,
+	upper(left(ltrim(rtrim(Nombreasegurado)),50)),
+	null,
+	id_historico_movimiento,
+	1,
+	Moneda
+	from TBL_Historico_Movimientos
+	where tipoMovimiento in('Aumento Reserva','Reserva Inicial - Aseguradora')
+	and id_historico_movimiento in (select id_historico_movimiento from TBL_historico_inicial)
+	and fechacontabilizacion is null;
 
-    @Nested
-    @DisplayName("GET /v1/aval-closing/files")
-    class FindGeneratedFiles {
+	insert into SiniestrosWp.dbo.TBL_Asientos_siniestro(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,
+	Fecha_pago_cuota1,cuota1,Nombre_asegurado,Poliza,id2, Participacion_Cardif, Moneda)
+	Select NumeroSiniestro,
+	NroIdentificacion,
+	Cobertura,
+	CodProducto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end,
+	Ramo,
+	FechaMovimiento2,
+	vrmovimiento,upper(left(ltrim(rtrim(Nombreasegurado)),50)),null, id_historico_movimiento, 1, Moneda
+	from TBL_Historico_Movimientos where
+	tipoMovimiento in('Pago')
+	and llavesiniestro in (select llavesiniestro from TBL_historico_inicial)
+	and fechacontabilizacion is null;
 
-        @Test
-        @DisplayName("debe devolver los archivos generados y código 200")
-        void shouldReturnGeneratedFiles() {
-            List<ColombiaXmlFileDTO> serviceResult = Collections.singletonList(
-                    ColombiaXmlFileDTO.builder()
-                            .id(1)
-                            .family("ReasegAlfa")
-                            .fileName("archivo.xml")
-                            .build());
+	insert into SiniestrosWp.dbo.TBL_Asientos_siniestro(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,
+	Fecha_dismi_reserva,Valor_dismin_reserva,Nombre_asegurado,Poliza,id2, Participacion_Cardif, Moneda)
+	Select NumeroSiniestro,
+	NroIdentificacion,
+	Cobertura,
+	CodProducto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end,
+	Ramo,
+	FechaMovimiento2,
+	vrmovimiento,upper(left(ltrim(rtrim(Nombreasegurado)),50)),null, id_historico_movimiento, 1, Moneda
+	from TBL_Historico_Movimientos where
+	tipoMovimiento in('Disminución Reserva','Objetado','Anulado ','Anulado','Disminucion Reserva','objecion')
+	and llavesiniestro in (select llavesiniestro from TBL_historico_inicial)
+	and fechacontabilizacion is null;
 
-            when(closingAvalService.findGeneratedFiles(
-                    correlationId, requestId))
-                    .thenReturn(serviceResult);
+	insert into #xmlOut(id,Mv,Secuencia,Line)
+	exec sp_Gen_Xml_Siniestros_ReasegCentro @periodo2;
 
-            ResponseEntity<ResponseModel<List<ColombiaXmlFileDTO>>> response =
-                    controller.findGeneratedFiles(correlationId, requestId);
+	update #xmlOut set Pasada=1 where Pasada is null;
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
+	truncate table SiniestrosWp.dbo.TBL_Asientos_siniestro;
 
-            ResponseModel<List<ColombiaXmlFileDTO>> body = response.getBody();
-            assertNotNull(body);
-            assertEquals(correlationId, body.getCorrelationId());
-            assertEquals(serviceResult, body.getBodyResponse());
+	insert into SiniestrosWp.dbo.TBL_Asientos_siniestro(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,
+	fecha_dismi_reserva,Valor_dismin_reserva,Fecha_pago_cuota1,cuota1,Nombre_asegurado,Poliza,id2,Participacion_Cardif, Moneda)
+	Select NumeroSiniestro,
+	NroIdentificacion,
+	Cobertura,
+	CodProducto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end,
+	Ramo,
+	null,null,
+	FechaMovimiento2,vrmovimiento,
+	upper(left(ltrim(rtrim(Nombreasegurado)),50)),'RevPag',id_historico_movimiento, 1, Moneda
+	from TBL_Historico_Movimientos where  tipoMovimiento  in ('Reversa')
+	and llavesiniestro in (select llavesiniestro from TBL_historico_inicial)
+	and fechacontabilizacion is null;
 
-            verify(closingAvalService, times(1))
-                    .findGeneratedFiles(correlationId, requestId);
-        }
-    }
+	insert into #xmlOut(id,Mv,Secuencia,Line)
+	exec sp_Gen_Xml_Siniestros_ReasegCentro @periodo2;
 
-    @Nested
-    @DisplayName("GET /v1/aval-closing/files/{id}/download")
-    class DownloadXmlFile {
+	update #xmlOut set Pasada=2 where Pasada is null;
 
-        @Test
-        @DisplayName("debe devolver el contenido del archivo con su nombre")
-        void shouldReturnFileContent() {
-            String content = "<SSC><Line/></SSC>";
+	update TBL_Historico_Movimientos
+	set fechacontabilizacion = dbo.truncdate(getdate())
+	where llavesiniestro in (select llavesiniestro from TBL_historico_inicial)
+	and fechacontabilizacion is null;
 
-            ArchivoAsientoAvalXml file = ArchivoAsientoAvalXml.builder()
-                    .id(1)
-                    .nombreArchivo("ReasegAlf_HogarPago20260827.xml")
-                    .contenido(content)
-                    .build();
+	select cast(@periodo2 as nvarchar(6)) Periodo, Pasada, id, Mv, Secuencia, Line
+	from #xmlOut
+	order by Pasada, id, Secuencia;
 
-            when(closingAvalService.findXmlFile(
-                    1, correlationId, requestId))
-                    .thenReturn(file);
-
-            ResponseEntity<byte[]> response = controller.downloadXmlFile(
-                    1, correlationId, requestId);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertArrayEquals(
-                    content.getBytes(StandardCharsets.UTF_8),
-                    response.getBody());
-            assertEquals(
-                    "attachment; filename=\""
-                            + "ReasegAlf_HogarPago20260827.xml\"",
-                    response.getHeaders()
-                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-
-            verify(closingAvalService, times(1))
-                    .findXmlFile(1, correlationId, requestId);
-        }
-    }
+END;
+GO
