@@ -1,9 +1,4 @@
-SELECT COUNT(*) FROM dbo.tmp_repavalcierre;
-SELECT COUNT(*) FROM dbo.historicomov_aval;
+SELECT id, fechagenera, nombreRpt, estado FROM dbo.tmp_repavalcierre;
 
-SELECT COUNT(*) 
-FROM historicomovimientos 
-WHERE Fechacontabilizacion IS NULL 
-  AND marcaavalpos IS NULL 
-  AND socio IN ('BANCO DE BOGOTA','BANCO AV VILLAS','BANCO DE OCCIDENTE','BANCO POPULAR')
-  AND CodProducto NOT IN (SELECT producto FROM dbo.productosnoaval);
+
+DELETE FROM dbo.tmp_repavalcierre;
