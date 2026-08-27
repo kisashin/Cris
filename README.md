@@ -1,36 +1,29 @@
-USE SiniestrosWp;
-GO
+Begin  
+ if @varxml is not null and @XmlDestino <> 'PANTALLA'
+ begin  
+  drop table if exists ##VARXML
 
-CREATE TABLE dbo.archivoAsientoAvalXml (
-    id              INT IDENTITY(1,1) NOT NULL,
-    idLote          VARCHAR(50)    NOT NULL,
-    periodo         VARCHAR(6)     NOT NULL,
-    familia         VARCHAR(50)    NOT NULL,
-    tipoMovimiento  VARCHAR(50)    NULL,
-    nombreArchivo   VARCHAR(500)   NOT NULL,
-    contenido       NVARCHAR(MAX)  NOT NULL,
-    cantidadLineas  INT            NOT NULL,
-    fechaproceso    DATETIME       NOT NULL,
-    estado          VARCHAR(50)    NOT NULL,
-    CONSTRAINT PK_archivoAsientoAvalXml PRIMARY KEY CLUSTERED (id)
-);
-GO
+  exec xp_cmdshell 'net use t: /delete',no_output;  
+ end;  
+end;  
+
+if @XmlDestino = 'PANTALLA'
+begin
+ select @Tipo_Diario Tipo_Diario,
+        @ar NombreArchivo,
+        case when @varxml is null then null
+             else '<?xml version="1.0" encoding="UTF-8" ?>' + @varxml
+        end Contenido;
+ return 0;
+end;
+
+select @Tipo_Diario Tipo_Diario ,@ar ar,@Periodo_Contable Periodo_Contable,@Producto Producto, @ajuste ajuste, @XmlDestino XmlDestino  
+if @varxml is  null select '0';  
+END;
 
 
-USE SiniestrosWp;
-GO
+-- modo legacy: debe comportarse como hoy
+EXEC dbo.sp_XMLAsientosPru 'SINIE', '2026/008', null, 'ASSE20260826_ALF';
 
-CREATE TABLE dbo.archivoAsientoCardifXml (
-    id              INT IDENTITY(1,1) NOT NULL,
-    idLote          VARCHAR(50)    NOT NULL,
-    periodo         VARCHAR(6)     NOT NULL,
-    familia         VARCHAR(50)    NOT NULL,
-    tipoMovimiento  VARCHAR(50)    NULL,
-    nombreArchivo   VARCHAR(500)   NOT NULL,
-    contenido       NVARCHAR(MAX)  NOT NULL,
-    cantidadLineas  INT            NOT NULL,
-    fechaproceso    DATETIME       NOT NULL,
-    estado          VARCHAR(50)    NOT NULL,
-    CONSTRAINT PK_archivoAsientoCardifXml PRIMARY KEY CLUSTERED (id)
-);
-GO
+-- modo nuevo: no debe tocar disco, devuelve 3 columnas
+EXEC dbo.sp_XMLAsientosPru 'SINIE', '2026/008', null, 'ASSE20260826_ALF', 'PANTALLA';
