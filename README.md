@@ -1,231 +1,164 @@
-package co.com.bnpparibas.cardif.closingclaims.api;
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingaval.ClosingAval;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingResultDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseHeader;
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.response.model.ResponseModel;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoAvalXml;
-import co.com.bnpparibas.cardif.closingclaims.domain.services.IClosingAvalService;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 
-/**
- * API REST para la consulta y actualizacion de reportes Cierre Mensual de Aval.
- *
- * <p>Expone los endpoints necesarios para:</p>
- * <ul>
- *   <li>Consultar los reportes de Cierre Mensual de Aval</li>
- *   <li>Actualizar los asientos contables, reportes aval</li>
- *   <li>Generar, consultar y descargar los archivos XML contables</li>
- * </ul>
- *
- * <p>Todos los métodos aceptan los encabezados de trazabilidad habituales
- * (<code>_p</code>,
- * <code>correlation_id</code> y <code>request_id</code>) que son
- * propagados al servicio.</p>
- */
-@RestController
-@RequestMapping("/v1")
-@Tag(name = "Cierre Aval")
-@CrossOrigin("*")
-public class ClosingAvalController {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
-    private static final String XML_CONTENT_TYPE = "application/xml";
+class ColombiaDtosTest {
 
-    private final IClosingAvalService closingAvalService;
+    @Test
+    @DisplayName("ColombiaAccountingLine builder asigna los valores")
+    void accountingLineBuilder() {
+        ColombiaAccountingLine line = ColombiaAccountingLine.builder()
+                .family("ReasegCardif")
+                .period("202608")
+                .pass(1)
+                .movementType("Pago")
+                .fileName("archivo.xml")
+                .sequence(3L)
+                .content("<Line/>")
+                .build();
 
-    public ClosingAvalController(IClosingAvalService closingAvalService) {
-        this.closingAvalService = closingAvalService;
+        assertEquals("ReasegCardif", line.getFamily());
+        assertEquals("202608", line.getPeriod());
+        assertEquals(1, line.getPass());
+        assertEquals("Pago", line.getMovementType());
+        assertEquals("archivo.xml", line.getFileName());
+        assertEquals(3L, line.getSequence());
+        assertEquals("<Line/>", line.getContent());
     }
 
-    /**
-     * Consultar los reportes aval
-     *
-     * @param pHeader        encabezado opcional de seguridad.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return mensaje de confirmación del proceso.
-     */
-    @GetMapping(path = "/all-aval-details-reports", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ResponseModel<List<ClosingAval>>> getReportsDetailsAval(
-            @RequestHeader(value = "_p", required = false) String pHeader,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
+    @Test
+    @DisplayName("ColombiaAccountingLine setters y constructores")
+    void accountingLineSetters() {
+        ColombiaAccountingLine line = new ColombiaAccountingLine();
 
-        List<ClosingAval> reports = closingAvalService.getDetailsReportsAval(pHeader, correlationId, requestId);
-        ResponseModel<List<ClosingAval>> listResponseModel = new ResponseModel<>(correlationId,
-                ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
-                reports);
-        return new ResponseEntity<>(listResponseModel, HttpStatus.OK);
+        line.setFamily("Directas");
+        line.setPeriod("202607");
+        line.setPass(2);
+        line.setMovementType("SINIE");
+        line.setFileName("directas.xml");
+        line.setSequence(1L);
+        line.setContent("<SSC/>");
+
+        assertEquals("Directas", line.getFamily());
+        assertEquals("202607", line.getPeriod());
+        assertEquals(2, line.getPass());
+        assertEquals("SINIE", line.getMovementType());
+        assertEquals("directas.xml", line.getFileName());
+        assertEquals(1L, line.getSequence());
+        assertEquals("<SSC/>", line.getContent());
+
+        ColombiaAccountingLine full = new ColombiaAccountingLine(
+                "CoaseguroCedido", "202608", 1, "Liberacion",
+                null, 5L, "<Line/>");
+
+        assertEquals("CoaseguroCedido", full.getFamily());
+        assertNull(full.getFileName());
     }
 
-    /**
-     * Actualizar el reporte Aval a estado Pendiente
-     *
-     * @param pHeader        encabezado opcional de seguridad.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return mensaje de confirmación del proceso.
-     */
-    @PutMapping(path = "/update-aval-report")
-    public ResponseEntity<ResponseModel<String>> updateReportsAval(
-            @RequestHeader(value = "_p", required = false) String pHeader,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
+    @Test
+    @DisplayName("ColombiaXmlFile builder, setters y constructores")
+    void xmlFile() {
+        ColombiaXmlFile file = ColombiaXmlFile.builder()
+                .family("ReasegAlfa")
+                .period("202608")
+                .movementType("Constitucion")
+                .fileName("ReasegAlf_HogarConstitucion20260827.xml")
+                .lineCount(4)
+                .content("<SSC/>")
+                .build();
 
-        String result = closingAvalService.uploadReportsPendingRptAval(
-                pHeader,
-                correlationId,
-                requestId);
+        assertEquals("ReasegAlfa", file.getFamily());
+        assertEquals("202608", file.getPeriod());
+        assertEquals("Constitucion", file.getMovementType());
+        assertEquals(
+                "ReasegAlf_HogarConstitucion20260827.xml",
+                file.getFileName());
+        assertEquals(4, file.getLineCount());
+        assertEquals("<SSC/>", file.getContent());
 
-        ResponseModel<String> response = new ResponseModel<>(correlationId,
-                ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(), result);
-        return new ResponseEntity<>(response, HttpStatus.OK);
+        ColombiaXmlFile empty = new ColombiaXmlFile();
+        empty.setFamily("Directas");
+        empty.setLineCount(2);
+        assertEquals("Directas", empty.getFamily());
+        assertEquals(2, empty.getLineCount());
+
+        ColombiaXmlFile full = new ColombiaXmlFile(
+                "Directas", "202608", "SINIE", "f.xml", 1, "<SSC/>");
+        assertEquals("SINIE", full.getMovementType());
     }
 
-    /**
-     * Consultar los reportes aval
-     *
-     * @param pHeader        encabezado opcional de seguridad.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return mensaje de confirmación del proceso.
-     */
-    @GetMapping(path = "/all-seat-aval-details-reports", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ResponseModel<List<ClosingAval>>> getReportsDetailsSeatAval(
-            @RequestHeader(value = "_p", required = false) String pHeader,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
+    @Test
+    @DisplayName("ColombiaXmlFileDTO builder, setters y constructores")
+    void xmlFileDto() {
+        ColombiaXmlFileDTO dto = ColombiaXmlFileDTO.builder()
+                .id(1)
+                .period("202608")
+                .family("ReasegCardif")
+                .movementType("Pago")
+                .fileName("archivo.xml")
+                .lineCount(10)
+                .processDate("27/08/2026 10:00:00 a. m.")
+                .status("GENERADO")
+                .build();
 
-        List<ClosingAval> reports = closingAvalService.getReportsSeatAval(pHeader, correlationId, requestId);
-        ResponseModel<List<ClosingAval>> listResponseModel = new ResponseModel<>(correlationId,
-                ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(),
-                reports);
-        return new ResponseEntity<>(listResponseModel, HttpStatus.OK);
+        assertEquals(1, dto.getId());
+        assertEquals("202608", dto.getPeriod());
+        assertEquals("ReasegCardif", dto.getFamily());
+        assertEquals("Pago", dto.getMovementType());
+        assertEquals("archivo.xml", dto.getFileName());
+        assertEquals(10, dto.getLineCount());
+        assertEquals("27/08/2026 10:00:00 a. m.", dto.getProcessDate());
+        assertEquals("GENERADO", dto.getStatus());
+
+        ColombiaXmlFileDTO empty = new ColombiaXmlFileDTO();
+        empty.setId(2);
+        empty.setStatus("GENERADO");
+        assertEquals(2, empty.getId());
+        assertEquals("GENERADO", empty.getStatus());
+
+        ColombiaXmlFileDTO full = new ColombiaXmlFileDTO(
+                3, "202608", "Directas", "SINIE",
+                "f.xml", 1, "fecha", "GENERADO");
+        assertEquals(3, full.getId());
     }
 
-    /**
-     * Actualizar el reporte Aval a estado Pendiente
-     *
-     * @param pHeader        encabezado opcional de seguridad.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return mensaje de confirmación del proceso.
-     */
-    @PutMapping(path = "/update-seat-aval-report")
-    public ResponseEntity<ResponseModel<String>> updateReportsSeatAval(
-            @RequestHeader(value = "_p", required = false) String pHeader,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
-
-        String result = closingAvalService.uploadReportsPendingRptSeatAval(
-                pHeader,
-                correlationId,
-                requestId);
-
-        ResponseModel<String> response = new ResponseModel<>(correlationId,
-                ResponseHeader.builder().returnCode(HttpStatus.OK.value()).build(), result);
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
-    /**
-     * Ejecuta la generación de los asientos contables.
-     *
-     * @param pHeader        encabezado opcional de seguridad.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return resultado del proceso con los archivos generados.
-     */
-    @PutMapping(
-            path = "/aval-closing/generate",
-            produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ResponseModel<ColombiaAccountingResultDTO>>
-            generateAccountingEntries(
-            @RequestHeader(value = "_p", required = false) String pHeader,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
+    @Test
+    @DisplayName("ColombiaAccountingResultDTO builder, setters y constructores")
+    void resultDto() {
+        List<ColombiaXmlFileDTO> files = Collections.singletonList(
+                ColombiaXmlFileDTO.builder().id(1).build());
 
         ColombiaAccountingResultDTO result =
-                closingAvalService.generateAccountingEntries(
-                        pHeader,
-                        correlationId,
-                        requestId);
+                ColombiaAccountingResultDTO.builder()
+                        .message("Asientos generados con éxito.")
+                        .period("202608")
+                        .files(files)
+                        .build();
 
-        ResponseModel<ColombiaAccountingResultDTO> response =
-                new ResponseModel<>(correlationId,
-                        ResponseHeader.builder()
-                                .returnCode(HttpStatus.OK.value()).build(),
-                        result);
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
+        assertEquals("Asientos generados con éxito.", result.getMessage());
+        assertEquals("202608", result.getPeriod());
+        assertNotNull(result.getFiles());
+        assertEquals(1, result.getFiles().size());
 
-    /**
-     * Consulta los archivos XML generados en procesos anteriores.
-     *
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return lista de archivos disponibles para descarga.
-     */
-    @GetMapping(
-            path = "/aval-closing/files",
-            produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ResponseModel<List<ColombiaXmlFileDTO>>>
-            findGeneratedFiles(
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
+        ColombiaAccountingResultDTO empty =
+                new ColombiaAccountingResultDTO();
+        empty.setMessage("otro");
+        empty.setPeriod("202607");
+        empty.setFiles(Collections.emptyList());
+        assertEquals("otro", empty.getMessage());
+        assertEquals("202607", empty.getPeriod());
+        assertEquals(0, empty.getFiles().size());
 
-        List<ColombiaXmlFileDTO> files =
-                closingAvalService.findGeneratedFiles(
-                        correlationId,
-                        requestId);
-
-        ResponseModel<List<ColombiaXmlFileDTO>> response =
-                new ResponseModel<>(correlationId,
-                        ResponseHeader.builder()
-                                .returnCode(HttpStatus.OK.value()).build(),
-                        files);
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
-    /**
-     * Descarga un archivo XML persistido.
-     *
-     * @param id             identificador del archivo.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return contenido del archivo XML.
-     */
-    @GetMapping(
-            path = "/aval-closing/files/{id}/download",
-            produces = XML_CONTENT_TYPE)
-    public ResponseEntity<byte[]> downloadXmlFile(
-            @PathVariable("id") Integer id,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
-
-        ArchivoAsientoAvalXml file = closingAvalService.findXmlFile(
-                id,
-                correlationId,
-                requestId);
-
-        byte[] content = file.getContenido()
-                .getBytes(StandardCharsets.UTF_8);
-
-        return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\""
-                                + file.getNombreArchivo() + "\"")
-                .contentType(MediaType.parseMediaType(XML_CONTENT_TYPE))
-                .contentLength(content.length)
-                .body(content);
+        ColombiaAccountingResultDTO full =
+                new ColombiaAccountingResultDTO("msg", "202608", files);
+        assertEquals("msg", full.getMessage());
     }
 }
