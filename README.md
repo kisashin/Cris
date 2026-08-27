@@ -1,149 +1,174 @@
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { INewGeneralResponse } from '../models/new-general-response.interface';
-import { catchError, map } from 'rxjs/operators'; 
-import { ClosingStatus } from '../models/closing-aval.model';
+import { CommonModule } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { HttpResponse } from '@angular/common/http';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatTableModule } from '@angular/material/table';
+import { MatIconModule } from '@angular/material/icon';
+import { ToastrService } from 'ngx-toastr';
 import { environment } from 'src/environments/environment';
-import {
-  IColombiaAccountingResult,
-  IColombiaXmlFile
-} from '../models/colombia-accounting-result.model';
+import { ClosingCardifService } from '../../services/closing-cardif.service';
+import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
+import { IColombiaXmlFile } from '../../models/colombia-accounting-result.model';
 
-@Injectable({
-  providedIn: 'root',
+/**
+ * Pantalla Cierre Mensual de Directas (Cardif).
+ */
+@Component({
+  selector: 'app-claims-closing-cardif',
+  imports: [
+    CommonModule,
+    MatTableModule,
+    MatButtonModule,
+    MatIconModule,
+    MatDialogModule
+  ],
+  standalone: true,
+  templateUrl: './claims-closing-cardif.component.html',
+  styleUrl: './claims-closing-cardif.component.scss'
 })
-export class ClosingAvalService {
-  
-  private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
-  private readonly closingUrl = `${this.baseUrl}/v1/aval-closing`;
-  private readonly correlationId = crypto.randomUUID();
+export class ClaimsClosingCardifComponent implements OnInit {
 
-  constructor (private http: HttpClient){}
+  readonly reportMovement = `${environment.reporting_service}/ReportServer/Pages/ReportViewer.aspx?/Acsele/Alterno/Cierre_siniestroscardif&rs:Command=Render&rc:Parameters=false&rc:Toolbar=false&rs:Format=Excel`;
 
-  getAllReportsDetailsAval(): Observable<ClosingStatus[]> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+  public isGenerating = false;
+  public isLoading = false;
+  public dataSource: IColombiaXmlFile[] = [];
 
-    return this.http
-      .get<INewGeneralResponse<ClosingStatus[]>>(
-        `${this.baseUrl}/v1/all-aval-details-reports`,
-        { headers }
-      )
-      .pipe(
-        map(resp => resp.bodyResponse ?? []),
-        catchError(err => {
-          const msg = err?.error?.errorDetail?.message ?? err?.error?.message ?? '';
-          if (err.status === 400 && msg.includes('No registros')) {
-            return of([]);
-          }
-          throw err;
-        })
+  public readonly displayedColumns: string[] = [
+    'processDate',
+    'period',
+    'family',
+    'movementType',
+    'lineCount',
+    'status',
+    'action'
+  ];
+
+  constructor(
+    private readonly cardifService: ClosingCardifService,
+    private readonly dialog: MatDialog,
+    private readonly toastr: ToastrService
+  ) {}
+
+  ngOnInit(): void {
+    this.loadGeneratedFiles();
+  }
+
+  /**
+   * Consulta los archivos generados en procesos anteriores.
+   */
+  public loadGeneratedFiles(): void {
+    this.isLoading = true;
+    this.cardifService
+      .findGeneratedFiles()
+      .subscribe({
+        next: response => {
+          this.dataSource = response?.bodyResponse ?? [];
+          this.isLoading = false;
+        },
+        error: error => {
+          console.error(
+            'Error loading Cardif accounting files:',
+            error
+          );
+          this.dataSource = [];
+          this.isLoading = false;
+        }
+      });
+  }
+
+  /**
+   * Solicita confirmacion antes de generar los asientos contables.
+   */
+  public generateAccountingEntries(): void {
+    if (this.isGenerating) {
+      return;
+    }
+
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        width: '440px',
+        disableClose: true,
+        data: {
+          title: 'Generar nuevo XML',
+          message: '¿Seguro que quiere generar un nuevo XML? Al hacerlo se '
+            + 'borrarán los registros anteriores.',
+          confirmText: 'SÍ, GENERAR',
+          cancelText: 'NO'
+        }
+      })
+      .afterClosed()
+      .subscribe(confirmed => {
+        if (confirmed) {
+          this.executeGeneration();
+        }
+      });
+  }
+
+  /**
+   * Descarga el XML de la fila seleccionada.
+   */
+  public onDownloadXml(row: IColombiaXmlFile): void {
+    this.cardifService
+      .downloadXmlFile(row.id)
+      .subscribe({
+        next: response => this.saveBlobFile(response, row.fileName),
+        error: error => {
+          console.error('Error downloading the XML file:', error);
+          this.toastr.error(
+            'No fue posible descargar el archivo XML.'
+          );
+        }
+      });
+  }
+
+  private executeGeneration(): void {
+    this.isGenerating = true;
+    this.cardifService
+      .generateAccountingEntries()
+      .subscribe({
+        next: response => {
+          this.toastr.success(
+            response?.bodyResponse?.message ??
+            'Proceso ejecutado correctamente.'
+          );
+          this.isGenerating = false;
+          this.loadGeneratedFiles();
+        },
+        error: error => {
+          console.error(
+            'Error generating Cardif accounting entries:',
+            error
+          );
+          this.toastr.error(
+            error?.error?.errorHeader?.errorMessage ??
+            'No fue posible generar los asientos contables.'
+          );
+          this.isGenerating = false;
+          this.loadGeneratedFiles();
+        }
+      });
+  }
+
+  private saveBlobFile(
+    response: HttpResponse<Blob>,
+    fileName: string
+  ): void {
+    const file = response.body;
+
+    if (!file || file.size === 0) {
+      this.toastr.warning(
+        'El archivo generado no contiene información.'
       );
-  }
+      return;
+    }
 
-  updateReportsAval(): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
-
-    return this.http.put<string>(
-      `${this.baseUrl}/v1/update-aval-report`,
-      null,
-      { 
-        headers,
-        responseType: 'text' as 'json'
-      }
-    ).pipe(
-      map((txt: string) => ({
-        bodyResponse: txt
-      }) as INewGeneralResponse<string>)
-    );
-  }
-
-  getAllReportsSeatAval(): Observable<ClosingStatus[]> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
-
-    return this.http
-      .get<INewGeneralResponse<ClosingStatus[]>>(
-        `${this.baseUrl}/v1/all-seat-aval-details-reports`,
-        { headers }
-      )
-      .pipe(
-        map(resp => resp.bodyResponse ?? [])
-      );
-  }
-
-  updateReportsSeatAval(): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
-
-    return this.http.put<string>(
-      `${this.baseUrl}/v1/update-seat-aval-report`,
-      null,
-      { 
-        headers,
-        responseType: 'text' as 'json'
-      }
-    ).pipe(
-      map((txt: string) => ({
-        bodyResponse: txt
-      }) as INewGeneralResponse<string>)
-    );
-  }
-
-  /**
-   * Ejecuta la generacion de los asientos contables.
-   */
-  generateAccountingEntries(): Observable<INewGeneralResponse<IColombiaAccountingResult>> {
-    return this.http.put<INewGeneralResponse<IColombiaAccountingResult>>(
-      `${this.closingUrl}/generate`,
-      null,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
-
-  /**
-   * Consulta los archivos XML generados en procesos anteriores.
-   */
-  findGeneratedFiles(): Observable<INewGeneralResponse<IColombiaXmlFile[]>> {
-    return this.http.get<INewGeneralResponse<IColombiaXmlFile[]>>(
-      `${this.closingUrl}/files`,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
-
-  /**
-   * Descarga el contenido de un archivo XML persistido.
-   */
-  downloadXmlFile(id: number): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.closingUrl}/files/${id}/download`,
-      {
-        headers: this.createHeaders('application/xml'),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
-
-  private createHeaders(accept: string): HttpHeaders {
-    return new HttpHeaders()
-      .set('correlation_id', this.correlationId)
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID())
-      .set('Accept', accept);
+    const objectUrl = window.URL.createObjectURL(file);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    anchor.click();
+    window.URL.revokeObjectURL(objectUrl);
   }
 }
