@@ -7,224 +7,132 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-/****** Object:  StoredProcedure [dbo].[sp_Gen_Xml_Siniestros_ReasegCardif]    Script Date: 1/02/2023 10:38:47 a. m. ******/
-
-ALTER     procedure  [dbo].[sp_Gen_Xml_Siniestros_ReasegCardif](@FC nvarchar(6)) as 
-/*
-----Proceso para generar archivos XML contables de los movimientos de Siniestro de reaseguro 
-*/
+ALTER   PROCEDURE [dbo].[sp_contabiliza_coaseguro]
+AS
+Declare
+@fecha varchar(12),
+@periodo varchar(12),
+@periodo2 int,
+@mes1 int,
+@mes2 varchar(2),
+@ano1 int,
+@ano2 varchar(4),
+@nombre varchar(40);
 
 BEGIN
-	SET NOCOUNT ON;
+SET NOCOUNT ON;
 
-    -- Se seleccionan los movimientos del periodo
-	update tmpsiniestros set Nombre_asegurado=upper(Nombre_asegurado);
-	update tmpsiniestros set Nombre_asegurado=replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(Nombre_asegurado,'Á','A'),'É','E'),'Í','I'),'Ó','O'),'Ú','U'),'Ñ','N'),'Ü','U'),'>',''),'<',''),';',' '),
-	Cobertura_afectada =replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(Cobertura_afectada,'Á','A'),'É','E'),'Í','I'),'Ó','O'),'Ú','U'),'Ñ','N'),'Ü','U'),'>',''),'<',''),';',' ');
-	
+create table #coaseguro(
+	Familia varchar(50),
+	Periodo nvarchar(6),
+	Mv varchar(50),
+	Secuencia bigint,
+	Line nvarchar(max));
 
-	declare @corte datetime=@FC+'01';
-	
-	begin try drop table #SinCC; end try begin catch end catch;
+select @fecha = CONVERT(nvarchar(8),getdate()-5,112);
 
-
-	SELECT 
-		id2,
-		'Constitucion' Mv,
-		Reserva_inicial_constituida Valor, 
-		replace(convert(varchar(10),Fecha_aviso_Cardif,103),'/','') Fecha, 
-		cod_producto Producto,
-		Numero_radicacion_siniestro SinId, 
-		Ramo,
-		left(Doc_Asegurado,10) Nit,
-		Participacion_Cardif,
-		replace(convert(varchar(10),@corte,103),'/','') Corte,
-		upper(Nombre_asegurado) Nombres,
-		Cobertura_afectada Cob,
-		ltrim(rtrim([Nombre_beneficiario ])) as NombreBeneficiario,
-		ltrim(rtrim(Resultado_siniestro)) as CCbeneficiario,  
-		ltrim(rtrim([Num_Planilla])) as NumPlanilla
-	into #SinCC 
-	FROM tmpsiniestros 
-		WHERE  convert(nvarchar(6),Fecha_aviso_Cardif,112)=  convert(nvarchar(6), @corte,112) 
-		and ramo in (22) 
-		and cod_producto in (select PRODUCTO from Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE where ramo = 22 and GRUPO = 'C') 
-	union all
-	SELECT 
-		   id2,
-		   'Pago' Mv,
-		   cuota1,
-		   replace(convert(varchar(10),fecha_pago_cuota1,103),'/',''),        
-		   cod_producto,
-		   Numero_radicacion_siniestro, 
-		   ramo,
-		   Doc_Asegurado,
-		   Participacion_Cardif,
-		   replace(convert(varchar(10),@corte,103),'/',''),
-		   upper(Nombre_asegurado) Nombres,
-		   Cobertura_afectada,
-		   ltrim(rtrim([Nombre_beneficiario ])) as NombreBeneficiario,
-		   ltrim(rtrim(Resultado_siniestro)) as CCbeneficiario, 
-		   ltrim(rtrim([Num_Planilla ])) as NumPlanilla  
-	FROM tmpsiniestros 
-		   WHERE  convert(nvarchar(6),fecha_pago_cuota1,112)=convert(nvarchar(6), @corte,112) 
-		   and ltrim(rtrim(isnull(Poliza,'')))<>'RevPag'  
-		   and ramo in (22) 
-		   and cod_producto in (select PRODUCTO from Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE where ramo = 22 and GRUPO = 'C')    
-	union all
-	SELECT	
-			id2,
-			'RevPago' Mv,
-			cuota1,                             
-			replace(convert(varchar(10),fecha_pago_cuota1,103),'/',''),        
-			cod_producto,
-			Numero_radicacion_siniestro, 
-			ramo,
-			Doc_Asegurado,
-			Participacion_Cardif,
-			replace(convert(varchar(10),@corte,103),'/',''),
-			upper(Nombre_asegurado) Nombres,
-			Cobertura_afectada,
-			ltrim(rtrim([Nombre_beneficiario ])) as NombreBeneficiario,
-			ltrim(rtrim(Resultado_siniestro)) as CCbeneficiario, 
-			ltrim(rtrim([Num_Planilla ])) as NumPlanilla 
-	FROM tmpsiniestros 
-			WHERE  convert(nvarchar(6),fecha_pago_cuota1,112)=convert(nvarchar(6), @corte,112) 
-			and ltrim(rtrim(isnull(Poliza,'')))='RevPag'  
-			and ramo in (22) 
-			and cod_producto in (select PRODUCTO from Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE where ramo = 22 and GRUPO = 'C') 		
-	union all
-	SELECT 
-			id2,
-			'Liberacion' Mv,
-			Valor_dismin_reserva,                
-			replace(convert(varchar(10),fecha_dismi_reserva,103),'/',''),      
-			cod_producto,
-			Numero_radicacion_siniestro, 
-			ramo,
-			Doc_Asegurado,
-			Participacion_Cardif,
-			replace(convert(varchar(10),@corte,103),'/',''),
-			upper(Nombre_asegurado) Nombres,
-			Cobertura_afectada,
-			ltrim(rtrim([Nombre_beneficiario ])) as NombreBeneficiario,
-			ltrim(rtrim(Resultado_siniestro)) as CCbeneficiario, 
-			ltrim(rtrim([Num_Planilla ])) as NumPlanilla 
-	FROM tmpsiniestros 
-			WHERE  convert(nvarchar(6),fecha_dismi_reserva,112)=convert(nvarchar(6), @corte,112)  
-			and ramo in (22) 
-			and cod_producto in (select PRODUCTO from Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE where ramo = 22 and GRUPO = 'C') 
-	union all
-	SELECT 
-		 id2,
-		 'Objecion' Mv,
-		 Valor_siniestro_objetado,
-		 replace(convert(varchar(10),Fecha_terminado_siniestro,103),'/',''),
-		 cod_producto,
-		 Numero_radicacion_siniestro, 
-		 ramo,
-		 Doc_Asegurado,
-		 Participacion_Cardif, 
-		 replace(convert(varchar(10),@corte,103),'/',''),
-		 upper(Nombre_asegurado) Nombres,
-		 Cobertura_afectada,
-		 ltrim(rtrim([Nombre_beneficiario ])) as NombreBeneficiario,
-		 ltrim(rtrim(Resultado_siniestro)) as CCbeneficiario, 
-		 ltrim(rtrim([Num_Planilla ])) as NumPlanilla
-	FROM tmpsiniestros 
-		WHERE  convert(nvarchar(6),Fecha_terminado_siniestro,112)=convert(nvarchar(6), @corte,112)  
-		and ramo in (22) 
-		and cod_producto in (select PRODUCTO from Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE where ramo = 22 and GRUPO = 'C') 
-	order by mv,Fecha;
+select @mes2 = substring(@fecha,5,2);
+select @ano2 = substring(@fecha,1,4);
 
 
-	delete #SinCC where  sinId is null or producto is null or ramo is null;
-	
-	update #SinCC set nit=sinId where nit is null;
+select @periodo = @ano2 + @mes2;
+select @periodo2 = cast(@periodo  as int);
 
-	--Elimina registros con fecha ocurrencia menor a 01/11/2021
-	--delete from #SinCC where id2 in (select t.id2 from tmpsiniestros t, historicomovimientos h where t.id2 = h.id and t.ramo=22 and dbo.truncDate(h.Fechaocurrencia) < '20211101');
+delete from SiniestrosWp.dbo.tmpsiniestros;
 
-	
-
-	begin try drop table #xmlSin7; end try begin catch end catch;
-
-	Select  
-		c.TIPODIARIO  collate database_default Tipo_Diario,
-		c.CUENTA  collate database_default Cuenta,
-		c.NATURALEZA  collate database_default DC,
-		c.REF_TRANSACCION  collate database_default Referencia,
-		m.Nombres Descripcion,
-		cast(m.Ramo as nvarchar) as Ramo,
-		m.Producto,
-		m.Fecha,
-		m.nit,
-		m.SinId,
-		m.mv,
-		m.Corte,--c.Grupo_Cuenta, c.Observacion,
-		m.Valor Prima,
-		cast(0 as float)Valor,
-		cast(null as int) idSocio,
-		c.Formula Calculo,
-		m.Participacion_Cardif,
-		c.Iva,
-		m.Cob,
-		m.NombreBeneficiario, 
-		m.CCbeneficiario, 
-		NumPlanilla,
-		row_number()over(order by c.id) idc,cast(null as nvarchar(max))  Line,
-		2 id
-	into  #xmlSin7  
-	from #SinCC m  
-		inner join cardifwp.[dbo].[CUENTAS_CONTABLES_PROD] c  on c.GRUPO='RSGCAR' 
-	where  c.TIPODIARIO in('CRVSI','LRVSI','SIREA') and c.formula = 'vOtros'
-			AND(  (m.Mv in('Pago','RevPago') and left(c.Observacion,1) in('3','4'))--4. CAUSACIoN PARA PAGO DEL SINIESTRO,3. LIBERACION DE LA RESERVA DE SINIESTROS POR APROBACIONES DE PAGO
-	        or(m.Mv='Constitucion' and left(c.Observacion,1) ='1')--1. CONSTITUCIoN O INCREMENTO DE LA RESERVA DE SINIESTROS
-	        or(m.Mv  in('Liberacion','Objecion') and left(c.Observacion,1) ='2'));--2. DISMINUCIoN DE LA RESERVA DE SINIESTROS
-	 
-	 delete #xmlSin7 where Prima=0;
-
-	 
-	 
-	--Se asigna Socio
-	update  x set x.idSocio=(select max(socio) from cardifwp.dbo.Producto_TD_Cierre p where p.Producto=x.Producto) from #xmlSin7 x;
+	-- Aumentos
 
 
-	--Se calcula el valor del atransaccion(todo el valor es 100% 
-	update #xmlSin7 set valor=(case DC when 'C' then -1.0 else 1.0 end)* abs(prima); 
+	insert into SiniestrosWp.dbo.tmpsiniestros(Numero_radicacion_siniestro,Doc_Asegurado,
+	Cobertura_afectada,cod_producto,cod_plan,Ramo,Fecha_aviso_Cardif,Reserva_inicial_constituida,Nombre_asegurado,Poliza,id2,Participacion_Cardif)
+	Select NumeroSiniestro as Numero_radicacion_siniestro,
+	NroIdentificacion as Doc_Asegurado,
+	Cobertura as Cobertura_afectada ,
+	CodProducto as cod_producto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end as cod_plan ,
+	Ramo,
+	FechaMovimiento2 as Fecha_aviso_Cardif,
+	VrMovimiento as  Reserva_inicial_constituida,upper(left(ltrim(rtrim(Nombreasegurado)),50)),null, id, round(vrcoaseguroretenido/Vrmovimiento,1)
+	from historicomovimientos (nolock) where
+	tipoMovimiento in('Aumento Reserva','Reserva Inicial - Aseguradora')
+	and llavesiniestro in (select llavesiniestro from historico_inicial where Aval = 0) 
+	and fechacontabilizacion is null and tipocoaseguro is not null
+	;
 
-	--Se genera las RevPago
-	update #xmlSin7 set  DC=case DC when 'C' then 'D' else 'C' end,valor=-1*valor,Referencia='rv'+Referencia where Mv='RevPago';
-	--Se crea las <Line> del xml
 
-	delete #xmlSin7 where id<>2 or valor=0;
-	update #xmlSin7 set NombreBeneficiario = ISNULL(NombreBeneficiario,''),CCbeneficiario = ISNULL(CCbeneficiario,''), NumPlanilla = ISNULL(NumPlanilla,'');
-	update #xmlSin7 set ramo=right('00'+ltrim(rtrim(ramo)),2); 
-	update #xmlSin7 set Line='<Line><JournalType>'+Tipo_Diario+'</JournalType><AccountingPeriod>0'+right(Corte,6)+'</AccountingPeriod><TransactionDate>'+Fecha
-		+'</TransactionDate><AccountCode>'+Cuenta+'</AccountCode><TransactionReference>'+left(Referencia,30)+'</TransactionReference><ValuDate>'+Corte+'</ValuDate><Description>'
-		+left(Descripcion,50)+'</Description><DueDate>'+Corte+'</DueDate><CurrencyCode>COP</CurrencyCode><TransactionAmount>'
-		+ltrim(str(Valor,20,2))+'</TransactionAmount><TransactionAmountDecimalPlaces>2</TransactionAmountDecimalPlaces><BaseAmount/><BaseOperator>*</BaseOperator><BaseRate>1</BaseRate><ConversionRate>1</ConversionRate><DebitCredit>'
-		+DC+'</DebitCredit><AnalysisCode1>99999</AnalysisCode1><AnalysisCode2>'+replace(str(Producto,4,0),' ','0')+'</AnalysisCode2><AnalysisCode3>'+Ramo+'</AnalysisCode3><AnalysisCode4>99</AnalysisCode4><AnalysisCode5>'
-		+right('00'+idSocio,2)+'</AnalysisCode5><AnalysisCode6>'+right(replace(ltrim(replace(Nit,'0',' ')),' ','0'),10)+'</AnalysisCode6><AnalysisCode7>9999999</AnalysisCode7><AnalysisCode8>99999</AnalysisCode8><AnalysisCode9/><AnalysisCode10>99999</AnalysisCode10><DetailLad><GeneralDescription1>'
-		+SinId+'</GeneralDescription1><GeneralDescription2>' + NumPlanilla + '</GeneralDescription2><GeneralDescription3>' +CCbeneficiario + '</GeneralDescription3><GeneralDescription4>' + NombreBeneficiario + '</GeneralDescription4><GeneralDescription5/><GeneralDescription6/><GeneralDescription7/><GeneralDescription8/><GeneralDescription9/><GeneralDescription10/><GeneralDescription11/><GeneralDescription12/><GeneralDescription13>'
-		+ left(mv+'-'+cob,29) +'</GeneralDescription13></DetailLad><JournalSource>SSC</JournalSource></Line>';
+	--Pagos
 
-	--Validar como esta en reaseguro alfa
-	---Actualiza Historico reaseguroCardif		
-	--delete Hist_Siniestro_ReaseguroCardif where id2 in(select id2 from #SinCC);
-	--insert into Hist_Siniestro_ReaseguroCardif(id2,Mv,Valor,Fecha,Producto,SinId,Ramo,Nit,Participacion_Cardif,Corte,Nombres,vTerremoto,vOtros,vDeposito,vBomberos,x100Terremoto,x100Otros,x100Deposito,x100Bomberos,Cob,wProc)
-	--select id2,Mv,Valor,Fecha,Producto,SinId,Ramo,Nit,Participacion_Cardif,Corte,Nombres,vTerremoto,vOtros,vDeposito,vBomberos,x100Terremoto,x100Otros,x100Deposito,x100Bomberos,Cob,
-	--getdate() wProc from #SinCC
+	insert into SiniestrosWp.dbo.tmpsiniestros(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,
+	Fecha_pago_cuota1,cuota1,Nombre_asegurado,Poliza,id2,Participacion_Cardif)
+	Select NumeroSiniestro as Numero_radicacion_siniestro,
+	NroIdentificacion as Doc_Asegurado,
+	Cobertura as Cobertura_afectada ,
+	CodProducto as cod_producto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end as cod_plan ,
+	Ramo,
+	FechaMovimiento2 as Fecha_pago_cuota1,
+	VrMovimiento as  cuota1,upper(left(ltrim(rtrim(Nombreasegurado)),50)),null, id, round(vrcoaseguroretenido/Vrmovimiento,1)
+	from historicomovimientos (nolock) where 
+	tipoMovimiento in('Pago')
+	and llavesiniestro in (select llavesiniestro from historico_inicial where Aval = 0) 
+	and fechacontabilizacion is null and tipocoaseguro is not null
+	;
 
-	select 'ReasegCardif' Familia,
-	       @FC Periodo,
-	       Mv,
-	       idc Secuencia,
-	       Line
-	from #xmlSin7
-	where Line is not null
-	order by Mv, idc;
+	--Disminuciones
 
-	return 0;
-END;
+	insert into SiniestrosWp.dbo.tmpsiniestros(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,
+	Fecha_dismi_reserva,Valor_dismin_reserva,Nombre_asegurado,Poliza,id2,Participacion_Cardif)
+	Select NumeroSiniestro as Numero_radicacion_siniestro,
+	NroIdentificacion as Doc_Asegurado,
+	Cobertura as Cobertura_afectada ,
+	CodProducto as cod_producto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end as cod_plan ,
+	Ramo,
+	FechaMovimiento2 as Fecha_dismi_reserva,
+	VrMovimiento as  Valor_dismin_reserva,upper(left(ltrim(rtrim(Nombreasegurado)),50)),null, id, round(vrcoaseguroretenido/Vrmovimiento,1)
+	from historicomovimientos (nolock) where 
+	tipoMovimiento in('Disminución Reserva','Objetado','Anulado ','Anulado','Disminucion Reserva','objecion')
+	and llavesiniestro in (select llavesiniestro from historico_inicial where Aval = 0) 
+	and fechacontabilizacion is null and tipocoaseguro is not null
+	;
+
+
+	insert into SiniestrosWp.dbo.tmpsiniestros(Numero_radicacion_siniestro,Doc_Asegurado,Cobertura_afectada,cod_producto,cod_plan,Ramo,
+	fecha_dismi_reserva,Valor_dismin_reserva,Fecha_pago_cuota1,cuota1,Nombre_asegurado,Poliza,id2,Participacion_Cardif)
+	Select NumeroSiniestro as Numero_radicacion_siniestro,
+	NroIdentificacion as Doc_Asegurado,
+	Cobertura as Cobertura_afectada ,
+	CodProducto as cod_producto,
+	case when isnumeric(CodPlan)=0 then '0' when isnumeric(CodPlan)>0 and CodPlan > 9 then '0' else isnull(CodPlan,'0') end as cod_plan ,
+	Ramo,
+	null as Fecha_dismi_reserva,null as  Valor_dismin_reserva,-- Reversa 1 Disminuciones 
+	FechaMovimiento2 as Fecha_pago_cuota1,VrMovimiento as  cuota1,-- Reversa 2 Pagos
+	upper(left(ltrim(rtrim(Nombreasegurado)),50)),'RevPag',id, round(vrcoaseguroretenido/Vrmovimiento,1)
+	 from historicomovimientos (nolock) where 	tipoMovimiento 	in ('Reversa')
+	and llavesiniestro in (select llavesiniestro from historico_inicial where Aval = 0) 
+	and fechacontabilizacion is null and tipocoaseguro is not null
+	;
+
+--GENERA XML
+
+insert into #coaseguro exec sp_Gen_Xml_Siniestros_CoaseguroC @periodo2;
+ 
+
+--- Actualiza Registros contabilizados
+
+
+update historicomovimientos set fechacontabilizacion = dbo.truncdate(getdate()) 
+where 
+llavesiniestro in (select llavesiniestro from historico_inicial where Aval = 0) 
+and fechacontabilizacion is null and marcaavalpos is null and tipocoaseguro is not null 
+--and year(FechaMovimiento2)=2016 and month(FechaMovimiento2)=8 
+;
+
+select Familia,Periodo,Mv,Secuencia,Line
+from #coaseguro
+order by Familia,Mv,Secuencia;
+
+
+
+END
 GO
