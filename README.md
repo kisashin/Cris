@@ -1,27 +1,35 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCardifXml;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+/**
+ * Errores controlados del cierre contable de Colombia.
+ */
+public enum ColombiaClosingMessage {
 
-import java.util.List;
+    /** El cierre de Aval no ha sido ejecutado en el periodo. */
+    AVAL_CLOSING_NOT_EXECUTED(
+            "Debe ejecutar primero el cierre de Aval"),
 
-@Repository
-public interface ArchivoAsientoCardifXmlRepository
-        extends JpaRepository<ArchivoAsientoCardifXml, Integer> {
+    /** Los procedimientos no devolvieron lineas contables. */
+    NO_ACCOUNTING_ENTRIES_GENERATED(
+            "No se generaron asientos contables para el periodo"),
 
-    @Query(
-            value = "SELECT TOP 50 * "
-                    + "FROM dbo.archivoAsientoCardifXml "
-                    + "ORDER BY fechaproceso DESC, id DESC",
-            nativeQuery = true)
-    List<ArchivoAsientoCardifXml> findLatest();
+    /** Falla al construir los archivos XML contables. */
+    XML_GENERATION_ERROR("Error al generar los archivos XML contables"),
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-            value = "DELETE FROM dbo.archivoAsientoCardifXml",
-            nativeQuery = true)
-    int deleteAllFiles();
+    /** El archivo solicitado no existe o no tiene contenido. */
+    XML_FILE_NOT_FOUND("El archivo XML solicitado no existe"),
+
+    /** Falla al acceder a la base de datos del cierre. */
+    DATABASE_ACCESS_ERROR(
+            "Error al acceder a la informacion del cierre de movimientos");
+
+    private final String message;
+
+    ColombiaClosingMessage(String message) {
+        this.message = message;
+    }
+
+    public String getMessage() {
+        return message;
+    }
 }
