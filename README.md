@@ -1,132 +1,133 @@
---liquibase formatted sql
---changeset j36147:HU_DDPT_566_sp_Gen_Xml_Siniestros_ReasegCentro_20260826_01 splitStatements:true endDelimiter:\nGO stripComments:false dbms:mssql
+export interface IColombiaXmlFile {
+  id: number;
+  period: string;
+  family: string;
+  movementType: string;
+  fileName: string;
+  lineCount: number;
+  processDate: string;
+  status: string;
+}
 
-USE [SiniestrosWp]
-GO
+export interface IColombiaAccountingResult {
+  message: string;
+  period: string;
+  files: IColombiaXmlFile[];
+}
 
-SET ANSI_NULLS ON
-GO
 
-SET QUOTED_IDENTIFIER ON
-GO
 
-CREATE OR ALTER PROCEDURE [dbo].[sp_Gen_Xml_Siniestros_ReasegCentro](@FC nvarchar(6)) AS
-BEGIN
-	SET NOCOUNT ON;
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { INewGeneralResponse } from '../models/new-general-response.interface';
+import { catchError, map } from 'rxjs/operators'; 
+import { ReportStatus } from '../models/report-status.model';
+import { environment } from 'src/environments/environment';
+import {
+  IColombiaAccountingResult,
+  IColombiaXmlFile
+} from '../models/colombia-accounting-result.model';
 
-	declare @corte datetime=@FC+'01';
+@Injectable({
+  providedIn: 'root',
+})
+export class ClosingCardifService {
 
-	DROP TABLE IF EXISTS #SinCCen;
+  private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
+  private readonly closingUrl = `${this.baseUrl}/v1/cardif-closing`;
+  private readonly correlationId = crypto.randomUUID();
 
-	SELECT 'Constitucion'Mv,Reserva_inicial_constituida Valor,
-	       replace(convert(varchar(10),Fecha_aviso_Cardif,103),'/','') Fecha, cod_producto Producto,
-	       Numero_radicacion_siniestro SinId,
-	       Ramo,left(Doc_Asegurado,10) Nit,
-	       Participacion_Cardif,
-	       replace(convert(varchar(10),@corte,103),'/','') Corte,
-	       upper(Nombre_asegurado) Nombres, Moneda
-	into #SinCCen
-	FROM TBL_Asientos_siniestro
-	WHERE  convert(nvarchar(6),Fecha_aviso_Cardif,112)=  convert(nvarchar(6), @corte,112)
+  constructor (private http: HttpClient){}
 
-	union all
+  getAllReportsDetailsCardif(): Observable<ReportStatus[]> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
 
-	SELECT 'Pago'Mv,cuota1,
-	       replace(convert(varchar(10),fecha_pago_cuota1,103),'/',''),
-	       cod_producto,Numero_radicacion_siniestro,ramo,
-	       Doc_Asegurado,Participacion_Cardif,
-	       replace(convert(varchar(10),@corte,103),'/',''),
-	       upper(Nombre_asegurado) Nombres, Moneda
-	FROM TBL_Asientos_siniestro
-	WHERE  convert(nvarchar(6),fecha_pago_cuota1,112)=convert(nvarchar(6), @corte,112)
-	and    ltrim(rtrim(isnull(Poliza,'')))<>'RevPag'
+    return this.http
+      .get<INewGeneralResponse<ReportStatus[]>>(
+        `${this.baseUrl}/v1/all-cardif-reports`,
+        { headers }
+      )
+      .pipe(
+        map(resp => resp.bodyResponse ?? []),
+        catchError(err => {
+          const msg = err?.error?.errorDetail?.message ?? err?.error?.message ?? '';
+          if (err.status === 400 && msg.includes('No registros')) {
+            return of([]);
+          }
+          throw err;
+        })
+      );
+  }
 
-	union all
+  updateReportsCardif(): Observable<INewGeneralResponse<string>> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
 
-	SELECT 'RevPago'Mv,cuota1,
-	       replace(convert(varchar(10),fecha_pago_cuota1,103),'/',''),
-	       cod_producto,Numero_radicacion_siniestro,ramo,
-	       Doc_Asegurado,Participacion_Cardif,
-	       replace(convert(varchar(10),@corte,103),'/',''),
-	       upper(Nombre_asegurado) Nombres, Moneda
-	FROM TBL_Asientos_siniestro
-	WHERE  convert(nvarchar(6),fecha_pago_cuota1,112)=convert(nvarchar(6), @corte,112)
-	and    ltrim(rtrim(isnull(Poliza,'')))='RevPag'
+    return this.http.put<string>(
+      `${this.baseUrl}/v1/update-cardif-report`,
+      null,
+      { 
+        headers,
+        responseType: 'text' as 'json'
+      }
+    ).pipe(
+      map((txt: string) => ({
+        bodyResponse: txt
+      }) as INewGeneralResponse<string>)
+    );
+  }
 
-	union all
+  /**
+   * Ejecuta la generacion de los asientos contables.
+   */
+  generateAccountingEntries(): Observable<INewGeneralResponse<IColombiaAccountingResult>> {
+    return this.http.put<INewGeneralResponse<IColombiaAccountingResult>>(
+      `${this.closingUrl}/generate`,
+      null,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
 
-	SELECT 'Liberacion'Mv,Valor_dismin_reserva,
-	       replace(convert(varchar(10),fecha_dismi_reserva,103),'/',''),
-	       cod_producto,Numero_radicacion_siniestro,ramo,
-	       Doc_Asegurado,Participacion_Cardif,
-	       replace(convert(varchar(10),@corte,103),'/',''),
-	       upper(Nombre_asegurado) Nombres, Moneda
-	FROM TBL_Asientos_siniestro
-	WHERE  convert(nvarchar(6),fecha_dismi_reserva,112)=convert(nvarchar(6), @corte,112)
+  /**
+   * Consulta los archivos XML generados en procesos anteriores.
+   */
+  findGeneratedFiles(): Observable<INewGeneralResponse<IColombiaXmlFile[]>> {
+    return this.http.get<INewGeneralResponse<IColombiaXmlFile[]>>(
+      `${this.closingUrl}/files`,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
 
-	union all
+  /**
+   * Descarga el contenido de un archivo XML persistido.
+   */
+  downloadXmlFile(id: number): Observable<HttpResponse<Blob>> {
+    return this.http.get(
+      `${this.closingUrl}/files/${id}/download`,
+      {
+        headers: this.createHeaders('application/xml'),
+        observe: 'response',
+        responseType: 'blob'
+      }
+    );
+  }
 
-	SELECT 'Objecion' Mv,Valor_siniestro_objetado,
-	       replace(convert(varchar(10),Fecha_terminado_siniestro,103),'/',''),
-	       cod_producto,Numero_radicacion_siniestro,ramo,
-	       Doc_Asegurado,Participacion_Cardif,
-	       replace(convert(varchar(10),@corte,103),'/',''),
-	       upper(Nombre_asegurado) Nombres, Moneda
-	FROM TBL_Asientos_siniestro
-	WHERE  convert(nvarchar(6),Fecha_terminado_siniestro,112)=convert(nvarchar(6), @corte,112)
-	order by mv,Fecha;
-
-	delete #SinCCen where  isnull(Participacion_Cardif,0)<=0 or sinId is null or producto is null or ramo is null;
-	update #SinCCen set nit=sinId where nit is null;
-
-	DROP TABLE IF EXISTS #xmlSinCen;
-
-	Select     c.TIPODIARIO  collate database_default Tipo_Diario,c.CUENTA  collate database_default Cuenta,
-	c.NATURALEZA  collate database_default DC,c.REF_TRANSACCION  collate database_default Referencia,
-	m.Nombres Descripcion,cast(m.Ramo as nvarchar) as Ramo,m.Producto,m.Fecha,m.nit,m.SinId,m.mv,m.Corte,
-	m.Valor Prima,cast(0 as float)Valor,cast(null as int) idSocio,c.Formula Calculo,m.Participacion_Cardif,c.Iva,
-	row_number()over(order by c.id) idc,cast(null as nvarchar(max))  Line,2 id,moneda
-	into  #xmlSinCen  from #SinCCen m  inner join cardifwp.[dbo].[CUENTAS_CONTABLES_PROD] c  on m.Ramo = c.ramo	and c.GRUPO='RC'
-	 where   c.TIPODIARIO in('CRVSI','LRVSI','SINIE')
-	 AND ((c.IVA='SI' and m.Ramo in(select distinct ramo from cardifwp.dbo.Ramos_Cierre where iva<>0 and Origen='CO'))
-	    or (c.IVA<>'SI' and m.Ramo in(select distinct ramo from cardifwp.dbo.Ramos_Cierre where iva  =0 and Origen='CO'))
-		or (c.IVA='99'))
-	 AND(  (m.Mv in('Pago','RevPago') and left(c.Observacion,1) in('3','4'))
-	        or(m.Mv='Constitucion' and left(c.Observacion,1) ='1')
-	        or(m.Mv  in('Liberacion','Objecion') and left(c.Observacion,1) ='2'));
-
-	delete #xmlSinCen where Prima=0;
-	update #xmlSinCen set idSocio=left(Producto,2);
-	update #xmlSinCen set valor=(case DC when 'C' then -1.0 else 1.0 end)*
-	                            (case when charindex('Prima',Calculo)>0 then abs(Prima) else 1 end)
-	                           *(case when charindex('ParteCardif',Calculo)>0 then Participacion_Cardif else 1 end)
-	                           *(case when charindex('ParteOtro',Calculo)>0 then 1.0-Participacion_Cardif else 1 end);
-	update #xmlSinCen set  DC=case DC when 'C' then 'D' else 'C' end,valor=-1*valor,Referencia='rv'+Referencia where Mv='RevPago';
-	delete #xmlSinCen where id<>2;
-	update #xmlSinCen set ramo=right('00'+ltrim(rtrim(ramo)),2);
-	update #xmlSinCen set Descripcion=replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(Descripcion,'Á','A'),'É','E'),'Í','I'),'Ó','O'),'Ú','U'),'Ñ','N'),'Ü','U'),'>',''),'<',''),';',' ');
-	update #xmlSinCen set Line='<Line><JournalType>'+Tipo_Diario+'</JournalType><AccountingPeriod>0'+right(Corte,6)+'</AccountingPeriod><TransactionDate>'+Fecha
-		+'</TransactionDate><AccountCode>'+Cuenta+'</AccountCode><TransactionReference>'
-		+left(case mv when 'Liberacion' then replace(Referencia,'Constitucion','Liberacion') else Referencia end+'('+mv+')',30)+'</TransactionReference>'
-		+'<ValuDate>'+Corte+'</ValuDate><Description>'
-		+left(Descripcion,30)+'</Description><DueDate>'+Corte+'</DueDate><CurrencyCode>'+Moneda+'</CurrencyCode><TransactionAmount>'
-		+ltrim(str(Valor,20,2))+'</TransactionAmount><TransactionAmountDecimalPlaces>2</TransactionAmountDecimalPlaces><BaseAmount/><BaseOperator>*</BaseOperator><BaseRate/><ConversionRate>1</ConversionRate><DebitCredit>'
-		+DC+'</DebitCredit><AnalysisCode1>99999</AnalysisCode1><AnalysisCode2>'+replace(str(Producto,4,0),' ','0')+'</AnalysisCode2><AnalysisCode3>' + right('00'+ltrim(rtrim(Ramo)),2) + '</AnalysisCode3><AnalysisCode4>99</AnalysisCode4><AnalysisCode5>'
-		+right('00'+idSocio,2)+'</AnalysisCode5><AnalysisCode6>'+ltrim(nit)+'</AnalysisCode6><AnalysisCode7>9999999</AnalysisCode7><AnalysisCode8>99999</AnalysisCode8><AnalysisCode9/><AnalysisCode10>99999</AnalysisCode10><DetailLad><GeneralDescription1>'
-		+SinId+'</GeneralDescription1><GeneralDescription2/><GeneralDescription3/><GeneralDescription4/><GeneralDescription5/><GeneralDescription6/><GeneralDescription7/><GeneralDescription8/><GeneralDescription9/><GeneralDescription10/><GeneralDescription11/><GeneralDescription12/><GeneralDescription13>'
-		+mv+'</GeneralDescription13></DetailLad><JournalSource>SSC</JournalSource></Line>';
-
-	insert into #xmlSinCen(line,id,mv)
-	 select '<?xml version="1.0" encoding="UTF-8" ?><SSC><SunSystemsContext><BusinessUnit>S01</BusinessUnit><BudgetCode>A</BudgetCode></SunSystemsContext><Payload><Ledger>',0,'enc' union
-	 select '</Ledger></Payload></SSC>',3,'pie';
-
-	select id, mv Mv, idc Secuencia, Line
-	from #xmlSinCen
-	where Line is not null
-	order by id, idc;
-
-	DROP TABLE IF EXISTS #xmlSinCen;
-
-	return 0;
-END;
-GO
+  private createHeaders(accept: string): HttpHeaders {
+    return new HttpHeaders()
+      .set('correlation_id', this.correlationId)
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID())
+      .set('Accept', accept);
+  }
+  
+}
