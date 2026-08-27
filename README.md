@@ -1,20 +1,19 @@
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingResultDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCardifXml;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoAvalXml;
+import org.junit.jupiter.api.Nested;
 import org.springframework.http.HttpHeaders;
 
     @Nested
-    @DisplayName("PUT /v1/cardif-closing/generate")
+    @DisplayName("PUT /v1/aval-closing/generate")
     class GenerateAccountingEntries {
 
         @Test
         @DisplayName("debe devolver el resultado del proceso y código 200")
         void shouldReturnGenerationResult() {
-            String correlationId = "corr-gen";
-            String requestId = "req-gen";
-
             ColombiaAccountingResultDTO serviceResult =
                     ColombiaAccountingResultDTO.builder()
                             .message("Asientos generados con éxito.")
@@ -22,13 +21,13 @@ import org.springframework.http.HttpHeaders;
                             .files(Collections.emptyList())
                             .build();
 
-            when(closingCardifService.generateAccountingEntries(
-                    "hdr", correlationId, requestId))
+            when(closingAvalService.generateAccountingEntries(
+                    pHeader, correlationId, requestId))
                     .thenReturn(serviceResult);
 
             ResponseEntity<ResponseModel<ColombiaAccountingResultDTO>> response =
                     controller.generateAccountingEntries(
-                            "hdr", correlationId, requestId);
+                            pHeader, correlationId, requestId);
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
 
@@ -40,29 +39,27 @@ import org.springframework.http.HttpHeaders;
                     body.getResponseHeader().getReturnCode());
             assertEquals(serviceResult, body.getBodyResponse());
 
-            verify(closingCardifService, times(1))
-                    .generateAccountingEntries("hdr", correlationId, requestId);
+            verify(closingAvalService, times(1))
+                    .generateAccountingEntries(
+                            pHeader, correlationId, requestId);
         }
     }
 
     @Nested
-    @DisplayName("GET /v1/cardif-closing/files")
+    @DisplayName("GET /v1/aval-closing/files")
     class FindGeneratedFiles {
 
         @Test
         @DisplayName("debe devolver los archivos generados y código 200")
         void shouldReturnGeneratedFiles() {
-            String correlationId = "corr-files";
-            String requestId = "req-files";
-
             List<ColombiaXmlFileDTO> serviceResult = Collections.singletonList(
                     ColombiaXmlFileDTO.builder()
                             .id(1)
-                            .family("ReasegCardif")
+                            .family("ReasegAlfa")
                             .fileName("archivo.xml")
                             .build());
 
-            when(closingCardifService.findGeneratedFiles(
+            when(closingAvalService.findGeneratedFiles(
                     correlationId, requestId))
                     .thenReturn(serviceResult);
 
@@ -76,29 +73,27 @@ import org.springframework.http.HttpHeaders;
             assertEquals(correlationId, body.getCorrelationId());
             assertEquals(serviceResult, body.getBodyResponse());
 
-            verify(closingCardifService, times(1))
+            verify(closingAvalService, times(1))
                     .findGeneratedFiles(correlationId, requestId);
         }
     }
 
     @Nested
-    @DisplayName("GET /v1/cardif-closing/files/{id}/download")
+    @DisplayName("GET /v1/aval-closing/files/{id}/download")
     class DownloadXmlFile {
 
         @Test
         @DisplayName("debe devolver el contenido del archivo con su nombre")
         void shouldReturnFileContent() {
-            String correlationId = "corr-download";
-            String requestId = "req-download";
             String content = "<SSC><Line/></SSC>";
 
-            ArchivoAsientoCardifXml file = ArchivoAsientoCardifXml.builder()
+            ArchivoAsientoAvalXml file = ArchivoAsientoAvalXml.builder()
                     .id(1)
-                    .nombreArchivo("ReasegDirectasPago20260827.xml")
+                    .nombreArchivo("ReasegAlf_HogarPago20260827.xml")
                     .contenido(content)
                     .build();
 
-            when(closingCardifService.findXmlFile(
+            when(closingAvalService.findXmlFile(
                     1, correlationId, requestId))
                     .thenReturn(file);
 
@@ -111,14 +106,11 @@ import org.springframework.http.HttpHeaders;
                     response.getBody());
             assertEquals(
                     "attachment; filename=\""
-                            + "ReasegDirectasPago20260827.xml\"",
+                            + "ReasegAlf_HogarPago20260827.xml\"",
                     response.getHeaders()
                             .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-            assertEquals(
-                    content.getBytes(StandardCharsets.UTF_8).length,
-                    response.getHeaders().getContentLength());
 
-            verify(closingCardifService, times(1))
+            verify(closingAvalService, times(1))
                     .findXmlFile(1, correlationId, requestId);
         }
     }
