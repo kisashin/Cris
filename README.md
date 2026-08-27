@@ -1,22 +1,24 @@
 package co.com.bnpparibas.cardif.closingclaims.domain.services.impl;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcardif.ClosingCardif;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingLine;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaAccountingResultDTO;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFile;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.ColombiaXmlFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCardif;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoCardifXml;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoAsientoAvalXml;
 import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.ColombiaAccountingXmlHelper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ArchivoAsientoCardifXmlRepository;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ClosingCardifRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ArchivoAsientoAvalXmlRepository;
+import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.ClosingAvalRepository;
 import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.StoredProcedureExecutor;
 import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.StoredProcedureRowMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -28,25 +30,24 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
+import co.com.bnpparibas.cardif.closingclaims.domain.util.exception.BusinessException;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingaval.ClosingAval;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.TmpRepAvalCierre;
+
 
 @ExtendWith(MockitoExtension.class)
-public class ClosingCardifServiceImplTest {
+public class ClosingAvalServiceImplTest {
 
     private static final String P_HEADER = "hdr";
     private static final String CORRELATION_ID = "corr-123";
     private static final String REQUEST_ID = "req-456";
 
     @Mock
-    private ClosingCardifRepository closingCardifRepository;
+    private ClosingAvalRepository closingAvalRepository;
 
     @Mock
-    private ArchivoAsientoCardifXmlRepository fileRepository;
+    private ArchivoAsientoAvalXmlRepository fileRepository;
 
     @Mock
     private ColombiaAccountingXmlHelper xmlHelper;
@@ -55,14 +56,14 @@ public class ClosingCardifServiceImplTest {
     private StoredProcedureExecutor storedProcedureExecutor;
 
     @InjectMocks
-    private ClosingCardifServiceImpl service;
+    private ClosingAvalServiceImpl service;
 
     private ColombiaAccountingLine line() {
         return ColombiaAccountingLine.builder()
-                .family("ReasegCardif")
+                .family("ReasegAlfa")
                 .period("202608")
                 .pass(1)
-                .movementType("Pago")
+                .movementType("Constitucion")
                 .sequence(1L)
                 .content("<Line/>")
                 .build();
@@ -70,23 +71,23 @@ public class ClosingCardifServiceImplTest {
 
     private ColombiaXmlFile file() {
         return ColombiaXmlFile.builder()
-                .family("ReasegCardif")
+                .family("ReasegAlfa")
                 .period("202608")
-                .movementType("Pago")
-                .fileName("ReasegDirectasPago20260827.xml")
+                .movementType("Constitucion")
+                .fileName("ReasegAlf_HogarConstitucion20260827.xml")
                 .lineCount(1)
                 .content("<SSC/>")
                 .build();
     }
 
-    private ArchivoAsientoCardifXml entity() {
-        return ArchivoAsientoCardifXml.builder()
+    private ArchivoAsientoAvalXml entity() {
+        return ArchivoAsientoAvalXml.builder()
                 .id(1)
                 .idLote("lote")
                 .periodo("202608")
-                .familia("ReasegCardif")
-                .tipoMovimiento("Pago")
-                .nombreArchivo("ReasegDirectasPago20260827.xml")
+                .familia("ReasegAlfa")
+                .tipoMovimiento("Constitucion")
+                .nombreArchivo("ReasegAlf_HogarConstitucion20260827.xml")
                 .contenido("<SSC/>")
                 .cantidadLineas(1)
                 .fechaproceso(LocalDateTime.of(2026, 8, 27, 15, 3, 29))
@@ -94,102 +95,189 @@ public class ClosingCardifServiceImplTest {
                 .build();
     }
 
-    @Nested
-    @DisplayName("getDetailsReportsCardif")
-    class GetDetailsReportsCardif {
+    @Test
+    @DisplayName("getDetailsReportsAval devuelve lista completa de ClosingAval")
+    void getDetailsReportsAval_success() {
+        TmpRepAvalCierre detail = new TmpRepAvalCierre();
+        LocalDateTime now = LocalDateTime.now();
+        detail.setFechagenera(now);
+        detail.setEstado("APPROVED");
+        detail.setNombreRpt("Rpt001");
 
-        @Test
-        @DisplayName("debe devolver lista mapeada cuando el repositorio retorna datos")
-        void shouldReturnMappedList() {
-            ArchivoAsientoCardif entity = new ArchivoAsientoCardif();
-            entity.setNombreArchivo("archivo1.txt");
-            entity.setFechaproceso(LocalDateTime.of(2024, 5, 1, 10, 30));
-            entity.setEstado("PROCESADO");
+        when(closingAvalRepository.findAllDetailsAval())
+                .thenReturn(Collections.singletonList(detail));
 
-            when(closingCardifRepository.findAllDetailsCardif())
-                    .thenReturn(Arrays.asList(entity));
+        List<ClosingAval> result = service.getDetailsReportsAval("hdr", "corrId", "reqId");
 
-            List<ClosingCardif> result = service.getDetailsReportsCardif("hdr", "corrId", "reqId");
+        assertNotNull(result);
+        assertEquals(1, result.size());
 
-            assertNotNull(result);
-            assertEquals(1, result.size());
+        ClosingAval av = result.get(0);
+        assertEquals(now, av.getDateGenerate());
+        assertEquals("APPROVED", av.getStatus());
+        assertEquals("Rpt001", av.getNombreRpt());
 
-            ClosingCardif dto = result.get(0);
-            assertEquals("archivo1.txt", dto.getNombreArchivo());
-            assertEquals(LocalDateTime.of(2024, 5, 1, 10, 30), dto.getDateProcessing());
-            assertEquals("PROCESADO", dto.getStatus());
-
-            verify(closingCardifRepository, times(1)).findAllDetailsCardif();
-        }
-
-        @Test
-        @DisplayName("debe lanzar BusinessException cuando no hay registros")
-        void shouldThrowExceptionWhenNoData() {
-            when(closingCardifRepository.findAllDetailsCardif())
-                    .thenReturn(Collections.emptyList());
-
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.getDetailsReportsCardif("hdr", "corrId", "reqId")
-            );
-
-            assertEquals("No registros para consultar", ex.getMessage());
-            assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
-
-            verify(closingCardifRepository, times(1)).findAllDetailsCardif();
-        }
+        verify(closingAvalRepository, times(1)).findAllDetailsAval();
     }
 
     @Test
-    @DisplayName("debe lanzar BusinessException cuando el repositorio devuelve null")
-    void shouldThrowExceptionWhenRepositoryReturnsNull() {
-        when(closingCardifRepository.findAllDetailsCardif())
+    @DisplayName("getDetailsReportsAval lanza BusinessException cuando la lista está vacía")
+    void getDetailsReportsAval_noData_throwsException() {
+        when(closingAvalRepository.findAllDetailsAval())
                 .thenReturn(null);
 
         BusinessException ex = assertThrows(
                 BusinessException.class,
-                () -> service.getDetailsReportsCardif("hdr", "corrId", "reqId")
+                () -> service.getDetailsReportsAval("hdr", "corrId", "reqId")
         );
 
-        assertEquals("No registros para consultar", ex.getMessage());
         assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
-
-        verify(closingCardifRepository, times(1)).findAllDetailsCardif();
+        assertEquals("No registros para consultar", ex.getMessage());
+        verify(closingAvalRepository, times(1)).findAllDetailsAval();
     }
 
+    @Test
+    @DisplayName("lanza BusinessException cuando la lista está vacía")
+    void getDetailsReportsAval_emptyList_throwsException() {
+        when(closingAvalRepository.findAllDetailsAval())
+                .thenReturn(Collections.emptyList());
 
-    @Nested
-    @DisplayName("uploadReportsPendingRptCardif")
-    class UploadReportsPendingRptCardif {
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.getDetailsReportsAval("hdr", "corrId", "reqId"));
 
-        @Test
-        @DisplayName("debe devolver mensaje con filas afectadas cuando la actualización es exitosa")
-        void shouldReturnSuccessMessage() {
-            when(closingCardifRepository.markAsPendingRptCardif()).thenReturn(5);
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        assertEquals("No registros para consultar", ex.getMessage());
 
-            String result = service.uploadReportsPendingRptCardif("hdr", "corrId", "reqId");
+        verify(closingAvalRepository, times(1)).findAllDetailsAval();
+    }
 
-            assertEquals("Actualización completada, filas afectadas: 5", result);
-            verify(closingCardifRepository, times(1)).markAsPendingRptCardif();
-        }
+    @Test
+    @DisplayName("uploadReportsPendingRptAval devuelve mensaje con filas actualizadas")
+    void uploadReportsPendingRptAval_success() {
+        when(closingAvalRepository.markAsPendingRptAval()).thenReturn(5);
 
-        @Test
-        @DisplayName("debe devolver mensaje de error cuando el repositorio lanza excepción")
-        void shouldReturnErrorMessageOnException() {
-            when(closingCardifRepository.markAsPendingRptCardif())
-                    .thenThrow(new RuntimeException("Fallo DB"));
+        String result = service.uploadReportsPendingRptAval("hdr", "corrId", "reqId");
 
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.uploadReportsPendingRptCardif("hdr", "corrId", "reqId")
-            );
+        assertEquals("Actualización completada, filas afectadas: 5", result);
+        verify(closingAvalRepository, times(1)).markAsPendingRptAval();
+    }
 
-            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
-            assertEquals("Error al actualizar reporte", ex.getMessage());
-            assertEquals("Fallo DB", ex.getCause().getMessage());
+    @Test
+    @DisplayName("cuando el repositorio lanza excepción, se devuelve mensaje de error")
+    void uploadReportsPendingRptAval_repositoryThrows() {
+        when(closingAvalRepository.markAsPendingRptAval())
+                .thenThrow(new RuntimeException("DB error"));
 
-            verify(closingCardifRepository, times(1)).markAsPendingRptCardif();
-        }
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.uploadReportsPendingRptAval("hdr", "corrId", "reqId")
+        );
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
+        assertEquals("Error al actualizar reporte", ex.getMessage());
+        assertEquals("DB error", ex.getCause().getMessage());
+
+        verify(closingAvalRepository, times(1)).markAsPendingRptAval();
+    }
+
+    @Test
+    @DisplayName("uploadReportsPendingRptAval maneja caso 0 filas actualizadas")
+    void uploadReportsPendingRptAval_zeroRows() {
+        when(closingAvalRepository.markAsPendingRptAval()).thenReturn(0);
+
+        String result = service.uploadReportsPendingRptAval("hdr", "corrId", "reqId");
+
+        assertEquals("Actualización completada, filas afectadas: 0", result);
+        verify(closingAvalRepository, times(1)).markAsPendingRptAval();
+    }
+
+    @Test
+    @DisplayName("lanza BusinessException cuando el repositorio devuelve null")
+    void getReportsSeatAval_null_throwsException() {
+        when(closingAvalRepository.findAllReportsAsientoAval())
+                .thenReturn(null);
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.getReportsSeatAval("hdr", "corrId", "reqId"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        assertEquals("No registros para consultar", ex.getMessage());
+
+        verify(closingAvalRepository, times(1)).findAllReportsAsientoAval();
+    }
+
+    @Test
+    @DisplayName("getReportsSeatAval devuelve lista completa de ClosingAval")
+    void getReportsSeatAval_success() {
+        ClosingAvalRepository.ArchivoAsientoAvalProjection mockRow =
+                mock(ClosingAvalRepository.ArchivoAsientoAvalProjection.class);
+        LocalDateTime now = LocalDateTime.now();
+        when(mockRow.getFechaproceso()).thenReturn(now);
+        when(mockRow.getEstado()).thenReturn("PENDING");
+        when(mockRow.getNombreArchivo()).thenReturn("SeatRpt001");
+
+        when(closingAvalRepository.findAllReportsAsientoAval())
+                .thenReturn(Collections.singletonList(mockRow));
+
+        List<ClosingAval> result = service.getReportsSeatAval("hdr", "corrId", "reqId");
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+
+        ClosingAval av = result.get(0);
+        assertEquals(now, av.getDateGenerate());
+        assertEquals("PENDING", av.getStatus());
+        assertEquals("SeatRpt001", av.getNombreRpt());
+
+        verify(closingAvalRepository, times(1)).findAllReportsAsientoAval();
+    }
+
+    @Test
+    @DisplayName("getReportsSeatAval lanza BusinessException cuando no hay registros")
+    void getReportsSeatAval_noData_throwsException() {
+        when(closingAvalRepository.findAllReportsAsientoAval())
+                .thenReturn(Collections.emptyList());
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.getReportsSeatAval("hdr", "corrId", "reqId")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
+        assertEquals("No registros para consultar", ex.getMessage());
+
+        verify(closingAvalRepository, times(1)).findAllReportsAsientoAval();
+    }
+
+    @Test
+    @DisplayName("uploadReportsPendingRptSeatAval devuelve mensaje con filas actualizadas")
+    void uploadReportsPendingRptSeatAval_success() {
+        when(closingAvalRepository.markAsPendingRptSeatAval()).thenReturn(7);
+
+        String result = service.uploadReportsPendingRptSeatAval("hdr", "corrId", "reqId");
+
+        assertEquals("Actualización completada, filas afectadas: 7", result);
+        verify(closingAvalRepository, times(1)).markAsPendingRptSeatAval();
+    }
+
+    @Test
+    @DisplayName("uploadReportsPendingRptSeatAval maneja excepción del repositorio")
+    void uploadReportsPendingRptSeatAval_exception() {
+        when(closingAvalRepository.markAsPendingRptSeatAval())
+                .thenThrow(new RuntimeException("DB error"));
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> service.uploadReportsPendingRptSeatAval("hdr", "corrId", "reqId")
+        );
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
+        assertEquals("Error al actualizar reporte", ex.getMessage());
+        assertEquals("DB error", ex.getCause().getMessage());
+
+        verify(closingAvalRepository, times(1)).markAsPendingRptSeatAval();
     }
 
     @Nested
@@ -199,8 +287,6 @@ public class ClosingCardifServiceImplTest {
         @Test
         @DisplayName("debe persistir los archivos generados y devolverlos")
         void shouldPersistGeneratedFiles() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(1);
             when(storedProcedureExecutor.query(
                     anyString(),
                     any(StoredProcedureRowMapper.class),
@@ -218,40 +304,18 @@ public class ClosingCardifServiceImplTest {
             assertEquals("Asientos generados con éxito.", result.getMessage());
             assertEquals("202608", result.getPeriod());
             assertEquals(1, result.getFiles().size());
-            assertEquals("ReasegCardif", result.getFiles().get(0).getFamily());
-            assertEquals("GENERADO", result.getFiles().get(0).getStatus());
+            assertEquals("ReasegAlfa", result.getFiles().get(0).getFamily());
 
             verify(fileRepository, times(1)).deleteAllFiles();
-            verify(storedProcedureExecutor, times(2)).query(
+            verify(storedProcedureExecutor, times(1)).query(
                     anyString(),
                     any(StoredProcedureRowMapper.class),
                     anyString());
         }
 
         @Test
-        @DisplayName("debe lanzar BusinessException cuando el cierre de aval no se ejecuto")
-        void shouldThrowWhenAvalClosingIsMissing() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(0);
-
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.generateAccountingEntries(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            assertEquals(HttpStatus.BAD_REQUEST, ex.getHttpStatus());
-            assertEquals(
-                    "Debe ejecutar primero el cierre de Aval",
-                    ex.getMessage());
-
-            verify(fileRepository, never()).deleteAllFiles();
-        }
-
-        @Test
         @DisplayName("debe lanzar BusinessException cuando no se generan archivos")
         void shouldThrowWhenNoFilesGenerated() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(1);
             when(storedProcedureExecutor.query(
                     anyString(),
                     any(StoredProcedureRowMapper.class),
@@ -274,8 +338,6 @@ public class ClosingCardifServiceImplTest {
         @Test
         @DisplayName("debe lanzar BusinessException cuando el helper falla")
         void shouldThrowWhenHelperFails() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(1);
             when(storedProcedureExecutor.query(
                     anyString(),
                     any(StoredProcedureRowMapper.class),
@@ -297,9 +359,9 @@ public class ClosingCardifServiceImplTest {
         }
 
         @Test
-        @DisplayName("debe lanzar BusinessException cuando falla el acceso a datos")
-        void shouldThrowWhenDatabaseFails() {
-            when(closingCardifRepository.countAvalClosingControl())
+        @DisplayName("debe lanzar BusinessException cuando falla el borrado previo")
+        void shouldThrowWhenDeleteFails() {
+            when(fileRepository.deleteAllFiles())
                     .thenThrow(new DataAccessResourceFailureException("db"));
 
             BusinessException ex = assertThrows(
@@ -315,11 +377,12 @@ public class ClosingCardifServiceImplTest {
         }
 
         @Test
-        @DisplayName("debe lanzar BusinessException cuando falla el borrado previo")
-        void shouldThrowWhenDeleteFails() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(1);
-            when(fileRepository.deleteAllFiles())
+        @DisplayName("debe lanzar BusinessException cuando falla el procedimiento")
+        void shouldThrowWhenProcedureFails() {
+            when(storedProcedureExecutor.query(
+                    anyString(),
+                    any(StoredProcedureRowMapper.class),
+                    anyString()))
                     .thenThrow(new DataAccessResourceFailureException("db"));
 
             BusinessException ex = assertThrows(
@@ -334,8 +397,6 @@ public class ClosingCardifServiceImplTest {
         @Test
         @DisplayName("debe lanzar BusinessException cuando falla el guardado")
         void shouldThrowWhenSaveFails() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(1);
             when(storedProcedureExecutor.query(
                     anyString(),
                     any(StoredProcedureRowMapper.class),
@@ -344,26 +405,6 @@ public class ClosingCardifServiceImplTest {
             when(xmlHelper.buildFiles(anyList()))
                     .thenReturn(Collections.singletonList(file()));
             when(fileRepository.saveAll(anyList()))
-                    .thenThrow(new DataAccessResourceFailureException("db"));
-
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.generateAccountingEntries(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            assertEquals(
-                    HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
-        }
-
-        @Test
-        @DisplayName("debe lanzar BusinessException cuando falla el procedimiento")
-        void shouldThrowWhenProcedureFails() {
-            when(closingCardifRepository.countAvalClosingControl())
-                    .thenReturn(1);
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
                     .thenThrow(new DataAccessResourceFailureException("db"));
 
             BusinessException ex = assertThrows(
@@ -391,14 +432,14 @@ public class ClosingCardifServiceImplTest {
 
             assertEquals(1, files.size());
             assertEquals(1, files.get(0).getId());
-            assertEquals("ReasegCardif", files.get(0).getFamily());
+            assertEquals("ReasegAlfa", files.get(0).getFamily());
             assertNotNull(files.get(0).getProcessDate());
         }
 
         @Test
         @DisplayName("debe devolver fecha nula cuando la entidad no la tiene")
         void shouldReturnNullProcessDate() {
-            ArchivoAsientoCardifXml withoutDate = entity();
+            ArchivoAsientoAvalXml withoutDate = entity();
             withoutDate.setFechaproceso(null);
 
             when(fileRepository.findLatest())
@@ -436,7 +477,7 @@ public class ClosingCardifServiceImplTest {
             when(fileRepository.findById(1))
                     .thenReturn(Optional.of(entity()));
 
-            ArchivoAsientoCardifXml file =
+            ArchivoAsientoAvalXml file =
                     service.findXmlFile(1, CORRELATION_ID, REQUEST_ID);
 
             assertEquals(1, file.getId());
@@ -462,7 +503,7 @@ public class ClosingCardifServiceImplTest {
         @Test
         @DisplayName("debe lanzar BusinessException cuando el archivo no tiene contenido")
         void shouldThrowWhenContentIsMissing() {
-            ArchivoAsientoCardifXml withoutContent = entity();
+            ArchivoAsientoAvalXml withoutContent = entity();
             withoutContent.setContenido(null);
 
             when(fileRepository.findById(1))
