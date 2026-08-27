@@ -1,69 +1,102 @@
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 
-    import java.sql.ResultSetMetaData;
-    
-    public <T> List<T> query(
-            String call,
-            StoredProcedureRowMapper<T> mapper,
-            String requiredColumn) {
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-        return entityManager.unwrap(Session.class)
-                .doReturningWork(connection -> {
-                    List<T> rows = new ArrayList<>();
+/**
+ * Linea del XML contable devuelta por los procedimientos de Colombia.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ColombiaAccountingLine {
 
-                    try (CallableStatement statement =
-                                 connection.prepareCall(call)) {
+    private String family;
+    private String period;
+    private Integer pass;
+    private String movementType;
+    private String fileName;
+    private Long sequence;
+    private String content;
+}
 
-                        statement.setQueryTimeout(timeoutSeconds);
-                        boolean hasResultSet = statement.execute();
 
-                        while (hasResultSet
-                                || statement.getUpdateCount() != -1) {
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 
-                            if (hasResultSet) {
-                                readMatchingResultSet(
-                                        statement,
-                                        mapper,
-                                        rows,
-                                        requiredColumn);
-                            }
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-                            hasResultSet = statement.getMoreResults();
-                        }
-                    }
+/**
+ * Archivo XML armado en memoria antes de persistirse.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ColombiaXmlFile {
 
-                    return rows;
-                });
-    }
+    private String family;
+    private String period;
+    private String movementType;
+    private String fileName;
+    private int lineCount;
+    private String content;
+}
 
-    private <T> void readMatchingResultSet(
-            CallableStatement statement,
-            StoredProcedureRowMapper<T> mapper,
-            List<T> rows,
-            String requiredColumn) throws SQLException {
 
-        try (ResultSet resultSet = statement.getResultSet()) {
 
-            if (!hasColumn(resultSet, requiredColumn)) {
-                return;
-            }
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 
-            while (resultSet.next()) {
-                rows.add(mapper.map(resultSet));
-            }
-        }
-    }
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-    private boolean hasColumn(
-            ResultSet resultSet,
-            String columnName) throws SQLException {
+/**
+ * Archivo XML persistido expuesto por la API.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ColombiaXmlFileDTO {
 
-        ResultSetMetaData metaData = resultSet.getMetaData();
+    private Integer id;
+    private String period;
+    private String family;
+    private String movementType;
+    private String fileName;
+    private Integer lineCount;
+    private String processDate;
+    private String status;
+}
 
-        for (int index = 1; index <= metaData.getColumnCount(); index++) {
-            if (columnName.equalsIgnoreCase(metaData.getColumnLabel(index))) {
-                return true;
-            }
-        }
 
-        return false;
-    }
+
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+/**
+ * Resultado de la generacion de asientos contables de Colombia.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ColombiaAccountingResultDTO {
+
+    private String message;
+    private String period;
+    private List<ColombiaXmlFileDTO> files;
+}
