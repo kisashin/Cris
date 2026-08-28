@@ -1,106 +1,244 @@
-<div>
-    <div class="container-title">
-        <h1 class="title">Cierre Mensual de Aval</h1>
-    </div>
-    <div>
-      <span class="text-primary-color">Reporte de movimientos: </span>
-      <a [href]="reportMovement"
-        target="_blank">Consultar</a>
-    </div>
-    <br>
+import { CommonModule } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { HttpResponse } from '@angular/common/http';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatTableModule } from '@angular/material/table';
+import { MatIconModule } from '@angular/material/icon';
+import { ToastrService } from 'ngx-toastr';
+import { environment } from 'src/environments/environment';
+import { ClosingAvalService } from '../../services/closing-aval.service';
+import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
+import { IColombiaXmlFile } from '../../models/colombia-accounting-result.model';
+import { IAvalReportStatus } from '../../models/aval-report-status.model';
 
-    @if (!hasAvalData && !isLoadingReport) {
-      <p class="mt-2 text-muted">No registros para consultar</p>
+/**
+ * Pantalla Cierre Mensual de Aval.
+ */
+@Component({
+  selector: 'app-claims-closing-aval',
+  imports: [
+    CommonModule,
+    MatTableModule,
+    MatButtonModule,
+    MatIconModule,
+    MatDialogModule
+  ],
+  standalone: true,
+  templateUrl: './claims-closing-aval.component.html',
+  styleUrl: './claims-closing-aval.component.scss'
+})
+export class ClaimsClosingAvalComponent implements OnInit {
+
+  readonly reportMovement = `${environment.reporting_service}/ReportServer/Pages/ReportViewer.aspx?/Acsele/Alterno/Cierre_siniestrosaval&rs:Command=Render&rc:Parameters=false&rc:Toolbar=false&rs:Format=Excel`;
+
+  public isGenerating = false;
+  public isDownloadingReport = false;
+  public isLoading = false;
+  public isLoadingReport = false;
+  public hasAvalData = false;
+
+  public dataSource: IColombiaXmlFile[] = [];
+  public reportDataSource: IAvalReportStatus[] = [];
+
+  public readonly displayedColumns: string[] = [
+    'processDate',
+    'period',
+    'family',
+    'movementType',
+    'lineCount',
+    'status',
+    'action'
+  ];
+
+  public readonly displayedColumnsReport: string[] = [
+    'generationDate',
+    'action'
+  ];
+
+  constructor(
+    private readonly avalService: ClosingAvalService,
+    private readonly dialog: MatDialog,
+    private readonly toastr: ToastrService
+  ) {}
+
+  ngOnInit(): void {
+    this.loadReportStatus();
+    this.loadGeneratedFiles();
+  }
+
+  /**
+   * Consulta si existen movimientos pendientes por reportar.
+   */
+  public loadReportStatus(): void {
+    this.isLoadingReport = true;
+    this.avalService
+      .findReportStatus()
+      .subscribe({
+        next: response => {
+          const status = response?.bodyResponse;
+          this.hasAvalData = (status?.pendingMovements ?? 0) > 0;
+          this.reportDataSource = this.hasAvalData && status
+            ? [status]
+            : [];
+          this.isLoadingReport = false;
+        },
+        error: error => {
+          console.error('Error loading the Aval report status:', error);
+          this.hasAvalData = false;
+          this.reportDataSource = [];
+          this.isLoadingReport = false;
+        }
+      });
+  }
+
+  /**
+   * Descarga el reporte mensual de Aval.
+   */
+  public downloadReport(): void {
+    if (this.isDownloadingReport) {
+      return;
     }
 
-    @if (hasAvalData) {
-      <div class="container-table">
-        <table mat-table [dataSource]="reportDataSource" class="mat-elevation-z8">
-          <ng-container matColumnDef="generationDate">
-            <th mat-header-cell *matHeaderCellDef>
-              FECHA DEL REPORTE MENSUAL DE AVAL
-            </th>
-            <td mat-cell *matCellDef="let element">
-              {{ element.generationDate }}
-            </td>
-          </ng-container>
+    this.isDownloadingReport = true;
+    this.avalService
+      .downloadAvalReport()
+      .subscribe({
+        next: response => {
+          this.saveBlobFile(response, this.getFileName(response));
+          this.isDownloadingReport = false;
+        },
+        error: error => {
+          console.error('Error downloading the Aval report:', error);
+          this.toastr.error(
+            error?.error?.errorHeader?.errorMessage ??
+            'No fue posible descargar el reporte de movimientos.'
+          );
+          this.isDownloadingReport = false;
+        }
+      });
+  }
 
-          <ng-container matColumnDef="action">
-            <th mat-header-cell *matHeaderCellDef> REPORTE </th>
-            <td mat-cell *matCellDef="let element">
-              <a class="download-link" (click)="downloadReport()">
-                {{ isDownloadingReport ? 'DESCARGANDO...' : 'Descargar Excel' }}
-              </a>
-            </td>
-          </ng-container>
+  /**
+   * Consulta los archivos generados en procesos anteriores.
+   */
+  public loadGeneratedFiles(): void {
+    this.isLoading = true;
+    this.avalService
+      .findGeneratedFiles()
+      .subscribe({
+        next: response => {
+          this.dataSource = response?.bodyResponse ?? [];
+          this.isLoading = false;
+        },
+        error: error => {
+          console.error('Error loading Aval accounting files:', error);
+          this.dataSource = [];
+          this.isLoading = false;
+        }
+      });
+  }
 
-          <tr mat-header-row *matHeaderRowDef="displayedColumnsReport"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumnsReport;"></tr>
-        </table>
-      </div>
+  /**
+   * Solicita confirmacion antes de generar los asientos contables.
+   */
+  public generateAccountingEntries(): void {
+    if (this.isGenerating) {
+      return;
     }
 
-    <section class="action-section mt-4">
-      <span class="text-primary-color span-text-status-report">
-        Generación de Asientos Contables:
-      </span>
-      <button
-        mat-raised-button
-        color="primary"
-        type="button"
-        class="action-button"
-        [disabled]="isGenerating"
-        (click)="generateAccountingEntries()">
-        <mat-icon>refresh</mat-icon>
-        {{ isGenerating ? 'GENERANDO...' : 'GENERA XML' }}
-      </button>
-    </section>
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        width: '440px',
+        disableClose: true,
+        data: {
+          title: 'Generar nuevo XML',
+          message: '¿Seguro que quiere generar un nuevo XML? Al hacerlo se '
+            + 'borrarán los registros anteriores.',
+          confirmText: 'SÍ, GENERAR',
+          cancelText: 'NO'
+        }
+      })
+      .afterClosed()
+      .subscribe(confirmed => {
+        if (confirmed) {
+          this.executeGeneration();
+        }
+      });
+  }
 
-    @if (dataSource.length > 0) {
-      <div class="container-table">
-        <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
-          <ng-container matColumnDef="processDate">
-            <th mat-header-cell *matHeaderCellDef> FECHA PROCESO </th>
-            <td mat-cell *matCellDef="let element"> {{ element.processDate }} </td>
-          </ng-container>
+  /**
+   * Descarga el XML de la fila seleccionada.
+   */
+  public onDownloadXml(row: IColombiaXmlFile): void {
+    this.avalService
+      .downloadXmlFile(row.id)
+      .subscribe({
+        next: response => this.saveBlobFile(response, row.fileName),
+        error: error => {
+          console.error('Error downloading the XML file:', error);
+          this.toastr.error('No fue posible descargar el archivo XML.');
+        }
+      });
+  }
 
-          <ng-container matColumnDef="period">
-            <th mat-header-cell *matHeaderCellDef> PERIODO </th>
-            <td mat-cell *matCellDef="let element"> {{ element.period }} </td>
-          </ng-container>
+  private executeGeneration(): void {
+    this.isGenerating = true;
+    this.avalService
+      .generateAccountingEntries()
+      .subscribe({
+        next: response => {
+          this.toastr.success(
+            response?.bodyResponse?.message ??
+            'Proceso ejecutado correctamente.'
+          );
+          this.isGenerating = false;
+          this.loadGeneratedFiles();
+          this.loadReportStatus();
+        },
+        error: error => {
+          console.error(
+            'Error generating Aval accounting entries:',
+            error
+          );
+          this.toastr.error(
+            error?.error?.errorHeader?.errorMessage ??
+            'No fue posible generar los asientos contables.'
+          );
+          this.isGenerating = false;
+          this.loadGeneratedFiles();
+          this.loadReportStatus();
+        }
+      });
+  }
 
-          <ng-container matColumnDef="family">
-            <th mat-header-cell *matHeaderCellDef> ORIGEN </th>
-            <td mat-cell *matCellDef="let element"> {{ element.family }} </td>
-          </ng-container>
+  private saveBlobFile(
+    response: HttpResponse<Blob>,
+    fileName: string
+  ): void {
+    const file = response.body;
 
-          <ng-container matColumnDef="movementType">
-            <th mat-header-cell *matHeaderCellDef> TIPO MOVIMIENTO </th>
-            <td mat-cell *matCellDef="let element"> {{ element.movementType }} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="lineCount">
-            <th mat-header-cell *matHeaderCellDef> LÍNEAS </th>
-            <td mat-cell *matCellDef="let element"> {{ element.lineCount }} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="status">
-            <th mat-header-cell *matHeaderCellDef> ESTADO PROCESO </th>
-            <td mat-cell *matCellDef="let element"> {{ element.status }} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="action">
-            <th mat-header-cell *matHeaderCellDef> REPORTES </th>
-            <td mat-cell *matCellDef="let element">
-              <a class="download-link" (click)="onDownloadXml(element)">
-                Descargar XML
-              </a>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-        </table>
-      </div>
+    if (!file || file.size === 0) {
+      this.toastr.warning(
+        'El archivo generado no contiene información.'
+      );
+      return;
     }
-</div>
+
+    const objectUrl = window.URL.createObjectURL(file);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    anchor.click();
+    window.URL.revokeObjectURL(objectUrl);
+  }
+
+  private getFileName(response: HttpResponse<Blob>): string {
+    const contentDisposition =
+      response.headers.get('Content-Disposition');
+    const fileNameMatch = contentDisposition?.match(
+      /filename="?([^"]+)"?/
+    );
+    return fileNameMatch?.[1] ?? 'RPT_CIERRE_AVAL.xlsx';
+  }
+}
