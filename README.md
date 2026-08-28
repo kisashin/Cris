@@ -1,28 +1,22 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-/**
- * Errores controlados del reporte mensual de Aval.
- */
-public enum AvalReportMessage {
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.TmpRepAvalCierre;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
-    /** No existen movimientos pendientes para reportar. */
-    NO_MOVEMENTS_TO_EXPORT(
-            "No existen movimientos para generar el archivo"),
+@Repository
+public interface AvalReportRepository
+        extends JpaRepository<TmpRepAvalCierre, Long> {
 
-    /** Falla al construir el archivo Excel. */
-    EXCEL_GENERATION_ERROR("Error al generar el archivo Excel"),
-
-    /** Falla al acceder a la base de datos del reporte. */
-    DATABASE_ACCESS_ERROR(
-            "Error al acceder a la informacion del reporte de Aval");
-
-    private final String message;
-
-    AvalReportMessage(String message) {
-        this.message = message;
-    }
-
-    public String getMessage() {
-        return message;
-    }
+    @Query(
+            value = "SELECT COUNT(*) FROM historicomovimientos "
+                    + "WHERE Fechacontabilizacion IS NULL "
+                    + "AND marcaavalpos IS NULL "
+                    + "AND socio IN ('BANCO DE BOGOTA','BANCO AV VILLAS',"
+                    + "'BANCO DE OCCIDENTE','BANCO POPULAR') "
+                    + "AND CodProducto NOT IN "
+                    + "(SELECT producto FROM dbo.productosnoaval)",
+            nativeQuery = true)
+    int countPendingMovements();
 }
