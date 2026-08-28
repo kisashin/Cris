@@ -1,276 +1,197 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpHeaders, HttpResponse } from '@angular/common/http';
-import { MatDialog } from '@angular/material/dialog';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { ToastrService } from 'ngx-toastr';
-import { of, throwError } from 'rxjs';
+import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { INewGeneralResponse } from '../models/new-general-response.interface';
+import { catchError, map } from 'rxjs/operators'; 
+import { ClosingStatus } from '../models/closing-aval.model';
+import { environment } from 'src/environments/environment';
+import { IAvalReportStatus } from '../models/aval-report-status.model';
+import {
+  IColombiaAccountingResult,
+  IColombiaXmlFile
+} from '../models/colombia-accounting-result.model';
 
-import { AccountingClosingCAComponent } from './accounting-closing-ca.component';
-import { AccountingClosingCaService } from '../../services/accounting-closing-ca.service';
-import { IAccountingXmlFile } from '../../models/center-accounting-result.model';
+@Injectable({
+  providedIn: 'root',
+})
+export class ClosingAvalService {
+  
+  private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
+  private readonly closingUrl = `${this.baseUrl}/v1/aval-closing`;
+  private readonly correlationId = crypto.randomUUID();
 
-describe('AccountingClosingCAComponent', () => {
-  let component: AccountingClosingCAComponent;
-  let fixture: ComponentFixture<AccountingClosingCAComponent>;
-  let caService: jasmine.SpyObj<AccountingClosingCaService>;
-  let dialog: jasmine.SpyObj<MatDialog>;
-  let toastr: jasmine.SpyObj<ToastrService>;
+  constructor (private http: HttpClient){}
 
-  const file: IAccountingXmlFile = {
-    id: 1,
-    period: '202608',
-    movementType: 'Pago',
-    fileName: 'Sinie_ReasegCentro_Pago20260824.xml',
-    lineCount: 216,
-    processDate: '25/08/2026 03:45:30 p. m.',
-    status: 'GENERADO'
-  };
+  getAllReportsDetailsAval(): Observable<ClosingStatus[]> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
 
-  const stubAnchor = (): HTMLAnchorElement => {
-    const anchor = document.createElement('a');
-    spyOn(document, 'createElement').and.returnValue(anchor);
-    spyOn(anchor, 'click');
-    spyOn(window.URL, 'createObjectURL').and.returnValue('blob:url');
-    spyOn(window.URL, 'revokeObjectURL');
-    return anchor;
-  };
+    return this.http
+      .get<INewGeneralResponse<ClosingStatus[]>>(
+        `${this.baseUrl}/v1/all-aval-details-reports`,
+        { headers }
+      )
+      .pipe(
+        map(resp => resp.bodyResponse ?? []),
+        catchError(err => {
+          const msg = err?.error?.errorDetail?.message ?? err?.error?.message ?? '';
+          if (err.status === 400 && msg.includes('No registros')) {
+            return of([]);
+          }
+          throw err;
+        })
+      );
+  }
 
-  beforeEach(async () => {
-    caService = jasmine.createSpyObj('AccountingClosingCaService', [
-      'findGeneratedFiles',
-      'generateAccountingEntries',
-      'downloadXmlFile',
-      'downloadMovementsReport'
-    ]);
-    dialog = jasmine.createSpyObj('MatDialog', ['open']);
-    toastr = jasmine.createSpyObj('ToastrService', [
-      'success', 'error', 'warning'
-    ]);
+  updateReportsAval(): Observable<INewGeneralResponse<string>> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
 
-    caService.findGeneratedFiles.and.returnValue(
-      of({ bodyResponse: [file] } as any));
+    return this.http.put<string>(
+      `${this.baseUrl}/v1/update-aval-report`,
+      null,
+      { 
+        headers,
+        responseType: 'text' as 'json'
+      }
+    ).pipe(
+      map((txt: string) => ({
+        bodyResponse: txt
+      }) as INewGeneralResponse<string>)
+    );
+  }
 
-    await TestBed.configureTestingModule({
-      imports: [AccountingClosingCAComponent, NoopAnimationsModule],
-      providers: [
-        { provide: AccountingClosingCaService, useValue: caService },
-        { provide: MatDialog, useValue: dialog },
-        { provide: ToastrService, useValue: toastr }
-      ]
-    }).compileComponents();
+  getAllReportsSeatAval(): Observable<ClosingStatus[]> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
 
-    fixture = TestBed.createComponent(AccountingClosingCAComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
+    return this.http
+      .get<INewGeneralResponse<ClosingStatus[]>>(
+        `${this.baseUrl}/v1/all-seat-aval-details-reports`,
+        { headers }
+      )
+      .pipe(
+        map(resp => resp.bodyResponse ?? [])
+      );
+  }
+
+  updateReportsSeatAval(): Observable<INewGeneralResponse<string>> {
+    const headers = new HttpHeaders()
+      .set('correlation_id', crypto.randomUUID())
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID());
+
+    return this.http.put<string>(
+      `${this.baseUrl}/v1/update-seat-aval-report`,
+      null,
+      { 
+        headers,
+        responseType: 'text' as 'json'
+      }
+    ).pipe(
+      map((txt: string) => ({
+        bodyResponse: txt
+      }) as INewGeneralResponse<string>)
+    );
+  }
+
+  /**
+   * Ejecuta la generacion de los asientos contables.
+   */
+  generateAccountingEntries(): Observable<INewGeneralResponse<IColombiaAccountingResult>> {
+    return this.http.put<INewGeneralResponse<IColombiaAccountingResult>>(
+      `${this.closingUrl}/generate`,
+      null,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
+
+  /**
+   * Consulta los archivos XML generados en procesos anteriores.
+   */
+  findGeneratedFiles(): Observable<INewGeneralResponse<IColombiaXmlFile[]>> {
+    return this.http.get<INewGeneralResponse<IColombiaXmlFile[]>>(
+      `${this.closingUrl}/files`,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
+
+  /**
+   * Descarga el contenido de un archivo XML persistido.
+   */
+  downloadXmlFile(id: number): Observable<HttpResponse<Blob>> {
+    return this.http.get(
+      `${this.closingUrl}/files/${id}/download`,
+      {
+        headers: this.createHeaders('application/xml'),
+        observe: 'response',
+        responseType: 'blob'
+      }
+    );
+  }
+
+  /**
+   * Consulta el estado del reporte mensual de Aval.
+   */
+  findReportStatus(): Observable<INewGeneralResponse<IAvalReportStatus>> {
+    return this.http.get<INewGeneralResponse<IAvalReportStatus>>(
+      `${this.closingUrl}/report/status`,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
+
+  /**
+   * Descarga el reporte mensual de Aval en formato Excel.
+   */
+  downloadAvalReport(): Observable<HttpResponse<Blob>> {
+    return this.http.get(
+      `${this.closingUrl}/report/download`,
+      {
+        headers: this.createHeaders(
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ),
+        observe: 'response',
+        responseType: 'blob'
+      }
+    );
+  }
+
+  private createHeaders(accept: string): HttpHeaders {
+    return new HttpHeaders()
+      .set('correlation_id', this.correlationId)
+      .set('request_id', crypto.randomUUID())
+      .set('_p', crypto.randomUUID())
+      .set('Accept', accept);
+  }
+}
+
+closingcardiffront\src\app\views\claims-closing\services\closing-cardif.service.spec.ts
+
+import { TestBed } from '@angular/core/testing';
+
+import { ClosingCardifService } from './closing-cardif.service';
+
+describe('ClosingCardifService', () => {
+  let service: ClosingCardifService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(ClosingCardifService);
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
-  describe('#loadGeneratedFiles', () => {
-    it('should load the generated files on init', () => {
-      expect(component.dataSource.length).toBe(1);
-      expect(component.dataSource[0].movementType).toBe('Pago');
-      expect(component.isLoading).toBeFalse();
-    });
-
-    it('should use an empty list when the body is null', () => {
-      caService.findGeneratedFiles.and.returnValue(
-        of({ bodyResponse: null } as any));
-
-      component.loadGeneratedFiles();
-
-      expect(component.dataSource).toEqual([]);
-    });
-
-    it('should clear the list when the request fails', () => {
-      caService.findGeneratedFiles.and.returnValue(
-        throwError(() => new Error('boom')));
-
-      component.loadGeneratedFiles();
-
-      expect(component.dataSource).toEqual([]);
-      expect(component.isLoading).toBeFalse();
-    });
-  });
-
-  describe('#generateAccountingEntries', () => {
-    it('should generate when the dialog is confirmed', () => {
-      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
-      caService.generateAccountingEntries.and.returnValue(of({
-        bodyResponse: { message: 'Asientos generados con éxito.' }
-      } as any));
-
-      component.generateAccountingEntries();
-
-      expect(caService.generateAccountingEntries).toHaveBeenCalled();
-      expect(toastr.success)
-        .toHaveBeenCalledWith('Asientos generados con éxito.');
-      expect(component.isGenerating).toBeFalse();
-    });
-
-    it('should show a default message when the body has none', () => {
-      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
-      caService.generateAccountingEntries.and.returnValue(
-        of({ bodyResponse: null } as any));
-
-      component.generateAccountingEntries();
-
-      expect(toastr.success)
-        .toHaveBeenCalledWith('Proceso ejecutado correctamente.');
-    });
-
-    it('should not generate when the dialog is cancelled', () => {
-      dialog.open.and.returnValue({ afterClosed: () => of(false) } as any);
-
-      component.generateAccountingEntries();
-
-      expect(caService.generateAccountingEntries).not.toHaveBeenCalled();
-    });
-
-    it('should ignore the click while a generation is running', () => {
-      component.isGenerating = true;
-
-      component.generateAccountingEntries();
-
-      expect(dialog.open).not.toHaveBeenCalled();
-    });
-
-    it('should show the backend error message', () => {
-      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
-      caService.generateAccountingEntries.and.returnValue(
-        throwError(() => ({
-          error: { errorHeader: { errorMessage: 'Error controlado' } }
-        })));
-
-      component.generateAccountingEntries();
-
-      expect(toastr.error).toHaveBeenCalledWith('Error controlado');
-      expect(component.isGenerating).toBeFalse();
-    });
-
-    it('should show a default error message', () => {
-      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
-      caService.generateAccountingEntries.and.returnValue(
-        throwError(() => new Error('boom')));
-
-      component.generateAccountingEntries();
-
-      expect(toastr.error).toHaveBeenCalledWith(
-        'No fue posible generar los asientos contables.');
-    });
-  });
-
-  describe('#onDownloadXml', () => {
-    it('should download the file', () => {
-      caService.downloadXmlFile.and.returnValue(of(new HttpResponse({
-        body: new Blob(['<SSC/>'], { type: 'application/xml' }),
-        status: 200
-      })));
-
-      const anchor = stubAnchor();
-
-      component.onDownloadXml(file);
-
-      expect(caService.downloadXmlFile).toHaveBeenCalledWith(1);
-      expect(anchor.download)
-        .toBe('Sinie_ReasegCentro_Pago20260824.xml');
-      expect(anchor.click).toHaveBeenCalled();
-      expect(window.URL.revokeObjectURL).toHaveBeenCalled();
-    });
-
-    it('should warn when the file is empty', () => {
-      caService.downloadXmlFile.and.returnValue(
-        of(new HttpResponse({ body: new Blob([]), status: 200 })));
-
-      component.onDownloadXml(file);
-
-      expect(toastr.warning)
-        .toHaveBeenCalledWith('El archivo generado no contiene información.');
-    });
-
-    it('should warn when the body is null', () => {
-      caService.downloadXmlFile.and.returnValue(
-        of(new HttpResponse<Blob>({ body: null, status: 200 })));
-
-      component.onDownloadXml(file);
-
-      expect(toastr.warning).toHaveBeenCalled();
-    });
-
-    it('should show an error when the download fails', () => {
-      caService.downloadXmlFile.and.returnValue(
-        throwError(() => new Error('boom')));
-
-      component.onDownloadXml(file);
-
-      expect(toastr.error)
-        .toHaveBeenCalledWith('No fue posible descargar el archivo XML.');
-    });
-  });
-
-  describe('#downloadReport', () => {
-    it('should use the file name from the Content-Disposition header', () => {
-      caService.downloadMovementsReport.and.returnValue(
-        of(new HttpResponse({
-          body: new Blob(['excel']),
-          headers: new HttpHeaders({
-            'Content-Disposition':
-              'attachment; filename="ReporteMovimientosCentro.xlsx"'
-          }),
-          status: 200
-        })));
-
-      const anchor = stubAnchor();
-
-      component.downloadReport();
-
-      expect(anchor.download).toBe('ReporteMovimientosCentro.xlsx');
-      expect(component.isDownloading).toBeFalse();
-    });
-
-    it('should fall back to the default file name', () => {
-      caService.downloadMovementsReport.and.returnValue(
-        of(new HttpResponse({
-          body: new Blob(['excel']),
-          status: 200
-        })));
-
-      const anchor = stubAnchor();
-
-      component.downloadReport();
-
-      expect(anchor.download).toBe('ReporteMovimientosCentro.xlsx');
-    });
-
-    it('should ignore the click while a download is running', () => {
-      component.isDownloading = true;
-
-      component.downloadReport();
-
-      expect(caService.downloadMovementsReport).not.toHaveBeenCalled();
-    });
-
-    it('should warn when the report is empty', () => {
-      caService.downloadMovementsReport.and.returnValue(
-        of(new HttpResponse({ body: new Blob([]), status: 200 })));
-
-      component.downloadReport();
-
-      expect(toastr.warning)
-        .toHaveBeenCalledWith('El archivo generado no contiene información.');
-    });
-
-    it('should show an error when the download fails', () => {
-      caService.downloadMovementsReport.and.returnValue(
-        throwError(() => new Error('boom')));
-
-      component.downloadReport();
-
-      expect(toastr.error).toHaveBeenCalledWith(
-        'No fue posible descargar el reporte de movimientos.');
-      expect(component.isDownloading).toBeFalse();
-    });
+  it('should be created', () => {
+    expect(service).toBeTruthy();
   });
 });
