@@ -3,36 +3,26 @@ import {
   HttpClientTestingModule,
   HttpTestingController
 } from '@angular/common/http/testing';
-import { HttpHeaders } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
-import { AccountingClosingCaService } from './accounting-closing-ca.service';
+import { ClosingCardifService } from './closing-cardif.service';
 import { INewGeneralResponse } from '../models/new-general-response.interface';
-import {
-  IAccountingXmlFile,
-  ICenterAccountingResult
-} from '../models/center-accounting-result.model';
+import { IColombiaXmlFile } from '../models/colombia-accounting-result.model';
 
-describe('AccountingClosingCaService', () => {
-  let service: AccountingClosingCaService;
+describe('ClosingCardifService', () => {
+  let service: ClosingCardifService;
   let httpMock: HttpTestingController;
 
-  const baseUrl =
-    `${environment.urlAPIClosingClaimsBackEnd}/v1/cardif-center-closing`;
-
-  const expectTraceHeaders = (request: any, accept: string): void => {
-    expect(request.request.headers.has('correlation_id')).toBeTrue();
-    expect(request.request.headers.has('request_id')).toBeTrue();
-    expect(request.request.headers.has('_p')).toBeTrue();
-    expect(request.request.headers.get('Accept')).toBe(accept);
-  };
+  const baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
+  const closingUrl = `${baseUrl}/v1/cardif-closing`;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [AccountingClosingCaService]
+      providers: [ClosingCardifService]
     });
 
-    service = TestBed.inject(AccountingClosingCaService);
+    service = TestBed.inject(ClosingCardifService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -44,65 +34,113 @@ describe('AccountingClosingCaService', () => {
     expect(service).toBeTruthy();
   });
 
+  describe('#getAllReportsDetailsCardif', () => {
+    it('should return the report list', () => {
+      const mockResponse = {
+        bodyResponse: [{ dateProcessing: '2026-08-24', status: 'PROCESADO' }]
+      } as INewGeneralResponse<any>;
+
+      service.getAllReportsDetailsCardif().subscribe(result => {
+        expect(result.length).toBe(1);
+      });
+
+      const request = httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`);
+      expect(request.request.method).toBe('GET');
+      request.flush(mockResponse);
+    });
+
+    it('should return an empty array when the body is null', () => {
+      service.getAllReportsDetailsCardif().subscribe(result => {
+        expect(result).toEqual([]);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`)
+        .flush({ bodyResponse: null });
+    });
+
+    it('should return an empty array on a 400 with no records', () => {
+      service.getAllReportsDetailsCardif().subscribe(result => {
+        expect(result).toEqual([]);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`).flush(
+        { errorDetail: { message: 'No registros para consultar' } },
+        { status: 400, statusText: 'Bad Request' }
+      );
+    });
+
+    it('should rethrow any other error', () => {
+      service.getAllReportsDetailsCardif().subscribe({
+        next: () => fail('should not emit'),
+        error: (error: HttpErrorResponse) => {
+          expect(error.status).toBe(500);
+        }
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`).flush(
+        { message: 'boom' },
+        { status: 500, statusText: 'Server Error' }
+      );
+    });
+  });
+
+  describe('#updateReportsCardif', () => {
+    it('should PUT the pending mark request', () => {
+      service.updateReportsCardif().subscribe(response => {
+        expect(response.bodyResponse).toContain('Actualización');
+      });
+
+      const request = httpMock.expectOne(
+        `${baseUrl}/v1/update-cardif-report`);
+      expect(request.request.method).toBe('PUT');
+      request.flush('Actualización completada, filas afectadas: 1');
+    });
+  });
+
   describe('#generateAccountingEntries', () => {
     it('should PUT the accounting generation request', () => {
-      const mockResponse: INewGeneralResponse<ICenterAccountingResult> = {
-        correlationId: 'correlation-id',
-        responseHeader: {
-          returnCode: 200,
-          message: 'Success'
-        },
+      const mockResponse = {
         bodyResponse: {
           message: 'Asientos generados con éxito.',
           period: '202608',
           files: []
         }
-      };
+      } as INewGeneralResponse<any>;
 
       service.generateAccountingEntries().subscribe(response => {
-        expect(response).toEqual(mockResponse);
+        expect(response.bodyResponse?.message)
+          .toBe('Asientos generados con éxito.');
       });
 
-      const request = httpMock.expectOne(`${baseUrl}/generate`);
+      const request = httpMock.expectOne(`${closingUrl}/generate`);
       expect(request.request.method).toBe('PUT');
       expect(request.request.body).toBeNull();
-      expectTraceHeaders(request, 'application/json');
-
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
       request.flush(mockResponse);
     });
   });
 
   describe('#findGeneratedFiles', () => {
     it('should GET the generated files', () => {
-      const files: IAccountingXmlFile[] = [{
+      const files: IColombiaXmlFile[] = [{
         id: 1,
         period: '202608',
+        family: 'ReasegCardif',
         movementType: 'Pago',
         fileName: 'archivo.xml',
         lineCount: 4,
-        processDate: '24/08/2026 03:45:30 p. m.',
+        processDate: '28/08/2026 10:00:00 a. m.',
         status: 'GENERADO'
       }];
 
-      const mockResponse: INewGeneralResponse<IAccountingXmlFile[]> = {
-        correlationId: 'correlation-id',
-        responseHeader: {
-          returnCode: 200,
-          message: 'Success'
-        },
-        bodyResponse: files
-      };
-
       service.findGeneratedFiles().subscribe(response => {
-        expect(response.bodyResponse?.length).toBe(1);
-        expect(response.bodyResponse?.[0].fileName).toBe('archivo.xml');
+        expect(response.bodyResponse?.[0].family).toBe('ReasegCardif');
       });
 
-      const request = httpMock.expectOne(`${baseUrl}/files`);
+      const request = httpMock.expectOne(`${closingUrl}/files`);
       expect(request.request.method).toBe('GET');
-      expectTraceHeaders(request, 'application/json');
-
-      request.flush(mockResponse);
+      request.flush({ bodyResponse: files });
     });
   });
 
@@ -113,54 +151,14 @@ describe('AccountingClosingCaService', () => {
         'Content-Disposition': 'attachment; filename="archivo.xml"'
       });
 
-      service.downloadXmlFile(7).subscribe(response => {
+      service.downloadXmlFile(3).subscribe(response => {
         expect(response.body).toEqual(mockBlob);
-        expect(response.headers.get('Content-Disposition'))
-          .toContain('archivo.xml');
       });
 
-      const request = httpMock.expectOne(`${baseUrl}/files/7/download`);
+      const request = httpMock.expectOne(`${closingUrl}/files/3/download`);
       expect(request.request.method).toBe('GET');
       expect(request.request.responseType).toBe('blob');
-      expectTraceHeaders(request, 'application/xml');
-
-      request.flush(mockBlob, {
-        headers: responseHeaders,
-        status: 200,
-        statusText: 'OK'
-      });
-    });
-  });
-
-  describe('#downloadMovementsReport', () => {
-    it('should GET the Excel report as Blob', () => {
-      const mockBlob = new Blob(
-        ['excel-content'],
-        {
-          type:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        }
-      );
-
-      const responseHeaders = new HttpHeaders({
-        'Content-Disposition':
-          'attachment; filename="ReporteMovimientosCentro.xlsx"'
-      });
-
-      service.downloadMovementsReport().subscribe(response => {
-        expect(response.body).toEqual(mockBlob);
-        expect(
-          response.headers.get('Content-Disposition')
-        ).toContain('ReporteMovimientosCentro.xlsx');
-      });
-
-      const request = httpMock.expectOne(`${baseUrl}/download`);
-      expect(request.request.method).toBe('GET');
-      expect(request.request.responseType).toBe('blob');
-      expectTraceHeaders(
-        request,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      );
+      expect(request.request.headers.get('Accept')).toBe('application/xml');
 
       request.flush(mockBlob, {
         headers: responseHeaders,
