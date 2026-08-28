@@ -1,92 +1,106 @@
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportStatusDTO;
+<div>
+    <div class="container-title">
+        <h1 class="title">Cierre Mensual de Aval</h1>
+    </div>
+    <div>
+      <span class="text-primary-color">Reporte de movimientos: </span>
+      <a [href]="reportMovement"
+        target="_blank">Consultar</a>
+    </div>
+    <br>
 
-
-    @Nested
-    @DisplayName("GET /v1/aval-closing/report/status")
-    class FindReportStatus {
-
-        @Test
-        @DisplayName("debe devolver el estado del reporte y código 200")
-        void shouldReturnReportStatus() {
-            AvalReportStatusDTO serviceResult =
-                    AvalReportStatusDTO.builder()
-                            .generationDate("27/08/2026 10:00:00 a. m.")
-                            .pendingMovements(93)
-                            .build();
-
-            when(closingAvalService.findReportStatus(
-                    correlationId, requestId))
-                    .thenReturn(serviceResult);
-
-            ResponseEntity<ResponseModel<AvalReportStatusDTO>> response =
-                    controller.findReportStatus(correlationId, requestId);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-
-            ResponseModel<AvalReportStatusDTO> body = response.getBody();
-            assertNotNull(body);
-            assertEquals(correlationId, body.getCorrelationId());
-            assertEquals(
-                    HttpStatus.OK.value(),
-                    body.getResponseHeader().getReturnCode());
-            assertEquals(serviceResult, body.getBodyResponse());
-
-            verify(closingAvalService, times(1))
-                    .findReportStatus(correlationId, requestId);
-        }
-
-        @Test
-        @DisplayName("debe devolver cero movimientos cuando no hay pendientes")
-        void shouldReturnZeroPendingMovements() {
-            AvalReportStatusDTO serviceResult =
-                    AvalReportStatusDTO.builder()
-                            .generationDate("27/08/2026 10:00:00 a. m.")
-                            .pendingMovements(0)
-                            .build();
-
-            when(closingAvalService.findReportStatus(
-                    correlationId, requestId))
-                    .thenReturn(serviceResult);
-
-            ResponseEntity<ResponseModel<AvalReportStatusDTO>> response =
-                    controller.findReportStatus(correlationId, requestId);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-
-            ResponseModel<AvalReportStatusDTO> body = response.getBody();
-            assertNotNull(body);
-            assertEquals(0, body.getBodyResponse().getPendingMovements());
-        }
+    @if (!hasAvalData && !isLoadingReport) {
+      <p class="mt-2 text-muted">No registros para consultar</p>
     }
 
-    @Nested
-    @DisplayName("GET /v1/aval-closing/report/download")
-    class DownloadAvalReport {
+    @if (hasAvalData) {
+      <div class="container-table">
+        <table mat-table [dataSource]="reportDataSource" class="mat-elevation-z8">
+          <ng-container matColumnDef="generationDate">
+            <th mat-header-cell *matHeaderCellDef>
+              FECHA DEL REPORTE MENSUAL DE AVAL
+            </th>
+            <td mat-cell *matCellDef="let element">
+              {{ element.generationDate }}
+            </td>
+          </ng-container>
 
-        @Test
-        @DisplayName("debe devolver el contenido del archivo con su nombre")
-        void shouldReturnReportContent() {
-            byte[] content = new byte[] {0x50, 0x4B, 0x03, 0x04};
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef> REPORTE </th>
+            <td mat-cell *matCellDef="let element">
+              <a class="download-link" (click)="downloadReport()">
+                {{ isDownloadingReport ? 'DESCARGANDO...' : 'Descargar Excel' }}
+              </a>
+            </td>
+          </ng-container>
 
-            when(closingAvalService.downloadAvalReport(
-                    pHeader, correlationId, requestId))
-                    .thenReturn(content);
-
-            ResponseEntity<byte[]> response =
-                    controller.downloadAvalReport(
-                            pHeader, correlationId, requestId);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertArrayEquals(content, response.getBody());
-            assertEquals(
-                    "attachment; filename=\"RPT_CIERRE_AVAL.xlsx\"",
-                    response.getHeaders()
-                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-            assertEquals(
-                    content.length,
-                    response.getHeaders().getContentLength());
-
-            verify(closingAvalService, times(1))
-                    .downloadAvalReport(pHeader, correlationId, requestId);
-        }
+          <tr mat-header-row *matHeaderRowDef="displayedColumnsReport"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumnsReport;"></tr>
+        </table>
+      </div>
     }
+
+    <section class="action-section mt-4">
+      <span class="text-primary-color span-text-status-report">
+        Generación de Asientos Contables:
+      </span>
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        class="action-button"
+        [disabled]="isGenerating"
+        (click)="generateAccountingEntries()">
+        <mat-icon>refresh</mat-icon>
+        {{ isGenerating ? 'GENERANDO...' : 'GENERA XML' }}
+      </button>
+    </section>
+
+    @if (dataSource.length > 0) {
+      <div class="container-table">
+        <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
+          <ng-container matColumnDef="processDate">
+            <th mat-header-cell *matHeaderCellDef> FECHA PROCESO </th>
+            <td mat-cell *matCellDef="let element"> {{ element.processDate }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="period">
+            <th mat-header-cell *matHeaderCellDef> PERIODO </th>
+            <td mat-cell *matCellDef="let element"> {{ element.period }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="family">
+            <th mat-header-cell *matHeaderCellDef> ORIGEN </th>
+            <td mat-cell *matCellDef="let element"> {{ element.family }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="movementType">
+            <th mat-header-cell *matHeaderCellDef> TIPO MOVIMIENTO </th>
+            <td mat-cell *matCellDef="let element"> {{ element.movementType }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="lineCount">
+            <th mat-header-cell *matHeaderCellDef> LÍNEAS </th>
+            <td mat-cell *matCellDef="let element"> {{ element.lineCount }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef> ESTADO PROCESO </th>
+            <td mat-cell *matCellDef="let element"> {{ element.status }} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="action">
+            <th mat-header-cell *matHeaderCellDef> REPORTES </th>
+            <td mat-cell *matCellDef="let element">
+              <a class="download-link" (click)="onDownloadXml(element)">
+                Descargar XML
+              </a>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+      </div>
+    }
+</div>
