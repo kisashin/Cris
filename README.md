@@ -3,77 +3,63 @@ package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ColombiaAccountingResultDTOTest {
+class AvalReportStatusDTOTest {
 
-    private List<ColombiaXmlFileDTO> files() {
-        return Collections.singletonList(
-                ColombiaXmlFileDTO.builder().id(1).build());
-    }
-
-    private ColombiaAccountingResultDTO result() {
-        return ColombiaAccountingResultDTO.builder()
-                .message("Asientos generados con éxito.")
-                .period("202608")
-                .files(files())
+    private AvalReportStatusDTO status() {
+        return AvalReportStatusDTO.builder()
+                .generationDate("27/08/2026 10:00:00 a. m.")
+                .pendingMovements(93)
                 .build();
     }
 
     @Test
     @DisplayName("El builder asigna todos los campos")
     void builderAssignsEveryField() {
-        ColombiaAccountingResultDTO dto = result();
+        AvalReportStatusDTO dto = status();
 
-        assertEquals("Asientos generados con éxito.", dto.getMessage());
-        assertEquals("202608", dto.getPeriod());
-        assertNotNull(dto.getFiles());
-        assertEquals(1, dto.getFiles().size());
+        assertEquals("27/08/2026 10:00:00 a. m.", dto.getGenerationDate());
+        assertEquals(93, dto.getPendingMovements());
     }
 
     @Test
     @DisplayName("Los setters asignan todos los campos")
     void settersAssignEveryField() {
-        ColombiaAccountingResultDTO dto =
-                new ColombiaAccountingResultDTO();
+        AvalReportStatusDTO dto = new AvalReportStatusDTO();
 
-        assertNull(dto.getMessage());
+        assertNull(dto.getGenerationDate());
+        assertEquals(0, dto.getPendingMovements());
 
-        dto.setMessage("otro");
-        dto.setPeriod("202607");
-        dto.setFiles(Collections.emptyList());
+        dto.setGenerationDate("fecha");
+        dto.setPendingMovements(7);
 
-        assertEquals("otro", dto.getMessage());
-        assertEquals("202607", dto.getPeriod());
-        assertEquals(0, dto.getFiles().size());
+        assertEquals("fecha", dto.getGenerationDate());
+        assertEquals(7, dto.getPendingMovements());
     }
 
     @Test
     @DisplayName("El constructor con todos los argumentos asigna los campos")
     void allArgsConstructor() {
-        ColombiaAccountingResultDTO dto =
-                new ColombiaAccountingResultDTO("msg", "202608", files());
+        AvalReportStatusDTO dto =
+                new AvalReportStatusDTO("otra fecha", 5);
 
         assertNotNull(dto);
-        assertEquals("msg", dto.getMessage());
-        assertEquals("202608", dto.getPeriod());
-        assertEquals(1, dto.getFiles().size());
+        assertEquals("otra fecha", dto.getGenerationDate());
+        assertEquals(5, dto.getPendingMovements());
     }
 
     @Test
     @DisplayName("equals, hashCode y toString reflejan el contenido")
     void equalsHashCodeAndToString() {
-        ColombiaAccountingResultDTO first = result();
-        ColombiaAccountingResultDTO second = result();
-        ColombiaAccountingResultDTO different = result();
-        different.setPeriod("202607");
+        AvalReportStatusDTO first = status();
+        AvalReportStatusDTO second = status();
+        AvalReportStatusDTO different = status();
+        different.setPendingMovements(1);
 
         assertEquals(first, second);
         assertEquals(first, first);
@@ -81,7 +67,7 @@ class ColombiaAccountingResultDTOTest {
         assertNotEquals(first, different);
         assertNotEquals(first, null);
         assertNotEquals(first, "otro tipo");
-        assertNotEquals(first, new ColombiaAccountingResultDTO());
-        assertTrue(first.toString().contains("202608"));
+        assertNotEquals(first, new AvalReportStatusDTO());
+        assertTrue(first.toString().contains("93"));
     }
 }
