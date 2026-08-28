@@ -1,14 +1,29 @@
--- Productos Aval validos (ramo 7, grupo A)
-SELECT TOP 10 PRODUCTO 
-FROM Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE 
-WHERE ramo = 7 AND GRUPO = 'A';
+import { IAvalReportStatus } from '../models/aval-report-status.model';
 
--- Productos Cardif validos (ramo 22, grupo C)
-SELECT TOP 10 PRODUCTO 
-FROM Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE 
-WHERE ramo = 22 AND GRUPO = 'C';
+  /**
+   * Consulta el estado del reporte mensual de Aval.
+   */
+  findReportStatus(): Observable<INewGeneralResponse<IAvalReportStatus>> {
+    return this.http.get<INewGeneralResponse<IAvalReportStatus>>(
+      `${this.closingUrl}/report/status`,
+      {
+        headers: this.createHeaders('application/json')
+      }
+    );
+  }
 
--- Cuentas contables por grupo
-SELECT GRUPO, COUNT(*) 
-FROM Cardifwp.dbo.CUENTAS_CONTABLES_PROD 
-GROUP BY GRUPO;
+  /**
+   * Descarga el reporte mensual de Aval en formato Excel.
+   */
+  downloadAvalReport(): Observable<HttpResponse<Blob>> {
+    return this.http.get(
+      `${this.closingUrl}/report/download`,
+      {
+        headers: this.createHeaders(
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ),
+        observe: 'response',
+        responseType: 'blob'
+      }
+    );
+  }
