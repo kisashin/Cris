@@ -3,6 +3,8 @@ package co.com.bnpparibas.cardif.closingclaims.domain.dtos.cardifcenterclosing;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,115 +13,101 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class AccountingXmlFileDTOTest {
+class CenterAccountingResultDTOTest {
 
-    private AccountingXmlFileDTO dto() {
-        return AccountingXmlFileDTO.builder()
-                .id(1)
+    private List<AccountingXmlFileDTO> files() {
+        return Collections.singletonList(
+                AccountingXmlFileDTO.builder().id(1).build());
+    }
+
+    private CenterAccountingResultDTO result() {
+        return CenterAccountingResultDTO.builder()
+                .message("Asientos generados con éxito.")
                 .period("202608")
-                .movementType("Pago")
-                .fileName("archivo.xml")
-                .lineCount(10)
-                .processDate("24/08/2026 03:45:30 p. m.")
-                .status("GENERADO")
+                .files(files())
                 .build();
     }
 
     @Test
     @DisplayName("El builder asigna todos los campos")
     void builderAssignsEveryField() {
-        AccountingXmlFileDTO result = dto();
+        CenterAccountingResultDTO dto = result();
 
-        assertEquals(1, result.getId());
-        assertEquals("202608", result.getPeriod());
-        assertEquals("Pago", result.getMovementType());
-        assertEquals("archivo.xml", result.getFileName());
-        assertEquals(10, result.getLineCount());
-        assertEquals("24/08/2026 03:45:30 p. m.", result.getProcessDate());
-        assertEquals("GENERADO", result.getStatus());
+        assertEquals("Asientos generados con éxito.", dto.getMessage());
+        assertEquals("202608", dto.getPeriod());
+        assertNotNull(dto.getFiles());
+        assertEquals(1, dto.getFiles().size());
     }
 
     @Test
     @DisplayName("Los setters asignan todos los campos")
     void settersAssignEveryField() {
-        AccountingXmlFileDTO result = new AccountingXmlFileDTO();
+        CenterAccountingResultDTO dto = new CenterAccountingResultDTO();
 
-        assertNull(result.getId());
+        assertNull(dto.getMessage());
 
-        result.setId(2);
-        result.setPeriod("202607");
-        result.setMovementType("Constitucion");
-        result.setFileName("otro.xml");
-        result.setLineCount(3);
-        result.setProcessDate("fecha");
-        result.setStatus("GENERADO");
+        dto.setMessage("otro");
+        dto.setPeriod("202607");
+        dto.setFiles(Collections.emptyList());
 
-        assertEquals(2, result.getId());
-        assertEquals("202607", result.getPeriod());
-        assertEquals("Constitucion", result.getMovementType());
-        assertEquals("otro.xml", result.getFileName());
-        assertEquals(3, result.getLineCount());
-        assertEquals("fecha", result.getProcessDate());
-        assertEquals("GENERADO", result.getStatus());
+        assertEquals("otro", dto.getMessage());
+        assertEquals("202607", dto.getPeriod());
+        assertEquals(0, dto.getFiles().size());
     }
 
     @Test
     @DisplayName("El constructor con todos los argumentos asigna los campos")
     void allArgsConstructor() {
-        AccountingXmlFileDTO result = new AccountingXmlFileDTO(
-                3, "202608", "Liberacion", "f.xml", 1,
-                "fecha", "GENERADO");
+        CenterAccountingResultDTO dto = new CenterAccountingResultDTO(
+                "msg", "202608", files());
 
-        assertNotNull(result);
-        assertEquals(3, result.getId());
-        assertEquals("GENERADO", result.getStatus());
+        assertNotNull(dto);
+        assertEquals("msg", dto.getMessage());
+        assertEquals(1, dto.getFiles().size());
     }
 
     @Test
     @DisplayName("equals, hashCode y toString reflejan el contenido")
     void equalsHashCodeAndToString() {
-        AccountingXmlFileDTO first = dto();
-        AccountingXmlFileDTO second = dto();
+        CenterAccountingResultDTO first = result();
+        CenterAccountingResultDTO second = result();
 
         assertEquals(first, second);
         assertEquals(first, first);
         assertEquals(first.hashCode(), second.hashCode());
         assertNotEquals(first, null);
         assertNotEquals(first, "otro tipo");
-        assertNotEquals(first, new AccountingXmlFileDTO());
-        assertTrue(first.toString().contains("archivo.xml"));
+        assertNotEquals(first, new CenterAccountingResultDTO());
+        assertTrue(first.toString().contains("202608"));
     }
 
     @Test
     @DisplayName("equals detecta diferencias en cualquier campo")
     void equalsDetectsEveryFieldDifference() {
-        assertNotEquals(dto(), modified(d -> d.setId(99)));
-        assertNotEquals(dto(), modified(d -> d.setPeriod("X")));
-        assertNotEquals(dto(), modified(d -> d.setMovementType("X")));
-        assertNotEquals(dto(), modified(d -> d.setFileName("X")));
-        assertNotEquals(dto(), modified(d -> d.setLineCount(99)));
-        assertNotEquals(dto(), modified(d -> d.setProcessDate("X")));
-        assertNotEquals(dto(), modified(d -> d.setStatus("X")));
+        assertNotEquals(result(), modified(d -> d.setMessage("X")));
+        assertNotEquals(result(), modified(d -> d.setPeriod("X")));
+        assertNotEquals(result(),
+                modified(d -> d.setFiles(Collections.emptyList())));
     }
 
     @Test
     @DisplayName("equals compara correctamente los campos nulos")
     void equalsHandlesNullFields() {
-        AccountingXmlFileDTO empty = new AccountingXmlFileDTO();
-        AccountingXmlFileDTO other = new AccountingXmlFileDTO();
+        CenterAccountingResultDTO empty = new CenterAccountingResultDTO();
+        CenterAccountingResultDTO other = new CenterAccountingResultDTO();
 
         assertEquals(empty, other);
         assertEquals(empty.hashCode(), other.hashCode());
 
-        other.setId(1);
+        other.setMessage("msg");
         assertNotEquals(empty, other);
         assertNotEquals(other, empty);
         assertNotNull(empty.toString());
     }
 
-    private AccountingXmlFileDTO modified(
-            Consumer<AccountingXmlFileDTO> change) {
-        AccountingXmlFileDTO result = dto();
+    private CenterAccountingResultDTO modified(
+            Consumer<CenterAccountingResultDTO> change) {
+        CenterAccountingResultDTO result = result();
         change.accept(result);
         return result;
     }
