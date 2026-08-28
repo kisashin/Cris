@@ -3,87 +3,77 @@ package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ColombiaXmlFileDTOTest {
+class ColombiaAccountingResultDTOTest {
 
-    private ColombiaXmlFileDTO dto() {
-        return ColombiaXmlFileDTO.builder()
-                .id(1)
+    private List<ColombiaXmlFileDTO> files() {
+        return Collections.singletonList(
+                ColombiaXmlFileDTO.builder().id(1).build());
+    }
+
+    private ColombiaAccountingResultDTO result() {
+        return ColombiaAccountingResultDTO.builder()
+                .message("Asientos generados con éxito.")
                 .period("202608")
-                .family("ReasegCardif")
-                .movementType("Pago")
-                .fileName("archivo.xml")
-                .lineCount(10)
-                .processDate("27/08/2026 10:00:00 a. m.")
-                .status("GENERADO")
+                .files(files())
                 .build();
     }
 
     @Test
     @DisplayName("El builder asigna todos los campos")
     void builderAssignsEveryField() {
-        ColombiaXmlFileDTO result = dto();
+        ColombiaAccountingResultDTO dto = result();
 
-        assertEquals(1, result.getId());
-        assertEquals("202608", result.getPeriod());
-        assertEquals("ReasegCardif", result.getFamily());
-        assertEquals("Pago", result.getMovementType());
-        assertEquals("archivo.xml", result.getFileName());
-        assertEquals(10, result.getLineCount());
-        assertEquals("27/08/2026 10:00:00 a. m.", result.getProcessDate());
-        assertEquals("GENERADO", result.getStatus());
+        assertEquals("Asientos generados con éxito.", dto.getMessage());
+        assertEquals("202608", dto.getPeriod());
+        assertNotNull(dto.getFiles());
+        assertEquals(1, dto.getFiles().size());
     }
 
     @Test
     @DisplayName("Los setters asignan todos los campos")
     void settersAssignEveryField() {
-        ColombiaXmlFileDTO result = new ColombiaXmlFileDTO();
+        ColombiaAccountingResultDTO dto =
+                new ColombiaAccountingResultDTO();
 
-        assertNull(result.getId());
+        assertNull(dto.getMessage());
 
-        result.setId(2);
-        result.setPeriod("202607");
-        result.setFamily("Directas");
-        result.setMovementType("SINIE");
-        result.setFileName("directas.xml");
-        result.setLineCount(3);
-        result.setProcessDate("fecha");
-        result.setStatus("GENERADO");
+        dto.setMessage("otro");
+        dto.setPeriod("202607");
+        dto.setFiles(Collections.emptyList());
 
-        assertEquals(2, result.getId());
-        assertEquals("202607", result.getPeriod());
-        assertEquals("Directas", result.getFamily());
-        assertEquals("SINIE", result.getMovementType());
-        assertEquals("directas.xml", result.getFileName());
-        assertEquals(3, result.getLineCount());
-        assertEquals("fecha", result.getProcessDate());
-        assertEquals("GENERADO", result.getStatus());
+        assertEquals("otro", dto.getMessage());
+        assertEquals("202607", dto.getPeriod());
+        assertEquals(0, dto.getFiles().size());
     }
 
     @Test
     @DisplayName("El constructor con todos los argumentos asigna los campos")
     void allArgsConstructor() {
-        ColombiaXmlFileDTO result = new ColombiaXmlFileDTO(
-                3, "202608", "Directas", "SINIE",
-                "f.xml", 1, "fecha", "GENERADO");
+        ColombiaAccountingResultDTO dto =
+                new ColombiaAccountingResultDTO("msg", "202608", files());
 
-        assertNotNull(result);
-        assertEquals(3, result.getId());
-        assertEquals("GENERADO", result.getStatus());
+        assertNotNull(dto);
+        assertEquals("msg", dto.getMessage());
+        assertEquals("202608", dto.getPeriod());
+        assertEquals(1, dto.getFiles().size());
     }
 
     @Test
     @DisplayName("equals, hashCode y toString reflejan el contenido")
     void equalsHashCodeAndToString() {
-        ColombiaXmlFileDTO first = dto();
-        ColombiaXmlFileDTO second = dto();
-        ColombiaXmlFileDTO different = dto();
-        different.setId(99);
+        ColombiaAccountingResultDTO first = result();
+        ColombiaAccountingResultDTO second = result();
+        ColombiaAccountingResultDTO different = result();
+        different.setPeriod("202607");
 
         assertEquals(first, second);
         assertEquals(first, first);
@@ -91,7 +81,7 @@ class ColombiaXmlFileDTOTest {
         assertNotEquals(first, different);
         assertNotEquals(first, null);
         assertNotEquals(first, "otro tipo");
-        assertNotEquals(first, new ColombiaXmlFileDTO());
-        assertTrue(first.toString().contains("ReasegCardif"));
+        assertNotEquals(first, new ColombiaAccountingResultDTO());
+        assertTrue(first.toString().contains("202608"));
     }
 }
