@@ -1,176 +1,132 @@
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+
+import org.hibernate.Session;
+import org.hibernate.jdbc.Work;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import javax.persistence.EntityManager;
+import java.sql.CallableStatement;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import static org.mockito.Mockito.mock;
+@ExtendWith(MockitoExtension.class)
+class CardifPeruAccountingProcedureRepositoryTest {
 
+    @Mock
+    private EntityManager entityManager;
 
+    @Mock
+    private Session session;
 
-    @Nested
-    @DisplayName("Mapeo de resultados")
-    class RowMapping {
+    @Mock
+    private Connection connection;
 
-        @SuppressWarnings("unchecked")
-        private StoredProcedureRowMapper<ColombiaAccountingLine>
-                captureAccountingMapper() {
+    @Mock
+    private CallableStatement statement;
 
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList());
-            when(xmlHelper.buildFiles(anyList()))
-                    .thenReturn(Collections.emptyList());
+    @Mock
+    private ResultSet resultSet;
 
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.generateAccountingEntries(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
+    private CardifPeruAccountingProcedureRepository repository;
 
-            ArgumentCaptor<StoredProcedureRowMapper<ColombiaAccountingLine>>
-                    captor = ArgumentCaptor.forClass(
-                            StoredProcedureRowMapper.class);
-
-            verify(storedProcedureExecutor).query(
-                    anyString(), captor.capture(), anyString());
-
-            return captor.getValue();
-        }
-
-        @Test
-        @DisplayName("debe mapear la linea contable desde el ResultSet")
-        void shouldMapAccountingLine() throws SQLException {
-            StoredProcedureRowMapper<ColombiaAccountingLine> mapper =
-                    captureAccountingMapper();
-
-            ResultSet resultSet = mock(ResultSet.class);
-            when(resultSet.getString("Familia")).thenReturn("ReasegAlfa");
-            when(resultSet.getString("Periodo")).thenReturn("202608");
-            when(resultSet.getInt("Pasada")).thenReturn(1);
-            when(resultSet.getString("Mv")).thenReturn("Constitucion");
-            when(resultSet.getString("NombreArchivo")).thenReturn(null);
-            when(resultSet.getLong("Secuencia")).thenReturn(7L);
-            when(resultSet.getString("Line")).thenReturn("<Line/>");
-
-            ColombiaAccountingLine line = mapper.map(resultSet);
-
-            assertEquals("ReasegAlfa", line.getFamily());
-            assertEquals("202608", line.getPeriod());
-            assertEquals(1, line.getPass());
-            assertEquals("Constitucion", line.getMovementType());
-            assertNull(line.getFileName());
-            assertEquals(7L, line.getSequence());
-            assertEquals("<Line/>", line.getContent());
-        }
-
-        @SuppressWarnings("unchecked")
-        @Test
-        @DisplayName("debe mapear la fila del reporte desde el ResultSet")
-        void shouldMapReportRow() throws Exception {
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList());
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadAvalReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            ArgumentCaptor<StoredProcedureRowMapper<AvalReportRow>>
-                    captor = ArgumentCaptor.forClass(
-                            StoredProcedureRowMapper.class);
-
-            verify(storedProcedureExecutor, times(2)).query(
-                    anyString(), captor.capture(), anyString());
-
-            StoredProcedureRowMapper<AvalReportRow> mapper =
-                    captor.getAllValues().get(1);
-
-            ResultSet resultSet = mock(ResultSet.class);
-            when(resultSet.getString(anyString())).thenReturn("valor");
-            when(resultSet.getInt(anyString())).thenReturn(5);
-            when(resultSet.getBigDecimal(anyString()))
-                    .thenReturn(new java.math.BigDecimal("10.00"));
-            when(resultSet.wasNull()).thenReturn(false);
-
-            AvalReportRow row = mapper.map(resultSet);
-
-            assertNotNull(row);
-            assertEquals("valor", row.getCompania());
-            assertEquals(5, row.getRamo2());
-            assertEquals(
-                    new java.math.BigDecimal("10.00"),
-                    row.getValorPagos());
-            assertEquals("valor", row.getObservacionesPago());
-        }
-
-        @SuppressWarnings("unchecked")
-        @Test
-        @DisplayName("debe devolver null cuando el entero viene nulo")
-        void shouldReturnNullWhenIntegerIsNull() throws Exception {
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList());
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadAvalReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            ArgumentCaptor<StoredProcedureRowMapper<AvalReportRow>>
-                    captor = ArgumentCaptor.forClass(
-                            StoredProcedureRowMapper.class);
-
-            verify(storedProcedureExecutor, times(2)).query(
-                    anyString(), captor.capture(), anyString());
-
-            StoredProcedureRowMapper<AvalReportRow> mapper =
-                    captor.getAllValues().get(1);
-
-            ResultSet resultSet = mock(ResultSet.class);
-            when(resultSet.getString(anyString())).thenReturn(null);
-            when(resultSet.getInt(anyString())).thenReturn(0);
-            when(resultSet.getBigDecimal(anyString())).thenReturn(null);
-            when(resultSet.wasNull()).thenReturn(true);
-
-            AvalReportRow row = mapper.map(resultSet);
-
-            assertNotNull(row);
-            assertNull(row.getRamo2());
-            assertNull(row.getEdad());
-            assertNull(row.getValorPagos());
-        }
-
-        @SuppressWarnings("unchecked")
-        @Test
-        @DisplayName("debe descartar el resultado del procedimiento de reporte")
-        void shouldDiscardReportProcedureResult() throws Exception {
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList());
-
-            assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadAvalReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            ArgumentCaptor<StoredProcedureRowMapper<Object>>
-                    captor = ArgumentCaptor.forClass(
-                            StoredProcedureRowMapper.class);
-
-            verify(storedProcedureExecutor, times(2)).query(
-                    anyString(), captor.capture(), anyString());
-
-            StoredProcedureRowMapper<Object> mapper =
-                    captor.getAllValues().get(0);
-
-            assertNull(mapper.map(mock(ResultSet.class)));
-        }
+    @BeforeEach
+    void setUp() {
+        repository = new CardifPeruAccountingProcedureRepository();
+        ReflectionTestUtils.setField(
+                repository, "entityManager", entityManager);
     }
+
+    private void prepareSession() throws SQLException {
+        when(entityManager.unwrap(Session.class)).thenReturn(session);
+        doAnswerWork();
+        when(connection.prepareCall(anyString())).thenReturn(statement);
+    }
+
+    private void doAnswerWork() {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Work work = invocation.getArgument(0);
+            work.execute(connection);
+            return null;
+        }).when(session).doWork(any(Work.class));
+    }
+
+    @Test
+    @DisplayName("debe ejecutar el procedimiento y cerrar los cursores")
+    void shouldExecuteProcedureAndCloseResultSets() throws SQLException {
+        prepareSession();
+
+        when(statement.execute()).thenReturn(true);
+        when(statement.getResultSet()).thenReturn(resultSet);
+        when(statement.getMoreResults()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
+
+        repository.executeAccountingProcedure(180);
+
+        verify(statement, times(1)).setQueryTimeout(180);
+        verify(statement, times(1)).execute();
+        verify(resultSet, times(1)).close();
+        verify(statement, times(1)).close();
+    }
+
+    @Test
+    @DisplayName("debe recorrer varios result sets")
+    void shouldIterateSeveralResultSets() throws SQLException {
+        prepareSession();
+
+        ResultSet second = org.mockito.Mockito.mock(ResultSet.class);
+
+        when(statement.execute()).thenReturn(true);
+        when(statement.getResultSet()).thenReturn(resultSet, second);
+        when(statement.getMoreResults()).thenReturn(true, false);
+        when(statement.getUpdateCount()).thenReturn(-1);
+
+        repository.executeAccountingProcedure(120);
+
+        verify(resultSet, times(1)).close();
+        verify(second, times(1)).close();
+        verify(statement, times(1)).setQueryTimeout(120);
+    }
+
+    @Test
+    @DisplayName("debe terminar cuando el procedimiento no devuelve result sets")
+    void shouldFinishWhenThereAreNoResultSets() throws SQLException {
+        prepareSession();
+
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(-1);
+
+        repository.executeAccountingProcedure(60);
+
+        verify(statement, never()).getResultSet();
+        verify(statement, times(1)).close();
+    }
+
+    @Test
+    @DisplayName("debe omitir los conteos de actualizacion")
+    void shouldSkipUpdateCounts() throws SQLException {
+        prepareSession();
+
+        when(statement.execute()).thenReturn(false);
+        when(statement.getUpdateCount()).thenReturn(5, -1);
+        when(statement.getMoreResults()).thenReturn(false);
+
+        repository.executeAccountingProcedure(60);
+
+        verify(statement, never()).getResultSet();
+        verify(statement, times(1)).close();
+    }
+}
