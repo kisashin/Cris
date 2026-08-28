@@ -1,12 +1,20 @@
-SELECT COUNT(*) FROM historicomovimientos WHERE Fechacontabilizacion IS NOT NULL;
+-- Cuantos del cargue quedaron contabilizados hoy
+SELECT COUNT(*) FROM historicomovimientos 
+WHERE archivocargue = 'Cargue Col 11 08 2026.xlsx' 
+  AND Fechacontabilizacion = '2026-08-28';
 
-SELECT TOP 20 NumeroSiniestro, Tipomovimiento, Fechacontabilizacion, archivocargue
-FROM historicomovimientos 
-WHERE NumeroSiniestro IN ('0802026A192761','0192026A192673','0102026A192436')
-ORDER BY NumeroSiniestro;
+-- Total del cargue
+SELECT COUNT(*) FROM historicomovimientos 
+WHERE archivocargue = 'Cargue Col 11 08 2026.xlsx';
 
--- Los 1087 sin contabilizar, ¿de que cargue son?
-SELECT archivocargue, COUNT(*) 
-FROM historicomovimientos 
-WHERE Fechacontabilizacion IS NULL 
-GROUP BY archivocargue;
+-- ¿Se generaron XML?
+SELECT COUNT(*) FROM archivoAsientoAvalXml;
+SELECT COUNT(*) FROM archivoAsientoCardifXml;
+SELECT COUNT(*) FROM controlcierreaval;
+
+
+
+UPDATE historicomovimientos 
+SET Fechacontabilizacion = NULL 
+WHERE archivocargue = 'Cargue Col 11 08 2026.xlsx' 
+  AND Fechacontabilizacion = '2026-08-28';
