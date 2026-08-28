@@ -1,240 +1,208 @@
-import { TestBed } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController
-} from '@angular/common/http/testing';
-import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { environment } from 'src/environments/environment';
-import { ClosingAvalService } from './closing-aval.service';
-import { IColombiaXmlFile } from '../models/colombia-accounting-result.model';
-import { IAvalReportStatus } from '../models/aval-report-status.model';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpResponse } from '@angular/common/http';
+import { MatDialog } from '@angular/material/dialog';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { ToastrService } from 'ngx-toastr';
+import { of, throwError } from 'rxjs';
 
-describe('ClosingAvalService', () => {
-  let service: ClosingAvalService;
-  let httpMock: HttpTestingController;
+import { ClaimsClosingCardifComponent } from './claims-closing-cardif.component';
+import { ClosingCardifService } from '../../services/closing-cardif.service';
+import { IColombiaXmlFile } from '../../models/colombia-accounting-result.model';
 
-  const baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
-  const closingUrl = `${baseUrl}/v1/aval-closing`;
+describe('ClaimsClosingCardifComponent', () => {
+  let component: ClaimsClosingCardifComponent;
+  let fixture: ComponentFixture<ClaimsClosingCardifComponent>;
+  let cardifService: jasmine.SpyObj<ClosingCardifService>;
+  let dialog: jasmine.SpyObj<MatDialog>;
+  let toastr: jasmine.SpyObj<ToastrService>;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [ClosingAvalService]
+  const file: IColombiaXmlFile = {
+    id: 1,
+    period: '202608',
+    family: 'ReasegCardif',
+    movementType: 'Pago',
+    fileName: 'archivo.xml',
+    lineCount: 4,
+    processDate: '28/08/2026 10:00:00 a. m.',
+    status: 'GENERADO'
+  };
+
+  const blobResponse = (size = 10): HttpResponse<Blob> =>
+    new HttpResponse({
+      body: new Blob(['x'.repeat(size)], { type: 'application/xml' }),
+      status: 200
     });
 
-    service = TestBed.inject(ClosingAvalService);
-    httpMock = TestBed.inject(HttpTestingController);
+  beforeEach(async () => {
+    cardifService = jasmine.createSpyObj('ClosingCardifService', [
+      'findGeneratedFiles',
+      'generateAccountingEntries',
+      'downloadXmlFile'
+    ]);
+    dialog = jasmine.createSpyObj('MatDialog', ['open']);
+    toastr = jasmine.createSpyObj('ToastrService', [
+      'success', 'error', 'warning'
+    ]);
+
+    cardifService.findGeneratedFiles.and.returnValue(
+      of({ bodyResponse: [file] } as any));
+
+    await TestBed.configureTestingModule({
+      imports: [ClaimsClosingCardifComponent, NoopAnimationsModule],
+      providers: [
+        { provide: ClosingCardifService, useValue: cardifService },
+        { provide: MatDialog, useValue: dialog },
+        { provide: ToastrService, useValue: toastr }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ClaimsClosingCardifComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
   });
 
-  afterEach(() => {
-    httpMock.verify();
+  it('should create', () => {
+    expect(component).toBeTruthy();
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
-  });
-
-  describe('#getAllReportsDetailsAval', () => {
-    it('should return the report list', () => {
-      service.getAllReportsDetailsAval().subscribe(result => {
-        expect(result.length).toBe(1);
-      });
-
-      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`)
-        .flush({ bodyResponse: [{ status: 'PENDIENTE' }] });
+  describe('#loadGeneratedFiles', () => {
+    it('should load the generated files on init', () => {
+      expect(component.dataSource.length).toBe(1);
+      expect(component.dataSource[0].family).toBe('ReasegCardif');
+      expect(component.isLoading).toBeFalse();
     });
 
-    it('should return an empty array when the body is null', () => {
-      service.getAllReportsDetailsAval().subscribe(result => {
-        expect(result).toEqual([]);
-      });
+    it('should use an empty list when the body is null', () => {
+      cardifService.findGeneratedFiles.and.returnValue(
+        of({ bodyResponse: null } as any));
 
-      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`)
-        .flush({ bodyResponse: null });
+      component.loadGeneratedFiles();
+
+      expect(component.dataSource).toEqual([]);
     });
 
-    it('should return an empty array on a 400 with no records', () => {
-      service.getAllReportsDetailsAval().subscribe(result => {
-        expect(result).toEqual([]);
-      });
+    it('should clear the list when the request fails', () => {
+      cardifService.findGeneratedFiles.and.returnValue(
+        throwError(() => new Error('boom')));
 
-      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`).flush(
-        { message: 'No registros para consultar' },
-        { status: 400, statusText: 'Bad Request' }
-      );
-    });
+      component.loadGeneratedFiles();
 
-    it('should rethrow any other error', () => {
-      service.getAllReportsDetailsAval().subscribe({
-        next: () => fail('should not emit'),
-        error: (error: HttpErrorResponse) => {
-          expect(error.status).toBe(500);
-        }
-      });
-
-      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`).flush(
-        { message: 'boom' },
-        { status: 500, statusText: 'Server Error' }
-      );
-    });
-  });
-
-  describe('#updateReportsAval', () => {
-    it('should PUT the pending mark request', () => {
-      service.updateReportsAval().subscribe(response => {
-        expect(response.bodyResponse).toContain('Actualización');
-      });
-
-      const request = httpMock.expectOne(`${baseUrl}/v1/update-aval-report`);
-      expect(request.request.method).toBe('PUT');
-      request.flush('Actualización completada, filas afectadas: 1');
-    });
-  });
-
-  describe('#getAllReportsSeatAval', () => {
-    it('should return the seat report list', () => {
-      service.getAllReportsSeatAval().subscribe(result => {
-        expect(result.length).toBe(1);
-      });
-
-      httpMock.expectOne(`${baseUrl}/v1/all-seat-aval-details-reports`)
-        .flush({ bodyResponse: [{ status: 'PROCESADO' }] });
-    });
-
-    it('should return an empty array when the body is null', () => {
-      service.getAllReportsSeatAval().subscribe(result => {
-        expect(result).toEqual([]);
-      });
-
-      httpMock.expectOne(`${baseUrl}/v1/all-seat-aval-details-reports`)
-        .flush({ bodyResponse: null });
-    });
-  });
-
-  describe('#updateReportsSeatAval', () => {
-    it('should PUT the seat pending mark request', () => {
-      service.updateReportsSeatAval().subscribe(response => {
-        expect(response.bodyResponse).toContain('Actualización');
-      });
-
-      const request = httpMock.expectOne(
-        `${baseUrl}/v1/update-seat-aval-report`);
-      expect(request.request.method).toBe('PUT');
-      request.flush('Actualización completada, filas afectadas: 1');
+      expect(component.dataSource).toEqual([]);
+      expect(component.isLoading).toBeFalse();
     });
   });
 
   describe('#generateAccountingEntries', () => {
-    it('should PUT the accounting generation request', () => {
-      service.generateAccountingEntries().subscribe(response => {
-        expect(response.bodyResponse?.period).toBe('202608');
-      });
+    it('should generate when the dialog is confirmed', () => {
+      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
+      cardifService.generateAccountingEntries.and.returnValue(of({
+        bodyResponse: { message: 'Asientos generados con éxito.' }
+      } as any));
 
-      const request = httpMock.expectOne(`${closingUrl}/generate`);
-      expect(request.request.method).toBe('PUT');
-      expect(request.request.body).toBeNull();
-      expect(request.request.headers.get('Accept'))
-        .toBe('application/json');
+      component.generateAccountingEntries();
 
-      request.flush({
-        bodyResponse: {
-          message: 'Asientos generados con éxito.',
-          period: '202608',
-          files: []
-        }
-      });
+      expect(cardifService.generateAccountingEntries).toHaveBeenCalled();
+      expect(toastr.success)
+        .toHaveBeenCalledWith('Asientos generados con éxito.');
+      expect(component.isGenerating).toBeFalse();
+    });
+
+    it('should show a default message when the body has none', () => {
+      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
+      cardifService.generateAccountingEntries.and.returnValue(
+        of({ bodyResponse: null } as any));
+
+      component.generateAccountingEntries();
+
+      expect(toastr.success)
+        .toHaveBeenCalledWith('Proceso ejecutado correctamente.');
+    });
+
+    it('should not generate when the dialog is cancelled', () => {
+      dialog.open.and.returnValue({ afterClosed: () => of(false) } as any);
+
+      component.generateAccountingEntries();
+
+      expect(cardifService.generateAccountingEntries).not.toHaveBeenCalled();
+    });
+
+    it('should ignore the click while a generation is running', () => {
+      component.isGenerating = true;
+
+      component.generateAccountingEntries();
+
+      expect(dialog.open).not.toHaveBeenCalled();
+    });
+
+    it('should show the backend error message', () => {
+      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
+      cardifService.generateAccountingEntries.and.returnValue(
+        throwError(() => ({
+          error: { errorHeader: { errorMessage: 'Error controlado' } }
+        })));
+
+      component.generateAccountingEntries();
+
+      expect(toastr.error).toHaveBeenCalledWith('Error controlado');
+      expect(component.isGenerating).toBeFalse();
+    });
+
+    it('should show a default error message', () => {
+      dialog.open.and.returnValue({ afterClosed: () => of(true) } as any);
+      cardifService.generateAccountingEntries.and.returnValue(
+        throwError(() => new Error('boom')));
+
+      component.generateAccountingEntries();
+
+      expect(toastr.error)
+        .toHaveBeenCalledWith('No fue posible generar los asientos contables.');
     });
   });
 
-  describe('#findGeneratedFiles', () => {
-    it('should GET the generated files', () => {
-      const files: IColombiaXmlFile[] = [{
-        id: 1,
-        period: '202608',
-        family: 'ReasegAlfa',
-        movementType: 'Constitucion',
-        fileName: 'archivo.xml',
-        lineCount: 4,
-        processDate: '28/08/2026 10:00:00 a. m.',
-        status: 'GENERADO'
-      }];
+  describe('#onDownloadXml', () => {
+    it('should download the file', () => {
+      cardifService.downloadXmlFile.and.returnValue(of(blobResponse()));
+      const anchor = document.createElement('a');
+      spyOn(document, 'createElement').and.returnValue(anchor);
+      spyOn(anchor, 'click');
+      spyOn(window.URL, 'createObjectURL').and.returnValue('blob:url');
+      spyOn(window.URL, 'revokeObjectURL');
 
-      service.findGeneratedFiles().subscribe(response => {
-        expect(response.bodyResponse?.[0].family).toBe('ReasegAlfa');
-      });
+      component.onDownloadXml(file);
 
-      const request = httpMock.expectOne(`${closingUrl}/files`);
-      expect(request.request.method).toBe('GET');
-      request.flush({ bodyResponse: files });
+      expect(cardifService.downloadXmlFile).toHaveBeenCalledWith(1);
+      expect(anchor.download).toBe('archivo.xml');
+      expect(anchor.click).toHaveBeenCalled();
+      expect(window.URL.revokeObjectURL).toHaveBeenCalled();
     });
-  });
 
-  describe('#downloadXmlFile', () => {
-    it('should GET the XML file as Blob', () => {
-      const mockBlob = new Blob(['<SSC/>'], { type: 'application/xml' });
+    it('should warn when the file is empty', () => {
+      cardifService.downloadXmlFile.and.returnValue(
+        of(new HttpResponse({ body: new Blob([]), status: 200 })));
 
-      service.downloadXmlFile(5).subscribe(response => {
-        expect(response.body).toEqual(mockBlob);
-      });
+      component.onDownloadXml(file);
 
-      const request = httpMock.expectOne(`${closingUrl}/files/5/download`);
-      expect(request.request.method).toBe('GET');
-      expect(request.request.responseType).toBe('blob');
-      expect(request.request.headers.get('Accept')).toBe('application/xml');
-
-      request.flush(mockBlob, { status: 200, statusText: 'OK' });
+      expect(toastr.warning)
+        .toHaveBeenCalledWith('El archivo generado no contiene información.');
     });
-  });
 
-  describe('#findReportStatus', () => {
-    it('should GET the report status', () => {
-      const status: IAvalReportStatus = {
-        generationDate: '28/08/2026 10:00:00 a. m.',
-        pendingMovements: 93
-      };
+    it('should warn when the body is null', () => {
+      cardifService.downloadXmlFile.and.returnValue(
+        of(new HttpResponse<Blob>({ body: null, status: 200 })));
 
-      service.findReportStatus().subscribe(response => {
-        expect(response.bodyResponse?.pendingMovements).toBe(93);
-      });
+      component.onDownloadXml(file);
 
-      const request = httpMock.expectOne(`${closingUrl}/report/status`);
-      expect(request.request.method).toBe('GET');
-      expect(request.request.headers.get('Accept'))
-        .toBe('application/json');
-
-      request.flush({ bodyResponse: status });
+      expect(toastr.warning).toHaveBeenCalled();
     });
-  });
 
-  describe('#downloadAvalReport', () => {
-    it('should GET the Excel report as Blob', () => {
-      const mockBlob = new Blob(['excel'], {
-        type:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
+    it('should show an error when the download fails', () => {
+      cardifService.downloadXmlFile.and.returnValue(
+        throwError(() => new Error('boom')));
 
-      const responseHeaders = new HttpHeaders({
-        'Content-Disposition': 'attachment; filename="RPT_CIERRE_AVAL.xlsx"'
-      });
+      component.onDownloadXml(file);
 
-      service.downloadAvalReport().subscribe(response => {
-        expect(response.body).toEqual(mockBlob);
-        expect(response.headers.get('Content-Disposition'))
-          .toContain('RPT_CIERRE_AVAL.xlsx');
-      });
-
-      const request = httpMock.expectOne(`${closingUrl}/report/download`);
-      expect(request.request.method).toBe('GET');
-      expect(request.request.responseType).toBe('blob');
-      expect(request.request.headers.get('Accept')).toBe(
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      );
-
-      request.flush(mockBlob, {
-        headers: responseHeaders,
-        status: 200,
-        statusText: 'OK'
-      });
+      expect(toastr.error)
+        .toHaveBeenCalledWith('No fue posible descargar el archivo XML.');
     });
   });
 });
