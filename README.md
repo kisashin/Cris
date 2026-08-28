@@ -1,170 +1,92 @@
-import java.io.IOException;
-
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportRow;
 import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportStatusDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.util.helpers.AvalReportExcelHelper;
-import co.com.bnpparibas.cardif.closingclaims.infraestructure.repository.AvalReportRepository;
 
 
-    @Mock
-    private AvalReportRepository reportRepository;
-
-    @Mock
-    private AvalReportExcelHelper excelHelper;
-
-
-
-
-
-
-
-
-        @Nested
-    @DisplayName("findReportStatus")
+    @Nested
+    @DisplayName("GET /v1/aval-closing/report/status")
     class FindReportStatus {
 
         @Test
-        @DisplayName("debe devolver el conteo de movimientos pendientes")
-        void shouldReturnPendingCount() {
-            when(reportRepository.countPendingMovements()).thenReturn(93);
+        @DisplayName("debe devolver el estado del reporte y código 200")
+        void shouldReturnReportStatus() {
+            AvalReportStatusDTO serviceResult =
+                    AvalReportStatusDTO.builder()
+                            .generationDate("27/08/2026 10:00:00 a. m.")
+                            .pendingMovements(93)
+                            .build();
 
-            AvalReportStatusDTO status =
-                    service.findReportStatus(CORRELATION_ID, REQUEST_ID);
+            when(closingAvalService.findReportStatus(
+                    correlationId, requestId))
+                    .thenReturn(serviceResult);
 
-            assertEquals(93, status.getPendingMovements());
-            assertNotNull(status.getGenerationDate());
+            ResponseEntity<ResponseModel<AvalReportStatusDTO>> response =
+                    controller.findReportStatus(correlationId, requestId);
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+
+            ResponseModel<AvalReportStatusDTO> body = response.getBody();
+            assertNotNull(body);
+            assertEquals(correlationId, body.getCorrelationId());
+            assertEquals(
+                    HttpStatus.OK.value(),
+                    body.getResponseHeader().getReturnCode());
+            assertEquals(serviceResult, body.getBodyResponse());
+
+            verify(closingAvalService, times(1))
+                    .findReportStatus(correlationId, requestId);
         }
 
         @Test
-        @DisplayName("debe devolver cero cuando no hay movimientos pendientes")
-        void shouldReturnZeroWhenThereAreNoPendingMovements() {
-            when(reportRepository.countPendingMovements()).thenReturn(0);
+        @DisplayName("debe devolver cero movimientos cuando no hay pendientes")
+        void shouldReturnZeroPendingMovements() {
+            AvalReportStatusDTO serviceResult =
+                    AvalReportStatusDTO.builder()
+                            .generationDate("27/08/2026 10:00:00 a. m.")
+                            .pendingMovements(0)
+                            .build();
 
-            AvalReportStatusDTO status =
-                    service.findReportStatus(CORRELATION_ID, REQUEST_ID);
+            when(closingAvalService.findReportStatus(
+                    correlationId, requestId))
+                    .thenReturn(serviceResult);
 
-            assertEquals(0, status.getPendingMovements());
-            assertNotNull(status.getGenerationDate());
-        }
+            ResponseEntity<ResponseModel<AvalReportStatusDTO>> response =
+                    controller.findReportStatus(correlationId, requestId);
 
-        @Test
-        @DisplayName("debe lanzar BusinessException cuando falla la consulta")
-        void shouldThrowWhenQueryFails() {
-            when(reportRepository.countPendingMovements())
-                    .thenThrow(new DataAccessResourceFailureException("db"));
+            assertEquals(HttpStatus.OK, response.getStatusCode());
 
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.findReportStatus(
-                            CORRELATION_ID, REQUEST_ID));
-
-            assertEquals(
-                    HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
-            assertEquals(
-                    "Error al acceder a la informacion del reporte de Aval",
-                    ex.getMessage());
+            ResponseModel<AvalReportStatusDTO> body = response.getBody();
+            assertNotNull(body);
+            assertEquals(0, body.getBodyResponse().getPendingMovements());
         }
     }
 
     @Nested
-    @DisplayName("downloadAvalReport")
+    @DisplayName("GET /v1/aval-closing/report/download")
     class DownloadAvalReport {
 
-        private AvalReportRow reportRow() {
-            return AvalReportRow.builder()
-                    .compania("02")
-                    .siniestroLider("0902026A193877")
-                    .nombreasegurado("JUAN PEREZ")
-                    .build();
-        }
-
         @Test
-        @DisplayName("debe devolver el contenido del archivo Excel")
-        void shouldReturnExcelContent() throws IOException {
-            byte[] expected = new byte[] {0x50, 0x4B, 0x03, 0x04};
+        @DisplayName("debe devolver el contenido del archivo con su nombre")
+        void shouldReturnReportContent() {
+            byte[] content = new byte[] {0x50, 0x4B, 0x03, 0x04};
 
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList())
-                    .thenReturn(Collections.singletonList(reportRow()));
-            when(excelHelper.generateExcel(anyList()))
-                    .thenReturn(expected);
+            when(closingAvalService.downloadAvalReport(
+                    pHeader, correlationId, requestId))
+                    .thenReturn(content);
 
-            byte[] result = service.downloadAvalReport(
-                    P_HEADER, CORRELATION_ID, REQUEST_ID);
+            ResponseEntity<byte[]> response =
+                    controller.downloadAvalReport(
+                            pHeader, correlationId, requestId);
 
-            assertArrayEquals(expected, result);
-
-            verify(storedProcedureExecutor, times(2)).query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString());
-        }
-
-        @Test
-        @DisplayName("debe lanzar BusinessException cuando no hay movimientos")
-        void shouldThrowWhenThereAreNoRows() {
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList());
-
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadAvalReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            assertEquals(HttpStatus.NOT_FOUND, ex.getHttpStatus());
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertArrayEquals(content, response.getBody());
             assertEquals(
-                    "No existen movimientos para generar el archivo",
-                    ex.getMessage());
-        }
-
-        @Test
-        @DisplayName("debe lanzar BusinessException cuando falla el procedimiento")
-        void shouldThrowWhenProcedureFails() {
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenThrow(new DataAccessResourceFailureException("db"));
-
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadAvalReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
+                    "attachment; filename=\"RPT_CIERRE_AVAL.xlsx\"",
+                    response.getHeaders()
+                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
             assertEquals(
-                    HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
-            assertEquals(
-                    "Error al acceder a la informacion del reporte de Aval",
-                    ex.getMessage());
-        }
+                    content.length,
+                    response.getHeaders().getContentLength());
 
-        @Test
-        @DisplayName("debe lanzar BusinessException cuando falla la generacion del Excel")
-        void shouldThrowWhenExcelGenerationFails() throws IOException {
-            when(storedProcedureExecutor.query(
-                    anyString(),
-                    any(StoredProcedureRowMapper.class),
-                    anyString()))
-                    .thenReturn(Collections.emptyList())
-                    .thenReturn(Collections.singletonList(reportRow()));
-            when(excelHelper.generateExcel(anyList()))
-                    .thenThrow(new IOException("boom"));
-
-            BusinessException ex = assertThrows(
-                    BusinessException.class,
-                    () -> service.downloadAvalReport(
-                            P_HEADER, CORRELATION_ID, REQUEST_ID));
-
-            assertEquals(
-                    HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatus());
-            assertEquals(
-                    "Error al generar el archivo Excel",
-                    ex.getMessage());
+            verify(closingAvalService, times(1))
+                    .downloadAvalReport(pHeader, correlationId, requestId);
         }
     }
