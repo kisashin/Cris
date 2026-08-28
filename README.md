@@ -1,72 +1,129 @@
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportStatusDTO;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
 
-    private static final String EXCEL_CONTENT_TYPE =
-            "application/vnd.openxmlformats-officedocument"
-                    + ".spreadsheetml.sheet";
+import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportRow;
+import org.apache.poi.util.DefaultTempFileCreationStrategy;
+import org.apache.poi.util.TempFile;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-    private static final String REPORT_FILE_NAME =
-            "RPT_CIERRE_AVAL.xlsx";
+import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+class AvalReportExcelHelperTest {
 
-            
+    private static final File POI_TEMP_DIR =
+            new File("target/poi-files-aval");
 
+    private final AvalReportExcelHelper helper =
+            new AvalReportExcelHelper();
 
-    /**
-     * Consulta el estado del reporte mensual de Aval.
-     *
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return estado del reporte con los movimientos pendientes.
-     */
-    @GetMapping(
-            path = "/aval-closing/report/status",
-            produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ResponseModel<AvalReportStatusDTO>>
-            findReportStatus(
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
-
-        AvalReportStatusDTO status =
-                closingAvalService.findReportStatus(
-                        correlationId,
-                        requestId);
-
-        ResponseModel<AvalReportStatusDTO> response =
-                new ResponseModel<>(correlationId,
-                        ResponseHeader.builder()
-                                .returnCode(HttpStatus.OK.value()).build(),
-                        status);
-        return new ResponseEntity<>(response, HttpStatus.OK);
+    @BeforeAll
+    static void redirectPoiTempFiles() {
+        POI_TEMP_DIR.mkdirs();
+        TempFile.setTempFileCreationStrategy(
+                new DefaultTempFileCreationStrategy(POI_TEMP_DIR));
     }
 
-    /**
-     * Descarga el reporte mensual de Aval en formato Excel.
-     *
-     * @param pHeader        encabezado opcional de seguridad.
-     * @param correlationId  identificador de correlación para trazabilidad.
-     * @param requestId      identificador de la petición.
-     * @return contenido del archivo Excel.
-     */
-    @GetMapping(
-            path = "/aval-closing/report/download",
-            produces = EXCEL_CONTENT_TYPE)
-    public ResponseEntity<byte[]> downloadAvalReport(
-            @RequestHeader(value = "_p", required = false) String pHeader,
-            @RequestHeader(value = "correlation_id", required = false) String correlationId,
-            @RequestHeader(value = "request_id", required = false) String requestId) {
+    @AfterAll
+    static void resetPoiTempFiles() {
+        TempFile.setTempFileCreationStrategy(
+                new DefaultTempFileCreationStrategy());
+    }
 
-        byte[] content = closingAvalService.downloadAvalReport(
-                pHeader,
-                correlationId,
-                requestId);
+    @Test
+    @DisplayName("Should generate a valid Excel with header and data rows")
+    void shouldGenerateValidExcelWithData() throws IOException {
+        AvalReportRow row = AvalReportRow.builder()
+                .compania("02")
+                .sucursal("02")
+                .descripcionRamo("VIDA GRUPO")
+                .symbol("VG")
+                .ramo2(34)
+                .nroPoliza("1234567890")
+                .modulo("00")
+                .codBancoNegocio("4020")
+                .descripcionTomador("Banco de Bogota")
+                .siniestroLider("0902026A193877HC")
+                .valor(0)
+                .numeroLote(0)
+                .campoUnion("0902026A193877HC")
+                .valorInicialReserva(new BigDecimal("1500000.00"))
+                .valorAjustesReserva(BigDecimal.ZERO)
+                .valorPagos(BigDecimal.ZERO)
+                .valorActualReserva(BigDecimal.ZERO)
+                .porcentajeAlfa(100)
+                .valorGastosCoaseguro(0)
+                .valorSalvamento(0)
+                .valorRecuperaciones(0)
+                .nroidentificacion("1020304050")
+                .nombreasegurado("JUAN PEREZ")
+                .fechanacimiento("19800101")
+                .edad(45)
+                .sexo("M")
+                .profesion("INGENIERO")
+                .codigoCausa("HC")
+                .causaSiniestro("MUERTE ACCIDENTAL")
+                .ciudad("BOGOTA")
+                .tipoSiniestro("OT")
+                .nroCredito("00998877")
+                .porcentajeAsegurabilidad("100")
+                .tipocredito("LIBRE INVERSION")
+                .coberturaLider("MUERTE ACCIDENTAL")
+                .reportadoPor("Reserva Inicial - Re-Aseguradora")
+                .nitBeneficiario("8600029644")
+                .beneficiario("Banco de Bogota")
+                .build();
 
-        return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\""
-                                + REPORT_FILE_NAME + "\"")
-                .contentType(MediaType.parseMediaType(EXCEL_CONTENT_TYPE))
-                .contentLength(content.length)
-                .body(content);
-    }            
+        AvalReportRow secondRow = AvalReportRow.builder()
+                .compania("02")
+                .siniestroLider("0902026A193878HC")
+                .valorPagos(new BigDecimal("250000.00"))
+                .edad(30)
+                .build();
+
+        List<AvalReportRow> rows = Arrays.asList(row, secondRow);
+
+        byte[] result = helper.generateExcel(rows);
+
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+        assertValidOoxml(result);
+    }
+
+    @Test
+    @DisplayName("Should generate a valid Excel with only headers when list is empty")
+    void shouldGenerateValidExcelWhenListIsEmpty() throws IOException {
+        byte[] result = helper.generateExcel(Collections.emptyList());
+
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+        assertValidOoxml(result);
+    }
+
+    @Test
+    @DisplayName("Should generate a valid Excel when every value is null")
+    void shouldGenerateValidExcelWithNullValues() throws IOException {
+        byte[] result = helper.generateExcel(
+                Collections.singletonList(new AvalReportRow()));
+
+        assertNotNull(result);
+        assertTrue(result.length > 0);
+        assertValidOoxml(result);
+    }
+
+    private void assertValidOoxml(byte[] content) {
+        assertTrue(content.length >= 2, "El archivo no debe estar vacío");
+        assertTrue(
+                content[0] == 0x50 && content[1] == 0x4B,
+                "El archivo debe iniciar con la firma OOXML/ZIP (PK)");
+    }
+}
