@@ -1,244 +1,91 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { HttpResponse } from '@angular/common/http';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatTableModule } from '@angular/material/table';
-import { MatIconModule } from '@angular/material/icon';
-import { ToastrService } from 'ngx-toastr';
-import { environment } from 'src/environments/environment';
-import { ClosingAvalService } from '../../services/closing-aval.service';
-import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
-import { IColombiaXmlFile } from '../../models/colombia-accounting-result.model';
-import { IAvalReportStatus } from '../../models/aval-report-status.model';
+USE [SiniestrosWp];
+GO
 
-/**
- * Pantalla Cierre Mensual de Aval.
- */
-@Component({
-  selector: 'app-claims-closing-aval',
-  imports: [
-    CommonModule,
-    MatTableModule,
-    MatButtonModule,
-    MatIconModule,
-    MatDialogModule
-  ],
-  standalone: true,
-  templateUrl: './claims-closing-aval.component.html',
-  styleUrl: './claims-closing-aval.component.scss'
-})
-export class ClaimsClosingAvalComponent implements OnInit {
+DECLARE @corte datetime = DATEADD(DAY, -5, GETDATE());
+DECLARE @llave nvarchar(510) = 'TEST-AVAL-001';
 
-  readonly reportMovement = `${environment.reporting_service}/ReportServer/Pages/ReportViewer.aspx?/Acsele/Alterno/Cierre_siniestrosaval&rs:Command=Render&rc:Parameters=false&rc:Toolbar=false&rs:Format=Excel`;
+DELETE FROM historicomovimientos WHERE archivocargue = 'PRUEBA_COL_AVAL';
+DELETE FROM historico_inicial WHERE Llavesiniestro = @llave;
 
-  public isGenerating = false;
-  public isDownloadingReport = false;
-  public isLoading = false;
-  public isLoadingReport = false;
-  public hasAvalData = false;
+INSERT INTO historico_inicial (
+    IDCARVAJAL, Socio, NumeroSiniestro, Nroidentificacion, Codproducto,
+    CodPlan, Cobertura, Ramo, Llavesiniestro, Nombreasegurado, Aval)
+VALUES (
+    990000001, 'BANCO DE BOGOTA', '0902026A990001', '1020304050', '763',
+    '1', 'MUERTE ACCIDENTAL', '7', @llave, 'JUAN PEREZ PRUEBA', 1);
 
-  public dataSource: IColombiaXmlFile[] = [];
-  public reportDataSource: IAvalReportStatus[] = [];
+SET IDENTITY_INSERT historicomovimientos ON;
 
-  public readonly displayedColumns: string[] = [
-    'processDate',
-    'period',
-    'family',
-    'movementType',
-    'lineCount',
-    'status',
-    'action'
-  ];
+INSERT INTO historicomovimientos (
+    id, IDCARVAJAL, Socio, NumeroSiniestro, Nroidentificacion,
+    Codproducto, CodPlan, Cobertura, Ramo, Llavesiniestro,
+    Nombreasegurado, Tipomovimiento, Vrmovimiento, Fechamovimiento2,
+    Fechaocurrencia, Fechainiciovigencia, Certificado,
+    Beneficiariopago, NumeroIdentificacionBeneficiarioDelPago,
+    Iddoctosoportemanutencion, Fechacontabilizacion, marcaavalpos,
+    archivocargue, fechacargue)
+VALUES
+(990000001, 990000001, 'BANCO DE BOGOTA', '0902026A990001', '1020304050',
+ '763', '1', 'MUERTE ACCIDENTAL', '7', @llave,
+ 'JUAN PEREZ PRUEBA', 'Reserva Inicial - Re-Aseguradora', 1500000.00, @corte,
+ '20260101', '20250101', '6722434176267121',
+ NULL, NULL, NULL, NULL, NULL, 'PRUEBA_COL_AVAL', GETDATE()),
 
-  public readonly displayedColumnsReport: string[] = [
-    'generationDate',
-    'action'
-  ];
+(990000002, 990000002, 'BANCO DE BOGOTA', '0902026A990001', '1020304050',
+ '763', '1', 'MUERTE ACCIDENTAL', '7', @llave,
+ 'JUAN PEREZ PRUEBA', 'Aumento Reserva', 500000.00, @corte,
+ '20260101', '20250101', '6722434176267121',
+ NULL, NULL, NULL, NULL, NULL, 'PRUEBA_COL_AVAL', GETDATE()),
 
-  constructor(
-    private readonly avalService: ClosingAvalService,
-    private readonly dialog: MatDialog,
-    private readonly toastr: ToastrService
-  ) {}
+(990000003, 990000003, 'BANCO DE BOGOTA', '0902026A990001', '1020304050',
+ '763', '1', 'MUERTE ACCIDENTAL', '7', @llave,
+ 'JUAN PEREZ PRUEBA', 'Pago', 800000.00, @corte,
+ '20260101', '20250101', '6722434176267121',
+ 'BANCO DE BOGOTA', '8600029644', 'PLANILLA-001',
+ NULL, NULL, 'PRUEBA_COL_AVAL', GETDATE()),
 
-  ngOnInit(): void {
-    this.loadReportStatus();
-    this.loadGeneratedFiles();
-  }
+(990000004, 990000004, 'BANCO DE BOGOTA', '0902026A990001', '1020304050',
+ '763', '1', 'MUERTE ACCIDENTAL', '7', @llave,
+ 'JUAN PEREZ PRUEBA', 'Disminución Reserva', 300000.00, @corte,
+ '20260101', '20250101', '6722434176267121',
+ NULL, NULL, NULL, NULL, NULL, 'PRUEBA_COL_AVAL', GETDATE()),
 
-  /**
-   * Consulta si existen movimientos pendientes por reportar.
-   */
-  public loadReportStatus(): void {
-    this.isLoadingReport = true;
-    this.avalService
-      .findReportStatus()
-      .subscribe({
-        next: response => {
-          const status = response?.bodyResponse;
-          this.hasAvalData = (status?.pendingMovements ?? 0) > 0;
-          this.reportDataSource = this.hasAvalData && status
-            ? [status]
-            : [];
-          this.isLoadingReport = false;
-        },
-        error: error => {
-          console.error('Error loading the Aval report status:', error);
-          this.hasAvalData = false;
-          this.reportDataSource = [];
-          this.isLoadingReport = false;
-        }
-      });
-  }
+(990000005, 990000005, 'BANCO DE BOGOTA', '0902026A990001', '1020304050',
+ '763', '1', 'MUERTE ACCIDENTAL', '7', @llave,
+ 'JUAN PEREZ PRUEBA', 'Reversa', 200000.00, @corte,
+ '20260101', '20250101', '6722434176267121',
+ 'BANCO DE BOGOTA', '8600029644', 'PLANILLA-001',
+ NULL, NULL, 'PRUEBA_COL_AVAL', GETDATE());
 
-  /**
-   * Descarga el reporte mensual de Aval.
-   */
-  public downloadReport(): void {
-    if (this.isDownloadingReport) {
-      return;
-    }
+SET IDENTITY_INSERT historicomovimientos OFF;
+GO
 
-    this.isDownloadingReport = true;
-    this.avalService
-      .downloadAvalReport()
-      .subscribe({
-        next: response => {
-          this.saveBlobFile(response, this.getFileName(response));
-          this.isDownloadingReport = false;
-        },
-        error: error => {
-          console.error('Error downloading the Aval report:', error);
-          this.toastr.error(
-            error?.error?.errorHeader?.errorMessage ??
-            'No fue posible descargar el reporte de movimientos.'
-          );
-          this.isDownloadingReport = false;
-        }
-      });
-  }
 
-  /**
-   * Consulta los archivos generados en procesos anteriores.
-   */
-  public loadGeneratedFiles(): void {
-    this.isLoading = true;
-    this.avalService
-      .findGeneratedFiles()
-      .subscribe({
-        next: response => {
-          this.dataSource = response?.bodyResponse ?? [];
-          this.isLoading = false;
-        },
-        error: error => {
-          console.error('Error loading Aval accounting files:', error);
-          this.dataSource = [];
-          this.isLoading = false;
-        }
-      });
-  }
 
-  /**
-   * Solicita confirmacion antes de generar los asientos contables.
-   */
-  public generateAccountingEntries(): void {
-    if (this.isGenerating) {
-      return;
-    }
 
-    this.dialog
-      .open(ConfirmDialogComponent, {
-        width: '440px',
-        disableClose: true,
-        data: {
-          title: 'Generar nuevo XML',
-          message: '¿Seguro que quiere generar un nuevo XML? Al hacerlo se '
-            + 'borrarán los registros anteriores.',
-          confirmText: 'SÍ, GENERAR',
-          cancelText: 'NO'
-        }
-      })
-      .afterClosed()
-      .subscribe(confirmed => {
-        if (confirmed) {
-          this.executeGeneration();
-        }
-      });
-  }
 
-  /**
-   * Descarga el XML de la fila seleccionada.
-   */
-  public onDownloadXml(row: IColombiaXmlFile): void {
-    this.avalService
-      .downloadXmlFile(row.id)
-      .subscribe({
-        next: response => this.saveBlobFile(response, row.fileName),
-        error: error => {
-          console.error('Error downloading the XML file:', error);
-          this.toastr.error('No fue posible descargar el archivo XML.');
-        }
-      });
-  }
 
-  private executeGeneration(): void {
-    this.isGenerating = true;
-    this.avalService
-      .generateAccountingEntries()
-      .subscribe({
-        next: response => {
-          this.toastr.success(
-            response?.bodyResponse?.message ??
-            'Proceso ejecutado correctamente.'
-          );
-          this.isGenerating = false;
-          this.loadGeneratedFiles();
-          this.loadReportStatus();
-        },
-        error: error => {
-          console.error(
-            'Error generating Aval accounting entries:',
-            error
-          );
-          this.toastr.error(
-            error?.error?.errorHeader?.errorMessage ??
-            'No fue posible generar los asientos contables.'
-          );
-          this.isGenerating = false;
-          this.loadGeneratedFiles();
-          this.loadReportStatus();
-        }
-      });
-  }
+-- Debe dar 5
+SELECT COUNT(*) 
+FROM historicomovimientos 
+WHERE Fechacontabilizacion IS NULL AND marcaavalpos IS NULL 
+  AND socio IN ('BANCO DE BOGOTA','BANCO AV VILLAS','BANCO DE OCCIDENTE','BANCO POPULAR')
+  AND CodProducto NOT IN (SELECT producto FROM dbo.productosnoaval);
 
-  private saveBlobFile(
-    response: HttpResponse<Blob>,
-    fileName: string
-  ): void {
-    const file = response.body;
+-- Debe dar 5 tambien
+SELECT COUNT(*) 
+FROM historicomovimientos 
+WHERE llavesiniestro IN (SELECT llavesiniestro FROM historico_inicial WHERE Aval = 1)
+  AND fechacontabilizacion IS NULL AND marcaavalpos IS NULL;
 
-    if (!file || file.size === 0) {
-      this.toastr.warning(
-        'El archivo generado no contiene información.'
-      );
-      return;
-    }
+-- Confirmar que el producto no esta excluido
+SELECT * FROM dbo.productosnoaval WHERE producto = '763';
 
-    const objectUrl = window.URL.createObjectURL(file);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = fileName;
-    anchor.click();
-    window.URL.revokeObjectURL(objectUrl);
-  }
 
-  private getFileName(response: HttpResponse<Blob>): string {
-    const contentDisposition =
-      response.headers.get('Content-Disposition');
-    const fileNameMatch = contentDisposition?.match(
-      /filename="?([^"]+)"?/
-    );
-    return fileNameMatch?.[1] ?? 'RPT_CIERRE_AVAL.xlsx';
-  }
-}
+
+UPDATE historicomovimientos 
+SET Fechacontabilizacion = NULL 
+WHERE archivocargue = 'PRUEBA_COL_AVAL';
+
+DELETE FROM controlcierreaval;
+DELETE FROM archivoAsientoAvalXml;
