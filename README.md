@@ -11,108 +11,101 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class AccountingXmlLineTest {
+class AccountingXmlFileTest {
 
-    private AccountingXmlLine line() {
-        return AccountingXmlLine.builder()
-                .period("202608")
-                .pass(1)
-                .lineType(2)
+    private AccountingXmlFile file() {
+        return AccountingXmlFile.builder()
                 .movementType("Pago")
-                .sequence(3L)
-                .content("<Line/>")
+                .fileName("Sinie_ReasegCentro_Pago20260824.xml")
+                .lineCount(4)
+                .content("<SSC/>")
                 .build();
     }
 
     @Test
     @DisplayName("El builder asigna todos los campos")
     void builderAssignsEveryField() {
-        AccountingXmlLine result = line();
+        AccountingXmlFile result = file();
 
-        assertEquals("202608", result.getPeriod());
-        assertEquals(1, result.getPass());
-        assertEquals(2, result.getLineType());
         assertEquals("Pago", result.getMovementType());
-        assertEquals(3L, result.getSequence());
-        assertEquals("<Line/>", result.getContent());
+        assertEquals(
+                "Sinie_ReasegCentro_Pago20260824.xml",
+                result.getFileName());
+        assertEquals(4, result.getLineCount());
+        assertEquals("<SSC/>", result.getContent());
     }
 
     @Test
     @DisplayName("Los setters asignan todos los campos")
     void settersAssignEveryField() {
-        AccountingXmlLine result = new AccountingXmlLine();
+        AccountingXmlFile result = new AccountingXmlFile();
 
-        assertNull(result.getPeriod());
+        assertNull(result.getMovementType());
+        assertEquals(0, result.getLineCount());
 
-        result.setPeriod("202607");
-        result.setPass(2);
-        result.setLineType(0);
         result.setMovementType("Constitucion");
-        result.setSequence(9L);
+        result.setFileName("archivo.xml");
+        result.setLineCount(7);
         result.setContent("<SSC/>");
 
-        assertEquals("202607", result.getPeriod());
-        assertEquals(2, result.getPass());
-        assertEquals(0, result.getLineType());
         assertEquals("Constitucion", result.getMovementType());
-        assertEquals(9L, result.getSequence());
+        assertEquals("archivo.xml", result.getFileName());
+        assertEquals(7, result.getLineCount());
         assertEquals("<SSC/>", result.getContent());
     }
 
     @Test
     @DisplayName("El constructor con todos los argumentos asigna los campos")
     void allArgsConstructor() {
-        AccountingXmlLine result = new AccountingXmlLine(
-                "202608", 1, 2, "Liberacion", 5L, "<Line/>");
+        AccountingXmlFile result = new AccountingXmlFile(
+                "RevPago", "f.xml", 1, "<SSC/>");
 
         assertNotNull(result);
-        assertEquals("Liberacion", result.getMovementType());
-        assertEquals(5L, result.getSequence());
+        assertEquals("RevPago", result.getMovementType());
+        assertEquals(1, result.getLineCount());
     }
 
     @Test
     @DisplayName("equals, hashCode y toString reflejan el contenido")
     void equalsHashCodeAndToString() {
-        AccountingXmlLine first = line();
-        AccountingXmlLine second = line();
+        AccountingXmlFile first = file();
+        AccountingXmlFile second = file();
 
         assertEquals(first, second);
         assertEquals(first, first);
         assertEquals(first.hashCode(), second.hashCode());
         assertNotEquals(first, null);
         assertNotEquals(first, "otro tipo");
-        assertNotEquals(first, new AccountingXmlLine());
-        assertTrue(first.toString().contains("202608"));
+        assertNotEquals(first, new AccountingXmlFile());
+        assertTrue(first.toString().contains("Pago"));
     }
 
     @Test
     @DisplayName("equals detecta diferencias en cualquier campo")
     void equalsDetectsEveryFieldDifference() {
-        assertNotEquals(line(), modified(l -> l.setPeriod("202607")));
-        assertNotEquals(line(), modified(l -> l.setPass(9)));
-        assertNotEquals(line(), modified(l -> l.setLineType(9)));
-        assertNotEquals(line(), modified(l -> l.setMovementType("X")));
-        assertNotEquals(line(), modified(l -> l.setSequence(99L)));
-        assertNotEquals(line(), modified(l -> l.setContent("X")));
+        assertNotEquals(file(), modified(f -> f.setMovementType("X")));
+        assertNotEquals(file(), modified(f -> f.setFileName("X")));
+        assertNotEquals(file(), modified(f -> f.setLineCount(99)));
+        assertNotEquals(file(), modified(f -> f.setContent("X")));
     }
 
     @Test
     @DisplayName("equals compara correctamente los campos nulos")
     void equalsHandlesNullFields() {
-        AccountingXmlLine empty = new AccountingXmlLine();
-        AccountingXmlLine other = new AccountingXmlLine();
+        AccountingXmlFile empty = new AccountingXmlFile();
+        AccountingXmlFile other = new AccountingXmlFile();
 
         assertEquals(empty, other);
         assertEquals(empty.hashCode(), other.hashCode());
 
-        other.setPeriod("202608");
+        other.setMovementType("Pago");
         assertNotEquals(empty, other);
         assertNotEquals(other, empty);
         assertNotNull(empty.toString());
     }
 
-    private AccountingXmlLine modified(Consumer<AccountingXmlLine> change) {
-        AccountingXmlLine result = line();
+    private AccountingXmlFile modified(Consumer<AccountingXmlFile> change) {
+        AccountingXmlFile result = file();
         change.accept(result);
         return result;
     }
