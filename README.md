@@ -1,7 +1,7 @@
 <div class="accounting-report-container">
   <div class="container-title">
     <h1 class="title">
-      CIERRE MENSUAL DE DIRECTAS (CARDIF)
+      CIERRE MENSUAL DE AVAL
     </h1>
   </div>
 
@@ -11,6 +11,37 @@
     </span>
     <a [href]="reportMovement" target="_blank">Consultar</a>
   </section>
+
+  @if (!hasAvalData && !isLoadingReport) {
+    <p class="empty-message">No registros para consultar</p>
+  }
+
+  @if (hasAvalData) {
+    <div class="container-table">
+      <table mat-table [dataSource]="reportDataSource" class="mat-elevation-z8">
+        <ng-container matColumnDef="generationDate">
+          <th mat-header-cell *matHeaderCellDef>
+            FECHA DEL REPORTE MENSUAL DE AVAL
+          </th>
+          <td mat-cell *matCellDef="let element">
+            {{ element.generationDate }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef> REPORTE </th>
+          <td mat-cell *matCellDef="let element">
+            <a class="download-link" (click)="downloadReport()">
+              {{ isDownloadingReport ? 'DESCARGANDO...' : 'Descargar Excel' }}
+            </a>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumnsReport"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumnsReport;"></tr>
+      </table>
+    </div>
+  }
 
   <section class="action-section">
     <span class="section-label">
