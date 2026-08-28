@@ -1,43 +1,28 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+package co.com.bnpparibas.cardif.closingclaims.domain.util.messages;
 
 /**
- * Estado del reporte mensual de Aval expuesto por la API.
+ * Errores controlados del reporte mensual de Aval.
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AvalReportStatusDTO {
+public enum AvalReportMessage {
 
-    private String generationDate;
-    private int pendingMovements;
-}
+    /** No existen movimientos pendientes para reportar. */
+    NO_MOVEMENTS_TO_EXPORT(
+            "No existen movimientos para generar el archivo"),
 
+    /** Falla al construir el archivo Excel. */
+    EXCEL_GENERATION_ERROR("Error al generar el archivo Excel"),
 
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+    /** Falla al acceder a la base de datos del reporte. */
+    DATABASE_ACCESS_ERROR(
+            "Error al acceder a la informacion del reporte de Aval");
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.TmpRepAvalCierre;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+    private final String message;
 
-@Repository
-public interface AvalReportRepository
-        extends JpaRepository<TmpRepAvalCierre, Long> {
+    AvalReportMessage(String message) {
+        this.message = message;
+    }
 
-    @Query(
-            value = "SELECT COUNT(*) FROM historicomovimientos "
-                    + "WHERE Fechacontabilizacion IS NULL "
-                    + "AND marcaavalpos IS NULL "
-                    + "AND socio IN ('BANCO DE BOGOTA','BANCO AV VILLAS',"
-                    + "'BANCO DE OCCIDENTE','BANCO POPULAR') "
-                    + "AND CodProducto NOT IN "
-                    + "(SELECT producto FROM dbo.productosnoaval)",
-            nativeQuery = true)
-    int countPendingMovements();
+    public String getMessage() {
+        return message;
+    }
 }
