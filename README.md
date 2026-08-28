@@ -1,132 +1,172 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+import { TestBed } from '@angular/core/testing';
+import {
+  HttpClientTestingModule,
+  HttpTestingController
+} from '@angular/common/http/testing';
+import { HttpHeaders } from '@angular/common/http';
+import { environment } from 'src/environments/environment';
+import { AccountingClosingCaService } from './accounting-closing-ca.service';
+import { INewGeneralResponse } from '../models/new-general-response.interface';
+import {
+  IAccountingXmlFile,
+  ICenterAccountingResult
+} from '../models/center-accounting-result.model';
 
-import org.hibernate.Session;
-import org.hibernate.jdbc.Work;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+describe('AccountingClosingCaService', () => {
+  let service: AccountingClosingCaService;
+  let httpMock: HttpTestingController;
 
-import javax.persistence.EntityManager;
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+  const baseUrl =
+    `${environment.urlAPIClosingClaimsBackEnd}/v1/cardif-center-closing`;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+  const expectTraceHeaders = (request: any, accept: string): void => {
+    expect(request.request.headers.has('correlation_id')).toBeTrue();
+    expect(request.request.headers.has('request_id')).toBeTrue();
+    expect(request.request.headers.has('_p')).toBeTrue();
+    expect(request.request.headers.get('Accept')).toBe(accept);
+  };
 
-@ExtendWith(MockitoExtension.class)
-class CardifPeruAccountingProcedureRepositoryTest {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [AccountingClosingCaService]
+    });
 
-    @Mock
-    private EntityManager entityManager;
+    service = TestBed.inject(AccountingClosingCaService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
 
-    @Mock
-    private Session session;
+  afterEach(() => {
+    httpMock.verify();
+  });
 
-    @Mock
-    private Connection connection;
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
 
-    @Mock
-    private CallableStatement statement;
+  describe('#generateAccountingEntries', () => {
+    it('should PUT the accounting generation request', () => {
+      const mockResponse: INewGeneralResponse<ICenterAccountingResult> = {
+        correlationId: 'correlation-id',
+        responseHeader: {
+          returnCode: 200,
+          message: 'Success'
+        },
+        bodyResponse: {
+          message: 'Asientos generados con éxito.',
+          period: '202608',
+          files: []
+        }
+      };
 
-    @Mock
-    private ResultSet resultSet;
+      service.generateAccountingEntries().subscribe(response => {
+        expect(response).toEqual(mockResponse);
+      });
 
-    private CardifPeruAccountingProcedureRepository repository;
+      const request = httpMock.expectOne(`${baseUrl}/generate`);
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toBeNull();
+      expectTraceHeaders(request, 'application/json');
 
-    @BeforeEach
-    void setUp() {
-        repository = new CardifPeruAccountingProcedureRepository();
-        ReflectionTestUtils.setField(
-                repository, "entityManager", entityManager);
-    }
+      request.flush(mockResponse);
+    });
+  });
 
-    private void prepareSession() throws SQLException {
-        when(entityManager.unwrap(Session.class)).thenReturn(session);
-        doAnswerWork();
-        when(connection.prepareCall(anyString())).thenReturn(statement);
-    }
+  describe('#findGeneratedFiles', () => {
+    it('should GET the generated files', () => {
+      const files: IAccountingXmlFile[] = [{
+        id: 1,
+        period: '202608',
+        movementType: 'Pago',
+        fileName: 'archivo.xml',
+        lineCount: 4,
+        processDate: '24/08/2026 03:45:30 p. m.',
+        status: 'GENERADO'
+      }];
 
-    private void doAnswerWork() {
-        org.mockito.Mockito.doAnswer(invocation -> {
-            Work work = invocation.getArgument(0);
-            work.execute(connection);
-            return null;
-        }).when(session).doWork(any(Work.class));
-    }
+      const mockResponse: INewGeneralResponse<IAccountingXmlFile[]> = {
+        correlationId: 'correlation-id',
+        responseHeader: {
+          returnCode: 200,
+          message: 'Success'
+        },
+        bodyResponse: files
+      };
 
-    @Test
-    @DisplayName("debe ejecutar el procedimiento y cerrar los cursores")
-    void shouldExecuteProcedureAndCloseResultSets() throws SQLException {
-        prepareSession();
+      service.findGeneratedFiles().subscribe(response => {
+        expect(response.bodyResponse?.length).toBe(1);
+        expect(response.bodyResponse?.[0].fileName).toBe('archivo.xml');
+      });
 
-        when(statement.execute()).thenReturn(true);
-        when(statement.getResultSet()).thenReturn(resultSet);
-        when(statement.getMoreResults()).thenReturn(false);
-        when(statement.getUpdateCount()).thenReturn(-1);
+      const request = httpMock.expectOne(`${baseUrl}/files`);
+      expect(request.request.method).toBe('GET');
+      expectTraceHeaders(request, 'application/json');
 
-        repository.executeAccountingProcedure(180);
+      request.flush(mockResponse);
+    });
+  });
 
-        verify(statement, times(1)).setQueryTimeout(180);
-        verify(statement, times(1)).execute();
-        verify(resultSet, times(1)).close();
-        verify(statement, times(1)).close();
-    }
+  describe('#downloadXmlFile', () => {
+    it('should GET the XML file as Blob', () => {
+      const mockBlob = new Blob(['<SSC/>'], { type: 'application/xml' });
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition': 'attachment; filename="archivo.xml"'
+      });
 
-    @Test
-    @DisplayName("debe recorrer varios result sets")
-    void shouldIterateSeveralResultSets() throws SQLException {
-        prepareSession();
+      service.downloadXmlFile(7).subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(response.headers.get('Content-Disposition'))
+          .toContain('archivo.xml');
+      });
 
-        ResultSet second = org.mockito.Mockito.mock(ResultSet.class);
+      const request = httpMock.expectOne(`${baseUrl}/files/7/download`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expectTraceHeaders(request, 'application/xml');
 
-        when(statement.execute()).thenReturn(true);
-        when(statement.getResultSet()).thenReturn(resultSet, second);
-        when(statement.getMoreResults()).thenReturn(true, false);
-        when(statement.getUpdateCount()).thenReturn(-1);
+      request.flush(mockBlob, {
+        headers: responseHeaders,
+        status: 200,
+        statusText: 'OK'
+      });
+    });
+  });
 
-        repository.executeAccountingProcedure(120);
+  describe('#downloadMovementsReport', () => {
+    it('should GET the Excel report as Blob', () => {
+      const mockBlob = new Blob(
+        ['excel-content'],
+        {
+          type:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      );
 
-        verify(resultSet, times(1)).close();
-        verify(second, times(1)).close();
-        verify(statement, times(1)).setQueryTimeout(120);
-    }
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition':
+          'attachment; filename="ReporteMovimientosCentro.xlsx"'
+      });
 
-    @Test
-    @DisplayName("debe terminar cuando el procedimiento no devuelve result sets")
-    void shouldFinishWhenThereAreNoResultSets() throws SQLException {
-        prepareSession();
+      service.downloadMovementsReport().subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(
+          response.headers.get('Content-Disposition')
+        ).toContain('ReporteMovimientosCentro.xlsx');
+      });
 
-        when(statement.execute()).thenReturn(false);
-        when(statement.getUpdateCount()).thenReturn(-1);
+      const request = httpMock.expectOne(`${baseUrl}/download`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expectTraceHeaders(
+        request,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
 
-        repository.executeAccountingProcedure(60);
-
-        verify(statement, never()).getResultSet();
-        verify(statement, times(1)).close();
-    }
-
-    @Test
-    @DisplayName("debe omitir los conteos de actualizacion")
-    void shouldSkipUpdateCounts() throws SQLException {
-        prepareSession();
-
-        when(statement.execute()).thenReturn(false);
-        when(statement.getUpdateCount()).thenReturn(5, -1);
-        when(statement.getMoreResults()).thenReturn(false);
-
-        repository.executeAccountingProcedure(60);
-
-        verify(statement, never()).getResultSet();
-        verify(statement, times(1)).close();
-    }
-}
+      request.flush(mockBlob, {
+        headers: responseHeaders,
+        status: 200,
+        statusText: 'OK'
+      });
+    });
+  });
+});
