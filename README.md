@@ -1,65 +1,38 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.util.helpers;
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportRow;
-import org.apache.poi.util.DefaultTempFileCreationStrategy;
-import org.apache.poi.util.TempFile;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
-class AvalReportExcelHelperTest {
-
-    private static final File POI_TEMP_DIR =
-            new File("target/poi-files-aval");
-
-    private final AvalReportExcelHelper helper =
-            new AvalReportExcelHelper();
-
-    @BeforeAll
-    static void redirectPoiTempFiles() {
-        POI_TEMP_DIR.mkdirs();
-        TempFile.setTempFileCreationStrategy(
-                new DefaultTempFileCreationStrategy(POI_TEMP_DIR));
-    }
-
-    @AfterAll
-    static void resetPoiTempFiles() {
-        TempFile.setTempFileCreationStrategy(
-                new DefaultTempFileCreationStrategy());
-    }
+class AvalReportDtosTest {
 
     @Test
-    @DisplayName("Should generate a valid Excel with header and data rows")
-    void shouldGenerateValidExcelWithData() throws IOException {
+    @DisplayName("AvalReportRow builder asigna los valores")
+    void reportRowBuilder() {
         AvalReportRow row = AvalReportRow.builder()
                 .compania("02")
                 .sucursal("02")
                 .descripcionRamo("VIDA GRUPO")
                 .symbol("VG")
                 .ramo2(34)
-                .nroPoliza("1234567890")
+                .nroPoliza("123")
                 .modulo("00")
                 .codBancoNegocio("4020")
                 .descripcionTomador("Banco de Bogota")
-                .siniestroLider("0902026A193877HC")
+                .polizaLiderAlfa("456")
+                .siniestroLider("0902026A193877")
                 .valor(0)
                 .numeroLote(0)
-                .campoUnion("0902026A193877HC")
-                .valorInicialReserva(new BigDecimal("1500000.00"))
-                .valorAjustesReserva(BigDecimal.ZERO)
-                .valorPagos(BigDecimal.ZERO)
-                .valorActualReserva(BigDecimal.ZERO)
+                .campoUnion("0902026A193877")
+                .valorInicialReserva(new BigDecimal("100.00"))
+                .valorAjustesReserva(new BigDecimal("200.00"))
+                .valorPagos(new BigDecimal("300.00"))
+                .valorActualReserva(new BigDecimal("400.00"))
                 .porcentajeAlfa(100)
                 .valorGastosCoaseguro(0)
                 .valorSalvamento(0)
@@ -70,60 +43,109 @@ class AvalReportExcelHelperTest {
                 .edad(45)
                 .sexo("M")
                 .profesion("INGENIERO")
+                .fechaperdida("20260801")
+                .fechaaviso("20260805")
+                .fechareclamo("20260805")
                 .codigoCausa("HC")
                 .causaSiniestro("MUERTE ACCIDENTAL")
                 .ciudad("BOGOTA")
                 .tipoSiniestro("OT")
-                .nroCredito("00998877")
+                .nroCredito("998877")
+                .fechadesembolso("20250101")
                 .porcentajeAsegurabilidad("100")
                 .tipocredito("LIBRE INVERSION")
                 .coberturaLider("MUERTE ACCIDENTAL")
-                .reportadoPor("Reserva Inicial - Re-Aseguradora")
+                .reportadoPor("Pago")
                 .nitBeneficiario("8600029644")
                 .beneficiario("Banco de Bogota")
+                .causalObjecion("OBJ X MORA")
+                .fechaObjecion("20260810")
+                .placa("ABC123")
+                .serial("SER123")
+                .motor("MOT123")
+                .tipoVehiculo("AUTO")
+                .claseVehiculo("PARTICULAR")
+                .observacionesPago("SIN OBS")
                 .build();
 
-        AvalReportRow secondRow = AvalReportRow.builder()
-                .compania("02")
-                .siniestroLider("0902026A193878HC")
-                .valorPagos(new BigDecimal("250000.00"))
-                .edad(30)
-                .build();
-
-        List<AvalReportRow> rows = Arrays.asList(row, secondRow);
-
-        byte[] result = helper.generateExcel(rows);
-
-        assertNotNull(result);
-        assertTrue(result.length > 0);
-        assertValidOoxml(result);
+        assertEquals("02", row.getCompania());
+        assertEquals("VIDA GRUPO", row.getDescripcionRamo());
+        assertEquals(34, row.getRamo2());
+        assertEquals("0902026A193877", row.getSiniestroLider());
+        assertEquals(new BigDecimal("100.00"), row.getValorInicialReserva());
+        assertEquals(new BigDecimal("400.00"), row.getValorActualReserva());
+        assertEquals(100, row.getPorcentajeAlfa());
+        assertEquals("JUAN PEREZ", row.getNombreasegurado());
+        assertEquals(45, row.getEdad());
+        assertEquals("HC", row.getCodigoCausa());
+        assertEquals("Banco de Bogota", row.getBeneficiario());
+        assertEquals("OBJ X MORA", row.getCausalObjecion());
+        assertEquals("ABC123", row.getPlaca());
+        assertEquals("SIN OBS", row.getObservacionesPago());
     }
 
     @Test
-    @DisplayName("Should generate a valid Excel with only headers when list is empty")
-    void shouldGenerateValidExcelWhenListIsEmpty() throws IOException {
-        byte[] result = helper.generateExcel(Collections.emptyList());
+    @DisplayName("AvalReportRow setters y constructor vacio")
+    void reportRowSetters() {
+        AvalReportRow row = new AvalReportRow();
 
-        assertNotNull(result);
-        assertTrue(result.length > 0);
-        assertValidOoxml(result);
+        assertNull(row.getCompania());
+
+        row.setCompania("02");
+        row.setSucursal("02");
+        row.setSymbol("VG");
+        row.setModulo("00");
+        row.setValor(1);
+        row.setNumeroLote(2);
+        row.setValorPagos(new BigDecimal("500.00"));
+        row.setEdad(30);
+        row.setSexo("F");
+        row.setCiudad("MEDELLIN");
+        row.setSerial("SER999");
+        row.setMotor("MOT999");
+        row.setTipoVehiculo("MOTO");
+        row.setClaseVehiculo("PARTICULAR");
+
+        assertEquals("02", row.getCompania());
+        assertEquals("02", row.getSucursal());
+        assertEquals("VG", row.getSymbol());
+        assertEquals("00", row.getModulo());
+        assertEquals(1, row.getValor());
+        assertEquals(2, row.getNumeroLote());
+        assertEquals(new BigDecimal("500.00"), row.getValorPagos());
+        assertEquals(30, row.getEdad());
+        assertEquals("F", row.getSexo());
+        assertEquals("MEDELLIN", row.getCiudad());
+        assertEquals("SER999", row.getSerial());
+        assertEquals("MOT999", row.getMotor());
+        assertEquals("MOTO", row.getTipoVehiculo());
+        assertEquals("PARTICULAR", row.getClaseVehiculo());
     }
 
     @Test
-    @DisplayName("Should generate a valid Excel when every value is null")
-    void shouldGenerateValidExcelWithNullValues() throws IOException {
-        byte[] result = helper.generateExcel(
-                Collections.singletonList(new AvalReportRow()));
+    @DisplayName("AvalReportStatusDTO builder, setters y constructores")
+    void reportStatus() {
+        AvalReportStatusDTO status = AvalReportStatusDTO.builder()
+                .generationDate("27/08/2026 10:00:00 a. m.")
+                .pendingMovements(93)
+                .build();
 
-        assertNotNull(result);
-        assertTrue(result.length > 0);
-        assertValidOoxml(result);
-    }
+        assertEquals("27/08/2026 10:00:00 a. m.",
+                status.getGenerationDate());
+        assertEquals(93, status.getPendingMovements());
 
-    private void assertValidOoxml(byte[] content) {
-        assertTrue(content.length >= 2, "El archivo no debe estar vacío");
-        assertTrue(
-                content[0] == 0x50 && content[1] == 0x4B,
-                "El archivo debe iniciar con la firma OOXML/ZIP (PK)");
+        AvalReportStatusDTO empty = new AvalReportStatusDTO();
+        empty.setGenerationDate("fecha");
+        empty.setPendingMovements(0);
+
+        assertEquals("fecha", empty.getGenerationDate());
+        assertEquals(0, empty.getPendingMovements());
+
+        AvalReportStatusDTO full =
+                new AvalReportStatusDTO("otra fecha", 5);
+
+        assertNotNull(full);
+        assertEquals("otra fecha", full.getGenerationDate());
+        assertEquals(5, full.getPendingMovements());
     }
 }
