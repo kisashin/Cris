@@ -5,24 +5,24 @@ import {
 } from '@angular/common/http/testing';
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
-import { ClosingCardifService } from './closing-cardif.service';
-import { INewGeneralResponse } from '../models/new-general-response.interface';
+import { ClosingAvalService } from './closing-aval.service';
 import { IColombiaXmlFile } from '../models/colombia-accounting-result.model';
+import { IAvalReportStatus } from '../models/aval-report-status.model';
 
-describe('ClosingCardifService', () => {
-  let service: ClosingCardifService;
+describe('ClosingAvalService', () => {
+  let service: ClosingAvalService;
   let httpMock: HttpTestingController;
 
   const baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
-  const closingUrl = `${baseUrl}/v1/cardif-closing`;
+  const closingUrl = `${baseUrl}/v1/aval-closing`;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [ClosingCardifService]
+      providers: [ClosingAvalService]
     });
 
-    service = TestBed.inject(ClosingCardifService);
+    service = TestBed.inject(ClosingAvalService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -34,64 +34,91 @@ describe('ClosingCardifService', () => {
     expect(service).toBeTruthy();
   });
 
-  describe('#getAllReportsDetailsCardif', () => {
+  describe('#getAllReportsDetailsAval', () => {
     it('should return the report list', () => {
-      const mockResponse = {
-        bodyResponse: [{ dateProcessing: '2026-08-24', status: 'PROCESADO' }]
-      } as INewGeneralResponse<any>;
-
-      service.getAllReportsDetailsCardif().subscribe(result => {
+      service.getAllReportsDetailsAval().subscribe(result => {
         expect(result.length).toBe(1);
       });
 
-      const request = httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`);
-      expect(request.request.method).toBe('GET');
-      request.flush(mockResponse);
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`)
+        .flush({ bodyResponse: [{ status: 'PENDIENTE' }] });
     });
 
     it('should return an empty array when the body is null', () => {
-      service.getAllReportsDetailsCardif().subscribe(result => {
+      service.getAllReportsDetailsAval().subscribe(result => {
         expect(result).toEqual([]);
       });
 
-      httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`)
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`)
         .flush({ bodyResponse: null });
     });
 
     it('should return an empty array on a 400 with no records', () => {
-      service.getAllReportsDetailsCardif().subscribe(result => {
+      service.getAllReportsDetailsAval().subscribe(result => {
         expect(result).toEqual([]);
       });
 
-      httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`).flush(
-        { errorDetail: { message: 'No registros para consultar' } },
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`).flush(
+        { message: 'No registros para consultar' },
         { status: 400, statusText: 'Bad Request' }
       );
     });
 
     it('should rethrow any other error', () => {
-      service.getAllReportsDetailsCardif().subscribe({
+      service.getAllReportsDetailsAval().subscribe({
         next: () => fail('should not emit'),
         error: (error: HttpErrorResponse) => {
           expect(error.status).toBe(500);
         }
       });
 
-      httpMock.expectOne(`${baseUrl}/v1/all-cardif-reports`).flush(
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`).flush(
         { message: 'boom' },
         { status: 500, statusText: 'Server Error' }
       );
     });
   });
 
-  describe('#updateReportsCardif', () => {
+  describe('#updateReportsAval', () => {
     it('should PUT the pending mark request', () => {
-      service.updateReportsCardif().subscribe(response => {
+      service.updateReportsAval().subscribe(response => {
+        expect(response.bodyResponse).toContain('Actualización');
+      });
+
+      const request = httpMock.expectOne(`${baseUrl}/v1/update-aval-report`);
+      expect(request.request.method).toBe('PUT');
+      request.flush('Actualización completada, filas afectadas: 1');
+    });
+  });
+
+  describe('#getAllReportsSeatAval', () => {
+    it('should return the seat report list', () => {
+      service.getAllReportsSeatAval().subscribe(result => {
+        expect(result.length).toBe(1);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-seat-aval-details-reports`)
+        .flush({ bodyResponse: [{ status: 'PROCESADO' }] });
+    });
+
+    it('should return an empty array when the body is null', () => {
+      service.getAllReportsSeatAval().subscribe(result => {
+        expect(result).toEqual([]);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-seat-aval-details-reports`)
+        .flush({ bodyResponse: null });
+    });
+  });
+
+  describe('#updateReportsSeatAval', () => {
+    it('should PUT the seat pending mark request', () => {
+      service.updateReportsSeatAval().subscribe(response => {
         expect(response.bodyResponse).toContain('Actualización');
       });
 
       const request = httpMock.expectOne(
-        `${baseUrl}/v1/update-cardif-report`);
+        `${baseUrl}/v1/update-seat-aval-report`);
       expect(request.request.method).toBe('PUT');
       request.flush('Actualización completada, filas afectadas: 1');
     });
@@ -99,17 +126,8 @@ describe('ClosingCardifService', () => {
 
   describe('#generateAccountingEntries', () => {
     it('should PUT the accounting generation request', () => {
-      const mockResponse = {
-        bodyResponse: {
-          message: 'Asientos generados con éxito.',
-          period: '202608',
-          files: []
-        }
-      } as INewGeneralResponse<any>;
-
       service.generateAccountingEntries().subscribe(response => {
-        expect(response.bodyResponse?.message)
-          .toBe('Asientos generados con éxito.');
+        expect(response.bodyResponse?.period).toBe('202608');
       });
 
       const request = httpMock.expectOne(`${closingUrl}/generate`);
@@ -117,7 +135,14 @@ describe('ClosingCardifService', () => {
       expect(request.request.body).toBeNull();
       expect(request.request.headers.get('Accept'))
         .toBe('application/json');
-      request.flush(mockResponse);
+
+      request.flush({
+        bodyResponse: {
+          message: 'Asientos generados con éxito.',
+          period: '202608',
+          files: []
+        }
+      });
     });
   });
 
@@ -126,8 +151,8 @@ describe('ClosingCardifService', () => {
       const files: IColombiaXmlFile[] = [{
         id: 1,
         period: '202608',
-        family: 'ReasegCardif',
-        movementType: 'Pago',
+        family: 'ReasegAlfa',
+        movementType: 'Constitucion',
         fileName: 'archivo.xml',
         lineCount: 4,
         processDate: '28/08/2026 10:00:00 a. m.',
@@ -135,7 +160,7 @@ describe('ClosingCardifService', () => {
       }];
 
       service.findGeneratedFiles().subscribe(response => {
-        expect(response.bodyResponse?.[0].family).toBe('ReasegCardif');
+        expect(response.bodyResponse?.[0].family).toBe('ReasegAlfa');
       });
 
       const request = httpMock.expectOne(`${closingUrl}/files`);
@@ -147,18 +172,63 @@ describe('ClosingCardifService', () => {
   describe('#downloadXmlFile', () => {
     it('should GET the XML file as Blob', () => {
       const mockBlob = new Blob(['<SSC/>'], { type: 'application/xml' });
-      const responseHeaders = new HttpHeaders({
-        'Content-Disposition': 'attachment; filename="archivo.xml"'
-      });
 
-      service.downloadXmlFile(3).subscribe(response => {
+      service.downloadXmlFile(5).subscribe(response => {
         expect(response.body).toEqual(mockBlob);
       });
 
-      const request = httpMock.expectOne(`${closingUrl}/files/3/download`);
+      const request = httpMock.expectOne(`${closingUrl}/files/5/download`);
       expect(request.request.method).toBe('GET');
       expect(request.request.responseType).toBe('blob');
       expect(request.request.headers.get('Accept')).toBe('application/xml');
+
+      request.flush(mockBlob, { status: 200, statusText: 'OK' });
+    });
+  });
+
+  describe('#findReportStatus', () => {
+    it('should GET the report status', () => {
+      const status: IAvalReportStatus = {
+        generationDate: '28/08/2026 10:00:00 a. m.',
+        pendingMovements: 93
+      };
+
+      service.findReportStatus().subscribe(response => {
+        expect(response.bodyResponse?.pendingMovements).toBe(93);
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/report/status`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush({ bodyResponse: status });
+    });
+  });
+
+  describe('#downloadAvalReport', () => {
+    it('should GET the Excel report as Blob', () => {
+      const mockBlob = new Blob(['excel'], {
+        type:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition': 'attachment; filename="RPT_CIERRE_AVAL.xlsx"'
+      });
+
+      service.downloadAvalReport().subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(response.headers.get('Content-Disposition'))
+          .toContain('RPT_CIERRE_AVAL.xlsx');
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/report/download`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.headers.get('Accept')).toBe(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
 
       request.flush(mockBlob, {
         headers: responseHeaders,
