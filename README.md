@@ -1,127 +1,78 @@
-.accounting-report-container {
-  width: 100%;
-  max-width: 1100px;
-  padding: 1rem 0;
-}
+<div class="accounting-report-container">
+  <div class="container-title">
+    <h1 class="title">
+      CIERRE MENSUAL DE DIRECTAS (CARDIF)
+    </h1>
+  </div>
 
-.container-title {
-  padding-bottom: 3rem;
+  <section class="action-section">
+    <span class="section-label">
+      Reporte de movimientos:
+    </span>
+    <a [href]="reportMovement" target="_blank">Consultar</a>
+  </section>
 
-  .title {
-    margin: 0;
-    color: #006600;
-    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-    font-size: 14pt;
-    font-weight: 600;
+  <section class="action-section">
+    <span class="section-label">
+      Generación de asientos contables:
+    </span>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      class="action-button"
+      [disabled]="isGenerating"
+      (click)="generateAccountingEntries()">
+      <mat-icon>refresh</mat-icon>
+      {{ isGenerating ? 'GENERANDO...' : 'GENERA XML' }}
+    </button>
+  </section>
+
+  @if (dataSource.length > 0) {
+    <div class="container-table">
+      <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
+        <ng-container matColumnDef="processDate">
+          <th mat-header-cell *matHeaderCellDef> FECHA PROCESO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.processDate }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="period">
+          <th mat-header-cell *matHeaderCellDef> PERIODO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.period }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="family">
+          <th mat-header-cell *matHeaderCellDef> ORIGEN </th>
+          <td mat-cell *matCellDef="let element"> {{ element.family }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="movementType">
+          <th mat-header-cell *matHeaderCellDef> TIPO MOVIMIENTO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.movementType }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="lineCount">
+          <th mat-header-cell *matHeaderCellDef> LÍNEAS </th>
+          <td mat-cell *matCellDef="let element"> {{ element.lineCount }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef> ESTADO PROCESO </th>
+          <td mat-cell *matCellDef="let element"> {{ element.status }} </td>
+        </ng-container>
+
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef> REPORTES </th>
+          <td mat-cell *matCellDef="let element">
+            <a class="download-link" (click)="onDownloadXml(element)">
+              Descargar XML
+            </a>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
   }
-}
-
-.action-section {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.section-label {
-  color: #006600;
-  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.empty-message {
-  color: #666666;
-  font-family: Arial, sans-serif;
-  font-size: 13px;
-  margin-bottom: 2rem;
-}
-
-.action-button,
-.download-button {
-  min-height: 40px;
-  padding: 0 1.25rem;
-  color: #ffffff !important;
-  background-color: #006600 !important;
-  font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-  font-weight: 500;
-  text-transform: uppercase;
-
-  mat-icon {
-    margin-right: 6px;
-  }
-
-  &:hover:not(:disabled) {
-    background-color: #004d00 !important;
-  }
-
-  &:disabled {
-    color: rgba(255, 255, 255, 0.7) !important;
-    background-color: #7aa87a !important;
-    cursor: not-allowed;
-  }
-}
-
-.container-table {
-  overflow-x: auto;
-  padding-top: 0.5rem;
-  margin-bottom: 2rem;
-
-  table {
-    width: 100%;
-  }
-
-  th.mat-mdc-header-cell,
-  th.mat-header-cell {
-    background-color: #14532d !important;
-    color: #ffffff !important;
-    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.03rem;
-    padding: 0.9rem 0.75rem;
-    text-align: center;
-  }
-
-  td.mat-mdc-cell,
-  td.mat-cell {
-    border-bottom: 1px solid #e0e0e0;
-    font-family: Arial, sans-serif;
-    font-size: 13px;
-    padding: 0.75rem;
-    text-align: center;
-  }
-
-  .download-link {
-    color: #1976d2 !important;
-    cursor: pointer;
-    font-family: Arial, sans-serif;
-    text-decoration: underline;
-
-    &:hover {
-      color: #0d47a1 !important;
-    }
-  }
-}
-
-@media (max-width: 768px) {
-  .accounting-report-container {
-    padding: 1rem;
-  }
-
-  .container-title {
-    padding-bottom: 2rem;
-  }
-
-  .action-section {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .action-button,
-  .download-button {
-    width: 100%;
-  }
-}
+</div>
