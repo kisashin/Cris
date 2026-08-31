@@ -1,68 +1,55 @@
-# NFR — Cierre Contable Centroamérica: eliminación de `bcp`/STCP y descarga de XML en pantalla
+NFR: Migración cierre contable Colombia (Aval y Cardif) — XML por pantalla
 
-## Contexto
+Contexto
 
-La generación de asientos contables de Centroamérica escribía los archivos XML en disco mediante `xp_cmdshell` + `bcp`, sobre la ruta compartida `d:\Carguesocios\Salida\XML\`. Un proceso externo (STCP) recogía esos archivos y los enviaba a SunSystems.
+Los cierres contables de Aval y Cardif (Directas) generaban sus archivos XML mediante bcp y xp_cmdshell, escribiendo a un file server. El disparo dependía de dos paquetes SSIS que hacían polling sobre el estado de las tablas archivoAsientoAval y archivoAsientoCardif. Esas reglas del SSIS se van a retirar, por lo que el proceso debe ejecutarse desde la pantalla y los archivos quedar disponibles para descarga, siguiendo el patrón ya implementado en Centroamérica.
 
-Este esquema tenía tres problemas:
+Subtarea 1 — Ajuste de procedimientos almacenados
 
-- Dependencia de `xp_cmdshell` y de permisos de escritura del motor sobre una ruta de red.
-- Uso de una tabla temporal global (`##xmlSinCen`) leída desde una segunda conexión abierta por `bcp`, con riesgo de bloqueos.
-- El analista no tenía visibilidad ni control sobre los archivos generados.
+Eliminar bcp y xp_cmdshell de los generadores; devolver las líneas del asiento como conjunto de resultados.
 
-## Alcance entregado
+sp_XMLAsientosPru: se activa el parámetro existente @XmlDestino; con valor PANTALLA devuelve el XML como result set, y conserva el comportamiento actual con el valor por defecto para no afectar a otros consumidores.
+sp_Gen_Xml_Siniestros_ReasegAlfa, sp_Gen_Xml_Siniestros_ReasegCardif y sp_Gen_Xml_Siniestros_CoaseguroC: se retira el bloque bcp, las tablas temporales globales pasan a locales y la columna Line pasa a nvarchar(max).
+sp_contabiliza_aval, sp_contabiliza_cardif y sp_contabiliza_coaseguro: acumulan la salida de los generadores y devuelven un único result set con familia, periodo, pasada, movimiento, secuencia y línea.
 
-Se elimina `bcp` y la intervención de STCP. Los procedimientos almacenados devuelven las líneas del asiento como conjunto de resultados; el backend arma los archivos XML, los persiste y los expone para descarga desde la pantalla.
+Sugerido: 8 h
 
-### Cambios en base de datos
+Subtarea 2 — Modelo de datos
 
-- `sp_Gen_Xml_Siniestros_ReasegCentro`: se retira `xp_cmdshell` y `bcp`. Devuelve las líneas del XML como result set. `##xmlSinCen` pasa a tabla temporal local. `Line` pasa de `varchar(1500)` a `nvarchar(max)`.
-- `sp_contabiliza_cardifCentro`: acumula las dos pasadas (movimientos normales y reversas) y devuelve un único result set con `Periodo`, `Pasada`, `id`, `Mv`, `Secuencia`, `Line`. Se agrega `SET NOCOUNT ON`. La lógica de negocio y el `UPDATE fechacontabilizacion` se mantienen sin cambios.
-- Nueva tabla `archivoAsientoCentro`, siguiendo la convención de `archivoAsientoAval`, `archivoAsientoCardif` y `archivoAsientoEcosistemas`.
+Creación de las tablas archivoAsientoAvalXml y archivoAsientoCardifXml para persistir los XML generados, siguiendo la convención de archivoAsientoCentro más una columna de familia. Las tablas actuales se mantienen sin cambios hasta que se retiren los paquetes SSIS.
 
-### Cambios en backend
+Sugerido: 2 h
 
-- Componente `StoredProcedureExecutor`: ejecución de procedimientos almacenados con timeout configurable y cierre garantizado de statements y cursores. Reutilizable por los demás módulos de cierre.
-- Persistencia de los XML generados en `archivoAsientoCentro`.
-- Endpoints nuevos: consulta de archivos generados y descarga individual por identificador.
-- Borrado de los archivos de la corrida anterior al iniciar una nueva generación.
-- Operación transaccional: borrado, generación, armado, persistencia y marcación de contabilizados ocurren en una única transacción.
+Subtarea 3 — Backend
+Nuevos endpoints por módulo: generación de asientos, consulta de archivos generados y descarga individual.
+Endpoint adicional en Aval para la descarga del reporte mensual de movimientos en Excel, reemplazando el archivo que producía el paquete SSIS.
+Operación transaccional: borrado de la corrida anterior, ejecución, armado, persistencia y marcación de contabilizados en una única transacción.
+Validación explícita del orden Aval → Cardif, que en el proceso anterior estaba implícita en el paquete SSIS y fallaba en silencio.
+Reutilización del componente de ejecución de procedimientos ya existente.
+Cobertura unitaria por encima del 90%.
 
-### Cambios en frontend
+Sugerido: 16 h
 
-- Tabla con los archivos generados (fecha de proceso, periodo, tipo de movimiento, líneas, estado) y enlace de descarga por archivo.
-- La tabla se carga al abrir la pantalla, de modo que los archivos siguen disponibles tras refrescar o cerrar el navegador.
-- Diálogo de confirmación previo a la generación, advirtiendo que se eliminarán los registros anteriores.
-- Componente de confirmación genérico, reutilizable por los demás módulos de cierre.
+Subtarea 4 — Frontend
+Pantallas de Cierre Aval y Cierre Cardif alineadas con Centroamérica: botón de generación con diálogo de confirmación y tabla de archivos descargables.
+La tabla se carga al abrir la pantalla, de modo que los archivos siguen disponibles tras refrescar o cerrar el navegador.
+En Aval, el reporte mensual pasa a descarga directa; la sección se muestra solo cuando existen movimientos pendientes.
+Specs con cobertura por encima del 90%.
 
-## Beneficios
+Sugerido: 10 h
 
-- Se elimina la dependencia de `xp_cmdshell` y de permisos de escritura sobre rutas de red.
-- Se elimina la tabla temporal global y la segunda conexión, junto con su riesgo de bloqueo.
-- Los XML dejan de perderse al refrescar la pantalla.
-- Si la generación falla, no quedan movimientos marcados como contabilizados sin su archivo correspondiente.
-- El ejecutor de procedimientos y el diálogo de confirmación quedan disponibles para Perú, Colombia y Reaseguro.
+Subtarea 5 — Pruebas y despliegue
+Pruebas de extremo a extremo con el archivo de cargue del periodo.
+Empaquetado de los procedimientos en Liquibase.
+Validación de resultados con el área usuaria.
 
-## Fuera de alcance
+Sugerido: 8 h
 
-Se identificaron dos comportamientos preexistentes del proceso legacy que se reproducen sin cambios en esta entrega y se reportan por separado:
+Hallazgos para registrar aparte
 
-- Los movimientos de tipo `Aumento Reserva` no llegan al XML pero sí quedan marcados como contabilizados.
-- El archivo de `Objecion` se genera vacío; las objeciones viajan etiquetadas como `Liberacion`.
+Estos salieron durante el análisis y no forman parte del alcance. Conviene dejarlos como comentario en la tarea o como incidencias separadas:
 
-## Evidencia de pruebas
-
-Ejecución con 98 movimientos pendientes:
-
-| Archivo | Líneas |
-|---|---|
-| Constitucion | 204 |
-| Liberacion | 28 |
-| Pago | 216 |
-| RevPago | 24 |
-
-- Los archivos se conservan al refrescar la pantalla y se descargan correctamente.
-- Los XML abren sin errores de formato y cierran en `</SSC>`.
-- Con cero movimientos pendientes, la generación se rechaza y los archivos de la corrida anterior permanecen intactos.
-- Forzando un fallo en la persistencia, los movimientos permanecen sin contabilizar.
-- La estructura de cuentas coincide con la del archivo de producción.
+sp_Genera_RepAval_cierre divergente entre ambientes. La versión de DEV tenía un SET IDENTITY_INSERT sobre una tabla sin columna identidad, lo que impedía su ejecución. Se alineó con la versión de producción.
+Movimientos sin apertura registrada. En la prueba con datos reales, 650 de 1087 movimientos correspondían a siniestros sin registro en historico_inicial, por lo que quedaron fuera de ambos cierres. Se atribuye a que el ambiente de desarrollo no tiene el histórico completo, pero conviene confirmarlo.
+sp_contabiliza_cardif limpia marcaavalpos en toda la tabla, sin acotar a los movimientos procesados. Comportamiento heredado.
+Nombres de archivo con criterios distintos. Aval usa getdate()-5 y Cardif la fecha registrada en controlcierreaval, por lo que los archivos de una misma corrida pueden salir con fechas diferentes.
