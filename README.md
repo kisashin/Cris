@@ -95,4 +95,60 @@ BEGIN
     --Se toma solo ramo 25 Hogar
      delete #SinCC where producto not in(select producto from CardifWp.dbo.prp(nolock) where ramo=25)
     --select * from #SinCC 
-    --Se toma el valor Cedido a
+    --Se toma el valor Cedido a Cardif 60%
+     update #SinCC set Valor =valor *Participacion_Cardif
+    --Calcula Reaseguro Teremoto y otros
+     update m set m.vTerremoto=m.Valor*x.x100Cesion_Terremoto,vOtros=m.Valor*x.x100Cesion_Otros,vDeposito=m.Valor*x.Reserva_Deposito ,vBomberos=m.Valor*x.Bomberos,
+     m.x100Terremoto=x.x100Cesion_Terremoto,x100Otros=x.x100Cesion_Otros,x100Deposito=x.Reserva_Deposito ,x100Bomberos=x.Bomberos 
+     from #SinCC m,cardifwp.dbo.x100_Hogar_Otros_Cierre x where x.Grupo='CC' and x.Sub_Grupo='RC'
+    --Cuantas y %
+     DROP TABLE IF EXISTS #xmlSin25
+     Select     c.TIPODIARIO  collate database_default Tipo_Diario,c.CUENTA  collate database_default Cuenta,
+     c.NATURALEZA  collate database_default DC,c.REF_TRANSACCION  collate database_default Referencia,
+     m.Nombres Descripcion,cast(m.Ramo as nvarchar) as Ramo,m.Producto,m.Fecha,m.nit,m.SinId,m.mv,m.Corte,--c.Grupo_Cuenta, c.Observacion,
+     m.Valor Prima,cast(0 as float)Valor,cast(null as int) idSocio,c.Formula Calculo,m.Participacion_Cardif,c.Iva,
+     m.vTerremoto,m.vOtros,m.vDeposito,m.vBomberos,m.Cob,
+     row_number()over(order by c.id) idc,cast(null as nvarchar(max))  Line,2 id
+     into  #xmlSin25  from #SinCC m  inner join cardifwp.[dbo].[CUENTAS_CONTABLES_PROD] c  on c.GRUPO='HOGAR' 
+      where   c.TIPODIARIO in('CRVSI','LRVSI','SIREA')
+      AND(  (m.Mv in('Pago','RevPago') and left(c.Observacion,1) in('3','4'))--4. CAUSACIoN PARA PAGO DEL SINIESTRO,3. LIBERACION DE LA RESERVA DE SINIESTROS POR APROBACIONES DE PAGO
+             or(m.Mv='Constitucion' and left(c.Observacion,1) ='1')--1. CONSTITUCIoN O INCREMENTO DE LA RESERVA DE SINIESTROS
+             or(m.Mv  in('Liberacion','Objecion') and left(c.Observacion,1) ='2'))--2. DISMINUCIoN DE LA RESERVA DE SINIESTROS
+      delete #xmlSin25 where Prima=0
+      --Se retiran valores que no aplican a la RevPago
+     --delete #xmlSin25 where Mv='RevPago' and Tipo_Diario<>'SINIE'
+     --Se asigna Socio
+     update  x set x.idSocio=(select max(socio) from cardifwp.dbo.Producto_TD_Cierre p where p.Producto=x.Producto) from #xmlSin25 x
+     --Se calcula el valor del atransaccion(todo el valor es 100% el ramo 25 cob Teremoto y otros)
+     update #xmlSin25 set valor=(case DC when 'C' then -1.0 else 1.0 end)* abs(vTerremoto) where upper(Cob) like '%TERREMOTO%' and Calculo = 'vTerremoto'
+     update #xmlSin25 set valor=(case DC when 'C' then -1.0 else 1.0 end)* abs(vOtros) where upper(Cob) not like '%TERREMOTO%' and Calculo = 'vOtros'
+     --select * from #xmlSin25
+     --Se genera las RevPago
+     update #xmlSin25 set  DC=case DC when 'C' then 'D' else 'C' end,valor=-1*valor,Referencia='rv'+Referencia where Mv='RevPago'
+     --Se crea las <Line> del xml
+     delete #xmlSin25 where id<>2 or valor=0
+     update #xmlSin25 set ramo=right('00'+ltrim(rtrim(ramo)),2)
+     update #xmlSin25 set Line='<Line><JournalType>'+Tipo_Diario+'</JournalType><AccountingPeriod>0'+right(Corte,6)+'</AccountingPeriod><TransactionDate>'+Fecha
+      +'</TransactionDate><AccountCode>'+Cuenta+'</AccountCode><TransactionReference>'+left(Referencia,30)+'</TransactionReference><ValuDate>'+Corte+'</ValuDate><Description>'
+      +left(Descripcion,50)+'</Description><DueDate>'+Corte+'</DueDate><CurrencyCode>COP</CurrencyCode><TransactionAmount>'
+      +ltrim(str(Valor,20,1))+'</TransactionAmount><TransactionAmountDecimalPlaces>2</TransactionAmountDecimalPlaces><BaseAmount/><BaseOperator>*</BaseOperator><BaseRate>1</BaseRate><ConversionRate>1</ConversionRate><DebitCredit>'
+      +DC+'</DebitCredit><AnalysisCode1>99999</AnalysisCode1><AnalysisCode2>'+replace(str(Producto,4,0),' ','0')+'</AnalysisCode2><AnalysisCode3>'+Ramo+'</AnalysisCode3><AnalysisCode4>99</AnalysisCode4><AnalysisCode5>'
+      +right('00'+idSocio,2)+'</AnalysisCode5><AnalysisCode6>'+right(replace(ltrim(replace(Nit,'0',' ')),' ','0'),10)+'</AnalysisCode6><AnalysisCode7>9999999</AnalysisCode7><AnalysisCode8>99999</AnalysisCode8><AnalysisCode9/><AnalysisCode10>99999</AnalysisCode10><DetailLad><GeneralDescription1>'
+      +SinId+'</GeneralDescription1><GeneralDescription2/><GeneralDescription3/><GeneralDescription4/><GeneralDescription5/><GeneralDescription6/><GeneralDescription7/><GeneralDescription8/><GeneralDescription9/><GeneralDescription10/><GeneralDescription11/><GeneralDescription12/><GeneralDescription13>'
+      + left(mv+'-'+cob,29) +'</GeneralDescription13></DetailLad><JournalSource>SSC</JournalSource></Line>'
+
+     insert into #salida(Familia,Periodo,Mv,Secuencia,Line)
+     select 'ReasegCedidoHogar',@FC,Mv,idc,Line from #xmlSin25 where Line is not null
+
+     ---Actualiza Historico Hogar
+     delete Hist_Siniestro_Hogar where id2 in(select id2 from #SinCC)
+     insert into Hist_Siniestro_Hogar(id2,Mv,Valor,Fecha,Producto,SinId,Ramo,Nit,Participacion_Cardif,Corte,Nombres,vTerremoto,vOtros,vDeposito,vBomberos,x100Terremoto,x100Otros,x100Deposito,x100Bomberos,Cob,wProc)
+     select id2,Mv,Valor,Fecha,Producto,SinId,Ramo,Nit,Participacion_Cardif,Corte,Nombres,vTerremoto,vOtros,vDeposito,vBomberos,x100Terremoto,x100Otros,x100Deposito,x100Bomberos,Cob,
+     getdate() wProc from #SinCC
+
+     select Familia,Periodo,Mv,Secuencia,Line
+     from #salida
+     order by Familia,Mv,Secuencia
+
+     return 0
+END
