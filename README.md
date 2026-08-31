@@ -1,178 +1,68 @@
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { INewGeneralResponse } from '../models/new-general-response.interface';
-import { catchError, map } from 'rxjs/operators'; 
-import { ClosingStatus } from '../models/closing-aval.model';
-import { environment } from 'src/environments/environment';
-import { IAvalReportStatus } from '../models/aval-report-status.model';
-import {
-  IColombiaAccountingResult,
-  IColombiaXmlFile
-} from '../models/colombia-accounting-result.model';
+# NFR — Cierre Contable Centroamérica: eliminación de `bcp`/STCP y descarga de XML en pantalla
 
-@Injectable({
-  providedIn: 'root',
-})
-export class ClosingAvalService {
-  
-  private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
-  private readonly closingUrl = `${this.baseUrl}/v1/aval-closing`;
-  private readonly correlationId = crypto.randomUUID();
+## Contexto
 
-  constructor (private http: HttpClient){}
+La generación de asientos contables de Centroamérica escribía los archivos XML en disco mediante `xp_cmdshell` + `bcp`, sobre la ruta compartida `d:\Carguesocios\Salida\XML\`. Un proceso externo (STCP) recogía esos archivos y los enviaba a SunSystems.
 
-  getAllReportsDetailsAval(): Observable<ClosingStatus[]> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+Este esquema tenía tres problemas:
 
-    return this.http
-      .get<INewGeneralResponse<ClosingStatus[]>>(
-        `${this.baseUrl}/v1/all-aval-details-reports`,
-        { headers }
-      )
-      .pipe(
-        map(resp => resp.bodyResponse ?? []),
-        catchError(err => {
-          const msg = err?.error?.errorDetail?.message ?? err?.error?.message ?? '';
-          if (err.status === 400 && msg.includes('No registros')) {
-            return of([]);
-          }
-          throw err;
-        })
-      );
-  }
+- Dependencia de `xp_cmdshell` y de permisos de escritura del motor sobre una ruta de red.
+- Uso de una tabla temporal global (`##xmlSinCen`) leída desde una segunda conexión abierta por `bcp`, con riesgo de bloqueos.
+- El analista no tenía visibilidad ni control sobre los archivos generados.
 
-  updateReportsAval(): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+## Alcance entregado
 
-    return this.http.put<string>(
-      `${this.baseUrl}/v1/update-aval-report`,
-      null,
-      { 
-        headers,
-        responseType: 'text' as 'json'
-      }
-    ).pipe(
-      map((txt: string) => ({
-        bodyResponse: txt
-      }) as INewGeneralResponse<string>)
-    );
-  }
+Se elimina `bcp` y la intervención de STCP. Los procedimientos almacenados devuelven las líneas del asiento como conjunto de resultados; el backend arma los archivos XML, los persiste y los expone para descarga desde la pantalla.
 
-  getAllReportsSeatAval(): Observable<ClosingStatus[]> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+### Cambios en base de datos
 
-    return this.http
-      .get<INewGeneralResponse<ClosingStatus[]>>(
-        `${this.baseUrl}/v1/all-seat-aval-details-reports`,
-        { headers }
-      )
-      .pipe(
-        map(resp => resp.bodyResponse ?? [])
-      );
-  }
+- `sp_Gen_Xml_Siniestros_ReasegCentro`: se retira `xp_cmdshell` y `bcp`. Devuelve las líneas del XML como result set. `##xmlSinCen` pasa a tabla temporal local. `Line` pasa de `varchar(1500)` a `nvarchar(max)`.
+- `sp_contabiliza_cardifCentro`: acumula las dos pasadas (movimientos normales y reversas) y devuelve un único result set con `Periodo`, `Pasada`, `id`, `Mv`, `Secuencia`, `Line`. Se agrega `SET NOCOUNT ON`. La lógica de negocio y el `UPDATE fechacontabilizacion` se mantienen sin cambios.
+- Nueva tabla `archivoAsientoCentro`, siguiendo la convención de `archivoAsientoAval`, `archivoAsientoCardif` y `archivoAsientoEcosistemas`.
 
-  updateReportsSeatAval(): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+### Cambios en backend
 
-    return this.http.put<string>(
-      `${this.baseUrl}/v1/update-seat-aval-report`,
-      null,
-      { 
-        headers,
-        responseType: 'text' as 'json'
-      }
-    ).pipe(
-      map((txt: string) => ({
-        bodyResponse: txt
-      }) as INewGeneralResponse<string>)
-    );
-  }
+- Componente `StoredProcedureExecutor`: ejecución de procedimientos almacenados con timeout configurable y cierre garantizado de statements y cursores. Reutilizable por los demás módulos de cierre.
+- Persistencia de los XML generados en `archivoAsientoCentro`.
+- Endpoints nuevos: consulta de archivos generados y descarga individual por identificador.
+- Borrado de los archivos de la corrida anterior al iniciar una nueva generación.
+- Operación transaccional: borrado, generación, armado, persistencia y marcación de contabilizados ocurren en una única transacción.
 
-  /**
-   * Ejecuta la generacion de los asientos contables.
-   */
-  generateAccountingEntries(): Observable<INewGeneralResponse<IColombiaAccountingResult>> {
-    return this.http.put<INewGeneralResponse<IColombiaAccountingResult>>(
-      `${this.closingUrl}/generate`,
-      null,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+### Cambios en frontend
 
-  /**
-   * Consulta los archivos XML generados en procesos anteriores.
-   */
-  findGeneratedFiles(): Observable<INewGeneralResponse<IColombiaXmlFile[]>> {
-    return this.http.get<INewGeneralResponse<IColombiaXmlFile[]>>(
-      `${this.closingUrl}/files`,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+- Tabla con los archivos generados (fecha de proceso, periodo, tipo de movimiento, líneas, estado) y enlace de descarga por archivo.
+- La tabla se carga al abrir la pantalla, de modo que los archivos siguen disponibles tras refrescar o cerrar el navegador.
+- Diálogo de confirmación previo a la generación, advirtiendo que se eliminarán los registros anteriores.
+- Componente de confirmación genérico, reutilizable por los demás módulos de cierre.
 
-  /**
-   * Descarga el contenido de un archivo XML persistido.
-   */
-  downloadXmlFile(id: number): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.closingUrl}/files/${id}/download`,
-      {
-        headers: this.createHeaders('application/xml'),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
+## Beneficios
 
-  /**
-   * Consulta el estado del reporte mensual de Aval.
-   */
-  findReportStatus(): Observable<INewGeneralResponse<IAvalReportStatus>> {
-    return this.http.get<INewGeneralResponse<IAvalReportStatus>>(
-      `${this.closingUrl}/report/status`,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+- Se elimina la dependencia de `xp_cmdshell` y de permisos de escritura sobre rutas de red.
+- Se elimina la tabla temporal global y la segunda conexión, junto con su riesgo de bloqueo.
+- Los XML dejan de perderse al refrescar la pantalla.
+- Si la generación falla, no quedan movimientos marcados como contabilizados sin su archivo correspondiente.
+- El ejecutor de procedimientos y el diálogo de confirmación quedan disponibles para Perú, Colombia y Reaseguro.
 
-  /**
-   * Descarga el reporte mensual de Aval en formato Excel.
-   */
-  downloadAvalReport(): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.closingUrl}/report/download`,
-      {
-        headers: this.createHeaders(
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
+## Fuera de alcance
 
-  private createHeaders(accept: string): HttpHeaders {
-    return new HttpHeaders()
-      .set('correlation_id', this.correlationId)
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID())
-      .set('Accept', accept);
-  }
-}
+Se identificaron dos comportamientos preexistentes del proceso legacy que se reproducen sin cambios en esta entrega y se reportan por separado:
+
+- Los movimientos de tipo `Aumento Reserva` no llegan al XML pero sí quedan marcados como contabilizados.
+- El archivo de `Objecion` se genera vacío; las objeciones viajan etiquetadas como `Liberacion`.
+
+## Evidencia de pruebas
+
+Ejecución con 98 movimientos pendientes:
+
+| Archivo | Líneas |
+|---|---|
+| Constitucion | 204 |
+| Liberacion | 28 |
+| Pago | 216 |
+| RevPago | 24 |
+
+- Los archivos se conservan al refrescar la pantalla y se descargan correctamente.
+- Los XML abren sin errores de formato y cierran en `</SSC>`.
+- Con cero movimientos pendientes, la generación se rechaza y los archivos de la corrida anterior permanecen intactos.
+- Forzando un fallo en la persistencia, los movimientos permanecen sin contabilizar.
+- La estructura de cuentas coincide con la del archivo de producción.
