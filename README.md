@@ -1,49 +1,15 @@
-package co.com.bnpparibas.cardif.cierres.domain.dtos;
+    XmlFileDto generateXml(String journalType, String period, String product, String comment);
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+    void deleteFiles(String product, String period);
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class XmlFileDto {
-    private String journalType;
-    private String fileName;
-    private String content;
-}
+    void saveFile(String product, String journalType, String period,
+                  String fileName, String content, String user);
+
+    List<AccountingFileDto> findFiles(String period);
+
+    DownloadFileDto findFile(Integer id);
 
 
-package co.com.bnpparibas.cardif.cierres.domain.dtos;
-
-import java.util.Date;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class AccountingFileDto {
-    private Integer id;
-    private String product;
-    private String journalType;
-    private String fileName;
-    private Date generationDate;
-}
-
-
-package co.com.bnpparibas.cardif.cierres.domain.dtos;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class DownloadFileDto {
-    private String fileName;
-    private String content;
-}
+import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingFileDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.DownloadFileDto;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.XmlFileDto;
