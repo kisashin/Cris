@@ -1,112 +1,156 @@
-package co.com.bnpparibas.cardif.builders;
+package co.com.bnpparibas.cardif.cierres.domain.util.helpers;
 
-import java.nio.charset.Charset;
-import java.sql.Timestamp;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.springframework.mock.web.MockMultipartFile;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import co.com.bnpparibas.cardif.cierres.api.dtos.GenerateAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.RegisterAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.api.dtos.SendAccountingRequestDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.XmlFileDto;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.multipart.MultipartFile;
 
-public class ClaimAccountingBuilder {
+import co.com.bnpparibas.cardif.builders.ClaimAccountingBuilder;
+import co.com.bnpparibas.cardif.cierres.domain.util.exception.DataException;
+import co.com.bnpparibas.cardif.cierres.domain.util.helpers.ClaimFileHelper;
 
-    private ClaimAccountingBuilder() {
+class ClaimFileHelperTest {
+
+    private final ClaimFileHelper helper = new ClaimFileHelper();
+
+    @Test
+    void read_salteaLaFilaDeEncabezado() {
+        String content = ClaimAccountingBuilder.csvHeader() + "\n"
+                + ClaimAccountingBuilder.csvRow("022") + "\n"
+                + ClaimAccountingBuilder.csvRow("023");
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals(2, rows.size());
+        assertEquals("022", rows.get(0)[0]);
     }
 
-    public static final String PRODUCT = "2012";
-    public static final String COMMENT = "2012_202602";
-    public static final String PERIOD_RAW = "2026/02/01";
-    public static final String PERIOD = "2026/002";
-    public static final String USER = "j36147";
-    public static final String XML_CONTENT = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><SSC/>";
-    public static final String FILE_NAME = "2012_202602SINIE_2012202602.XML";
+    @Test
+    void read_salteaElEncabezadoQueEmpiezaConRamo() {
+        String content = ClaimAccountingBuilder.csvRow("RAMO") + "\n"
+                + ClaimAccountingBuilder.csvRow("022");
 
-    public static final String PATTERN = "326CO21SR012";
-    public static final String CSV_NAME = "326CO21SR0122026090110.csv";
-    public static final Charset CSV_CHARSET = Charset.forName("windows-1252");
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
 
-    private static final int COLUMNS = 46;
-
-    public static GenerateAccountingRequestDto generateRequest() {
-        GenerateAccountingRequestDto request = new GenerateAccountingRequestDto();
-        request.setProduct(PRODUCT);
-        request.setComment(COMMENT);
-        return request;
+        assertEquals(1, rows.size());
+        assertEquals("022", rows.get(0)[0]);
     }
 
-    public static RegisterAccountingRequestDto registerRequest() {
-        RegisterAccountingRequestDto request = new RegisterAccountingRequestDto();
-        request.setProduct(PRODUCT);
-        request.setComment(COMMENT);
-        return request;
+    @Test
+    void read_sinEncabezadoConservaLaPrimeraFila() {
+        String content = ClaimAccountingBuilder.csvRow("022") + "\n"
+                + ClaimAccountingBuilder.csvRow("023");
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals(2, rows.size());
     }
 
-    public static SendAccountingRequestDto sendRequest() {
-        SendAccountingRequestDto request = new SendAccountingRequestDto();
-        request.setProduct(PRODUCT);
-        request.setComment(COMMENT);
-        request.setUser(USER);
-        return request;
+    @Test
+    void read_devuelveSiempreCuarentaYSeisColumnas() {
+        String content = ClaimAccountingBuilder.csvRow("022");
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals(ClaimFileHelper.COLUMNS, rows.get(0).length);
     }
 
-    public static Object[] entryRow() {
-        return new Object[] {
-                "SINIE", "2026/002", "20260201", "51144000", "Pago Definitivo", "SOCIO",
-                "01/02/2026", "COP", "150000", "0", "D", "99999", "2012", "34", "99",
-                "20", "830000000", "9999999", "99999", "0", "99999", "SSC", "1;2",
-                "20260201", COMMENT, "Pendiente XML", "SIN-001"
-        };
+    @Test
+    void read_conFilaIncompletaRellenaConNulos() {
+        String content = ClaimAccountingBuilder.csvRow("022", 10);
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertNotNull(rows.get(0)[9]);
+        assertNull(rows.get(0)[10]);
+        assertNull(rows.get(0)[ClaimFileHelper.COLUMNS - 1]);
     }
 
-    public static Object[] totalRow() {
-        return new Object[] { "2012", "SINIE", "Pago Definitivo", "51144000", "150000", "0" };
+    @Test
+    void read_conFilaMasLargaDescartaElExcedente() {
+        String content = ClaimAccountingBuilder.csvRow("022", 50);
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals(ClaimFileHelper.COLUMNS, rows.get(0).length);
     }
 
-    public static XmlFileDto xmlFile(String journalType) {
-        return new XmlFileDto(journalType, journalType + "_" + PRODUCT + ".XML", XML_CONTENT);
+    @Test
+    void read_dejaNulosLosCamposVacios() {
+        String content = "022;;VALOR";
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals("022", rows.get(0)[0]);
+        assertNull(rows.get(0)[1]);
+        assertEquals("VALOR", rows.get(0)[2]);
     }
 
-    public static Object[] xmlRow() {
-        return new Object[] { "SINIE", FILE_NAME, XML_CONTENT };
+    @Test
+    void read_conservaLosCaracteresDeLaCodificacionDeOrigen() {
+        String content = "022;BANCO DE BOGOTÁ";
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals("BANCO DE BOGOTÁ", rows.get(0)[1]);
     }
 
-    public static Object[] fileRow() {
-        return new Object[] { 1, PRODUCT, "SINIE", FILE_NAME,
-                Timestamp.valueOf("2026-09-02 03:04:45") };
+    @Test
+    void read_ignoraLasLineasEnBlanco() {
+        String content = ClaimAccountingBuilder.csvRow("022") + "\n\n"
+                + ClaimAccountingBuilder.csvRow("023") + "\n";
+
+        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+
+        assertEquals(2, rows.size());
     }
 
-    public static String csvHeader() {
-        return "NoRAMO;RAMO;SINIESTRO;T_PAGO;SUC;SIMB;POLIZA;VIG;ASEGURADO;CC_ASEGURADO;"
-                + "TOMADOR;RES_ANTERIOR;AVISOS;PAGO_DEFINITIVO;SOBREPAGO;LIBERACIONES_rebajas;"
-                + "INCREMENTOS;CANCELACIONES_liberaciones;REVERSIONES;RES_ACTUAL;RECUP_PAGOS;"
-                + "FECHA_PAGO;LIDER;FECHA_STRO;FECHA_AVISO;FECHA_RECLAMO;REPORTADO;VLR_RECLAMO;"
-                + "DESCRIPCION;CAUSA;LUGAR;OBSERVACIONES;CREDITO;VLR_DESEMBOLSO;FECHA_DESEMB;"
-                + "PORCASEGU;GENERO;EDAD;LINEA_DE_CREDITO;USUARIO_RES;USUARIO_ANALIS;"
-                + "USUARIO_PAGO;COD_AJUSTADOR;FECHA_OBJECION;PERFIL;ESTADO";
+    @Test
+    void read_conSoloEncabezadoLanzaExcepcion() {
+        String content = ClaimAccountingBuilder.csvHeader();
+
+        assertThrows(DataException.class,
+                () -> helper.read(ClaimAccountingBuilder.csvFile(content)));
     }
 
-    /** Fila con el numero de campos indicado; el primero lleva el valor recibido. */
-    public static String csvRow(String first, int fields) {
-        StringBuilder row = new StringBuilder(first);
+    @Test
+    void read_conErrorDeLecturaLanzaExcepcion() throws IOException {
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.getInputStream()).thenThrow(new IOException());
 
-        for (int i = 1; i < fields; i++) {
-            row.append(';').append("V").append(i);
-        }
-
-        return row.toString();
+        assertThrows(DataException.class, () -> helper.read(file));
     }
 
-    public static String csvRow(String first) {
-        return csvRow(first, COLUMNS);
+    @Test
+    void countIncomplete_cuentaLasFilasSinLaUltimaColumna() {
+        String[] complete = new String[ClaimFileHelper.COLUMNS];
+        Arrays.fill(complete, "V");
+
+        String[] incomplete = new String[ClaimFileHelper.COLUMNS];
+
+        List<String[]> rows = new ArrayList<>();
+        rows.add(complete);
+        rows.add(incomplete);
+        rows.add(incomplete);
+
+        assertEquals(2, helper.countIncomplete(rows));
     }
 
-    public static MockMultipartFile csvFile(String name, String content) {
-        return new MockMultipartFile("file", name, "text/csv", content.getBytes(CSV_CHARSET));
-    }
+    @Test
+    void countIncomplete_sinFilasIncompletasDevuelveCero() {
+        String[] complete = new String[ClaimFileHelper.COLUMNS];
+        Arrays.fill(complete, "V");
 
-    public static MockMultipartFile csvFile(String content) {
-        return csvFile(CSV_NAME, content);
+        assertEquals(0, helper.countIncomplete(java.util.Collections.singletonList(complete)));
     }
 }
