@@ -1,7 +1,27 @@
-    @GetMapping(path = "/files", produces = { "application/json" })
-    BNPResponse getFiles();
+    @Override
+    public BNPResponse getFiles() {
+        return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(), service.getFiles());
+    }
 
-    @GetMapping(path = "/files/{id}/download")
-    ResponseEntity<byte[]> downloadFile(@PathVariable("id") Integer id);
+    @Override
+    public ResponseEntity<byte[]> downloadFile(Integer id) {
+        DownloadFileDto file = service.downloadFile(id);
+        byte[] content = file.getContent().getBytes(StandardCharsets.UTF_8);
 
-    import org.springframework.http.ResponseEntity;
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + file.getFileName() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(content);
+    }
+
+
+
+
+import java.nio.charset.StandardCharsets;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import co.com.bnpparibas.cardif.cierres.domain.dtos.DownloadFileDto;
