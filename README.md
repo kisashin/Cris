@@ -1,17 +1,10 @@
-{
-  "message": "5 Registros Cargados : 326CO21SR0122026090110.csv",
-  "totalRows": 5,
-  "incompleteRows": 1
-}
-
-
 USE CardifWP;
 
-SELECT NoRAMO, RAMO, SINIESTRO, ASEGURADO, AVISOS, PAGO_DEFINITIVO,
-       LIBERACIONES_rebajas, TOMADOR, NombreArchivo, Producto
+SELECT SINIESTRO, AVISOS, PAGO_DEFINITIVO
 FROM CargaSiniestrosAlfa
-WHERE NombreArchivo = '326CO21SR0122026090110.csv';
+WHERE NombreArchivo = '326CO21SR0122026090110.csv'
+  AND SINIESTRO = '500001-2026-009005';
 
-
-DELETE FROM CargaSiniestrosAlfa WHERE NombreArchivo = '326CO21SR0122026090110.csv';
-DELETE FROM tmpCargaSiniestrosAlfa;
+SELECT dbo.fFloat('1750,5') AS un_decimal,
+       dbo.fFloat('1750,50') AS dos_decimales,
+       dbo.fFloat('1750.5') AS punto;
