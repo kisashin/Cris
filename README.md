@@ -1,33 +1,9 @@
-  private showError(error: any, fallback: string): void {
+USE CardifWP;
 
-    const body = error?.error?.body ?? error?.error;
+SELECT COUNT(*) FROM CargaSiniestrosAlfa
+WHERE NombreArchivo = '326CO21SR0152026080403.csv';
 
-    this.toastr.error(
-      body?.errorDetail?.message ?? fallback
-    );
-
-  }
-
-
-
-          next: response => {
-
-          this.loading = false;
-
-          this.sendMessage = response.bodyResponse.message;
-
-          this.toastr.success(response.bodyResponse.message);
-
-          this.dataSource = [];
-
-          this.loadFiles();
-
-        },
-
-
-
-
-
-
-
-                ToastrModule.forRoot({ closeButton: true, progressBar: true, positionClass: 'toast-top-right' }),
+SELECT TOP 5 NoRAMO, RAMO, SINIESTRO, ASEGURADO, TOMADOR,
+       RES_ANTERIOR, AVISOS, RES_ACTUAL, ESTADO
+FROM CargaSiniestrosAlfa
+WHERE NombreArchivo = '326CO21SR0152026080403.csv';
