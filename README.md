@@ -1,1 +1,7 @@
-grep -rn "LoadClaimRequestDto" src --include=*.java
+    String findPattern(String product);
+
+    void clearTempClaims();
+
+    void insertTempClaims(List<String[]> rows);
+
+    String loadClaims(String product, String fileName);
