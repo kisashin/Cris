@@ -1,408 +1,224 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { HttpResponse } from '@angular/common/http';
-import { MatDialog } from '@angular/material/dialog';
-import { ToastrService } from 'ngx-toastr';
-import { of, throwError } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
+import {
+  HttpClientTestingModule,
+  HttpTestingController
+} from '@angular/common/http/testing';
 
-import { AccountingEntryComponent } from './accounting-entry.component';
-import { AccountingEntryService } from '../services/accounting-entry.service';
-import { AutenticacionService } from '../../../login/service/autenticacion.service';
+import { AccountingEntryService } from './accounting-entry.service';
+import { environment } from '../../../../../environments/environment';
 
-describe('AccountingEntryComponent', () => {
+describe('AccountingEntryService', () => {
 
-  let component: AccountingEntryComponent;
-  let fixture: ComponentFixture<AccountingEntryComponent>;
-  let accountingEntryService: jasmine.SpyObj<AccountingEntryService>;
-  let dialog: jasmine.SpyObj<MatDialog>;
-  let toastr: jasmine.SpyObj<ToastrService>;
-  let autenticacionService: any;
+  let service: AccountingEntryService;
+  let httpMock: HttpTestingController;
 
-  const csvFile = new File(['contenido'], '326CO21SR0122026090110.csv', {
-    type: 'text/csv'
+  const url = `${environment.urlAPICierresBackEnd}/v1/claim-accounting`;
+
+  const request = {
+    product: '2012',
+    comment: '2012_202602'
+  };
+
+  beforeEach(() => {
+
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [AccountingEntryService]
+    });
+
+    service = TestBed.inject(AccountingEntryService);
+    httpMock = TestBed.inject(HttpTestingController);
+
   });
 
-  const generatedFile = {
-    id: 1,
-    product: '2005',
-    journalType: 'SINIE',
-    fileName: '2005_202606SINIE_20052026006.XML',
-    generationDate: '02/09/2026 03:04:45'
-  };
+  afterEach(() => {
+    httpMock.verify();
+  });
 
-  const openDialog = (confirmed: boolean) => {
-    dialog.open.and.returnValue({
-      afterClosed: () => of(confirmed)
-    } as any);
-  };
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
 
-  beforeEach(async () => {
+  it('should query the accounting date', () => {
 
-    accountingEntryService = jasmine.createSpyObj(
-      'AccountingEntryService',
-      [
-        'getAccountingDate',
-        'getProducts',
-        'getFiles',
-        'loadClaims',
-        'previewAccountingEntry',
-        'registerAccountingEntry',
-        'getAccountSummary',
-        'sendAccountingEntry',
-        'downloadFile'
-      ]
-    );
+    service.getAccountingDate().subscribe(response => {
+      expect(response.bodyResponse.accountingDate).toBe('20260201');
+    });
 
-    dialog = jasmine.createSpyObj('MatDialog', ['open']);
+    const req = httpMock.expectOne(`${url}/accounting-date`);
 
-    toastr = jasmine.createSpyObj(
-      'ToastrService',
-      ['success', 'error', 'warning']
-    );
+    expect(req.request.method).toBe('GET');
 
-    autenticacionService = {
-      getUserAuthenticate: { user: 'j36147' }
+    req.flush({ bodyResponse: { accountingDate: '20260201' } });
+
+  });
+
+  it('should query the products', () => {
+
+    service.getProducts().subscribe(response => {
+      expect(response.bodyResponse.length).toBe(1);
+    });
+
+    const req = httpMock.expectOne(`${url}/products`);
+
+    expect(req.request.method).toBe('GET');
+
+    req.flush({ bodyResponse: [{ product: '2012' }] });
+
+  });
+
+  it('should send the file as multipart', () => {
+
+    const file = new File(['contenido'], '326CO21SR0122026090110.csv', {
+      type: 'text/csv'
+    });
+
+    service.loadClaims(file, '2012', 'j36147').subscribe(response => {
+      expect(response.bodyResponse.totalRows).toBe(5);
+    });
+
+    const req = httpMock.expectOne(`${url}/load`);
+
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body instanceof FormData).toBeTrue();
+
+    const body = req.request.body as FormData;
+
+    expect((body.get('file') as File).name).toBe('326CO21SR0122026090110.csv');
+    expect(body.get('product')).toBe('2012');
+    expect(body.get('user')).toBe('j36147');
+
+    req.flush({
+      bodyResponse: {
+        message: '5 Registros Cargados',
+        totalRows: 5,
+        incompleteRows: 0
+      }
+    });
+
+  });
+
+  it('should not set the content type on the upload', () => {
+
+    const file = new File(['contenido'], 'archivo.csv', { type: 'text/csv' });
+
+    service.loadClaims(file, '2012', 'j36147').subscribe();
+
+    const req = httpMock.expectOne(`${url}/load`);
+
+    expect(req.request.headers.get('Content-Type')).toBeNull();
+
+    req.flush({ bodyResponse: {} });
+
+  });
+
+  it('should request the entry preview', () => {
+
+    service.previewAccountingEntry(request).subscribe(response => {
+      expect(response.bodyResponse.length).toBe(1);
+    });
+
+    const req = httpMock.expectOne(`${url}/generate`);
+
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(request);
+
+    req.flush({ bodyResponse: [{ journalType: 'SINIE' }] });
+
+  });
+
+  it('should register the entry', () => {
+
+    service.registerAccountingEntry(request).subscribe(response => {
+      expect(response.bodyResponse).toBeNull();
+    });
+
+    const req = httpMock.expectOne(`${url}/register`);
+
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(request);
+
+    req.flush({ bodyResponse: null });
+
+  });
+
+  it('should query the account summary', () => {
+
+    service.getAccountSummary(request).subscribe(response => {
+      expect(response.bodyResponse.length).toBe(1);
+    });
+
+    const req = httpMock.expectOne(`${url}/total-by-account`);
+
+    expect(req.request.method).toBe('POST');
+
+    req.flush({ bodyResponse: [{ product: '2012' }] });
+
+  });
+
+  it('should send the entry with the user', () => {
+
+    const sendRequest = {
+      product: '2012',
+      comment: '2012_202602',
+      user: 'j36147'
     };
 
-    accountingEntryService.getAccountingDate.and.returnValue(
-      of({ bodyResponse: { accountingDate: '20260630' } })
-    );
-
-    accountingEntryService.getProducts.and.returnValue(
-      of({ bodyResponse: [{ product: '2005' }] })
-    );
-
-    accountingEntryService.getFiles.and.returnValue(
-      of({ bodyResponse: [] })
-    );
-
-    await TestBed.configureTestingModule({
-
-      declarations: [AccountingEntryComponent],
-
-      providers: [
-        { provide: AccountingEntryService, useValue: accountingEntryService },
-        { provide: MatDialog, useValue: dialog },
-        { provide: ToastrService, useValue: toastr },
-        { provide: AutenticacionService, useValue: autenticacionService }
-      ],
-
-      schemas: [NO_ERRORS_SCHEMA]
-
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(AccountingEntryComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
-  it('should load accounting date', () => {
-    expect(component.accountingDate).toBe('20260630');
-  });
-
-  it('should load products', () => {
-    expect(component.products.length).toBe(1);
-  });
-
-  it('should build comment automatically', () => {
-    expect(component.comment).toBe('2005_202606');
-  });
-
-  it('should load generated files on init', () => {
-    expect(accountingEntryService.getFiles).toHaveBeenCalled();
-    expect(component.files.length).toBe(0);
-  });
-
-  it('should leave the file list empty when the query fails', () => {
-    accountingEntryService.getFiles.and.returnValue(throwError(() => new Error()));
-
-    component.loadFiles();
-
-    expect(component.files.length).toBe(0);
-  });
-
-  it('should clear the state when the product changes', () => {
-    component.dataSource = [{ journalType: 'SINIE' }];
-    component.sendMessage = 'mensaje';
-    component.message = 'mensaje';
-    component.selectedFile = csvFile;
-
-    component.onProductChange();
-
-    expect(component.dataSource.length).toBe(0);
-    expect(component.sendMessage).toBe('');
-    expect(component.message).toBe('');
-    expect(component.selectedFile).toBeNull();
-  });
-
-  it('should keep the selected file', () => {
-    const event = { target: { files: [csvFile] } } as unknown as Event;
-
-    component.onFileSelected(event);
-
-    expect(component.selectedFile?.name).toBe('326CO21SR0122026090110.csv');
-  });
-
-  it('should clear the selection when no file is chosen', () => {
-    const event = { target: { files: [] } } as unknown as Event;
-
-    component.onFileSelected(event);
-
-    expect(component.selectedFile).toBeNull();
-  });
-
-  it('should warn when loading without a file', () => {
-    component.loadClaims();
-
-    expect(toastr.warning).toHaveBeenCalled();
-    expect(accountingEntryService.loadClaims).not.toHaveBeenCalled();
-  });
-
-  it('should warn when loading without a product', () => {
-    component.selectedProduct = '';
-    component.selectedFile = csvFile;
-
-    component.loadClaims();
-
-    expect(toastr.warning).toHaveBeenCalled();
-    expect(accountingEntryService.loadClaims).not.toHaveBeenCalled();
-  });
-
-  it('should load the file and show the message', () => {
-    accountingEntryService.loadClaims.and.returnValue(
-      of({
-        bodyResponse: {
-          message: '5 Registros Cargados',
-          totalRows: 5,
-          incompleteRows: 0
-        }
-      })
-    );
-
-    component.selectedFile = csvFile;
-
-    component.loadClaims();
-
-    expect(component.message).toBe('5 Registros Cargados');
-    expect(component.loading).toBeFalse();
-    expect(accountingEntryService.loadClaims)
-      .toHaveBeenCalledWith(csvFile, '2005', 'j36147');
-  });
-
-  it('should warn about incomplete rows', () => {
-    accountingEntryService.loadClaims.and.returnValue(
-      of({
-        bodyResponse: {
-          message: '5 Registros Cargados',
-          totalRows: 5,
-          incompleteRows: 2
-        }
-      })
-    );
-
-    component.selectedFile = csvFile;
-
-    component.loadClaims();
-
-    expect(toastr.warning).toHaveBeenCalled();
-  });
-
-  it('should show an error when the load fails', () => {
-    accountingEntryService.loadClaims.and.returnValue(
-      throwError(() => ({
-        error: { errorDetail: { message: 'El archivo es requerido.' } }
-      }))
-    );
-
-    component.selectedFile = csvFile;
-
-    component.loadClaims();
-
-    expect(toastr.error).toHaveBeenCalledWith('El archivo es requerido.');
-    expect(component.loading).toBeFalse();
-  });
-
-  it('should use the fallback message when the error has no detail', () => {
-    accountingEntryService.loadClaims.and.returnValue(
-      throwError(() => new Error())
-    );
-
-    component.selectedFile = csvFile;
-
-    component.loadClaims();
-
-    expect(toastr.error)
-      .toHaveBeenCalledWith('No fue posible cargar el archivo.');
-  });
-
-  it('should generate the entry with the preview columns', () => {
-    accountingEntryService.previewAccountingEntry.and.returnValue(
-      of({ bodyResponse: [{ journalType: 'SINIE', transactionAmount: 1500.567 }] })
-    );
-
-    component.generateAccountingEntry();
-
-    expect(component.displayedColumns).toBe(component.generateColumns);
-    expect(component.dataSource[0].transactionAmount).toBe(1500.57);
-  });
-
-  it('should show an error when the entry generation fails', () => {
-    accountingEntryService.previewAccountingEntry.and.returnValue(
-      throwError(() => new Error())
-    );
-
-    component.generateAccountingEntry();
-
-    expect(toastr.error).toHaveBeenCalled();
-    expect(component.loading).toBeFalse();
-  });
-
-  it('should register the entry with a fixed message', () => {
-    accountingEntryService.registerAccountingEntry.and.returnValue(
-      of({ bodyResponse: null })
-    );
-
-    component.registerAccountingEntry();
-
-    expect(component.sendMessage).toBe('Asiento registrado');
-  });
-
-  it('should show an error when the registration fails', () => {
-    accountingEntryService.registerAccountingEntry.and.returnValue(
-      throwError(() => new Error())
-    );
-
-    component.registerAccountingEntry();
-
-    expect(toastr.error).toHaveBeenCalled();
-  });
-
-  it('should query the account summary with the total columns', () => {
-    accountingEntryService.getAccountSummary.and.returnValue(
-      of({ bodyResponse: [{ product: '2005', debit: 100 }] })
-    );
-
-    component.getAccountSummary();
-
-    expect(component.displayedColumns).toBe(component.totalColumns);
-    expect(component.dataSource.length).toBe(1);
-  });
-
-  it('should show an error when the summary fails', () => {
-    accountingEntryService.getAccountSummary.and.returnValue(
-      throwError(() => new Error())
-    );
-
-    component.getAccountSummary();
-
-    expect(toastr.error).toHaveBeenCalled();
-  });
-
-  it('should not generate the XML when the dialog is cancelled', () => {
-    openDialog(false);
-
-    component.sendAccountingEntry();
-
-    expect(accountingEntryService.sendAccountingEntry).not.toHaveBeenCalled();
-  });
-
-  it('should generate the XML and refresh the file list when confirmed', () => {
-    openDialog(true);
-
-    accountingEntryService.sendAccountingEntry.and.returnValue(
-      of({ bodyResponse: { message: 'Interfaz generada correctamente.' } })
-    );
-
-    accountingEntryService.getFiles.and.returnValue(
-      of({ bodyResponse: [generatedFile] })
-    );
-
-    component.sendAccountingEntry();
-
-    expect(component.sendMessage).toBe('Interfaz generada correctamente.');
-    expect(component.files.length).toBe(1);
-    expect(accountingEntryService.sendAccountingEntry).toHaveBeenCalledWith({
-      product: '2005',
-      comment: '2005_202606',
-      user: 'j36147'
+    service.sendAccountingEntry(sendRequest).subscribe(response => {
+      expect(response.bodyResponse.files.length).toBe(3);
     });
+
+    const req = httpMock.expectOne(`${url}/send`);
+
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(sendRequest);
+
+    req.flush({
+      bodyResponse: {
+        files: ['a.XML', 'b.XML', 'c.XML'],
+        message: 'Interfaz generada correctamente.'
+      }
+    });
+
   });
 
-  it('should show an error when the XML generation fails', () => {
-    openDialog(true);
+  it('should query the generated files', () => {
 
-    accountingEntryService.sendAccountingEntry.and.returnValue(
-      throwError(() => new Error())
-    );
+    service.getFiles().subscribe(response => {
+      expect(response.bodyResponse.length).toBe(1);
+    });
 
-    component.sendAccountingEntry();
+    const req = httpMock.expectOne(`${url}/files`);
 
-    expect(toastr.error).toHaveBeenCalled();
-    expect(component.loading).toBeFalse();
+    expect(req.request.method).toBe('GET');
+
+    req.flush({
+      bodyResponse: [
+        {
+          id: 1,
+          product: '2012',
+          journalType: 'SINIE',
+          fileName: 'archivo.XML',
+          generationDate: '02/09/2026 03:04:45'
+        }
+      ]
+    });
+
   });
 
-  it('should ignore the generation while another one is running', () => {
-    component.loading = true;
+  it('should download the file as a blob', () => {
 
-    component.sendAccountingEntry();
+    service.downloadFile(1).subscribe(response => {
+      expect(response.body?.size).toBeGreaterThan(0);
+    });
 
-    expect(dialog.open).not.toHaveBeenCalled();
-  });
+    const req = httpMock.expectOne(`${url}/files/1/download`);
 
-  it('should download the XML file', () => {
-    const blob = new Blob(['<SSC/>'], { type: 'application/xml' });
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
 
-    accountingEntryService.downloadFile.and.returnValue(
-      of(new HttpResponse({ body: blob }))
-    );
+    req.flush(new Blob(['<SSC/>'], { type: 'application/xml' }));
 
-    spyOn(window.URL, 'createObjectURL').and.returnValue('blob:url');
-    spyOn(window.URL, 'revokeObjectURL');
-
-    component.onDownloadXml(generatedFile);
-
-    expect(window.URL.createObjectURL).toHaveBeenCalled();
-    expect(window.URL.revokeObjectURL).toHaveBeenCalled();
-  });
-
-  it('should warn when the downloaded file is empty', () => {
-    accountingEntryService.downloadFile.and.returnValue(
-      of(new HttpResponse({ body: new Blob([]) }))
-    );
-
-    component.onDownloadXml(generatedFile);
-
-    expect(toastr.warning).toHaveBeenCalled();
-  });
-
-  it('should show an error when the download fails', () => {
-    accountingEntryService.downloadFile.and.returnValue(
-      throwError(() => new Error())
-    );
-
-    component.onDownloadXml(generatedFile);
-
-    expect(toastr.error).toHaveBeenCalled();
-  });
-
-  it('should send an empty user when there is no session', () => {
-    autenticacionService.getUserAuthenticate = null;
-
-    accountingEntryService.loadClaims.and.returnValue(
-      of({ bodyResponse: { message: 'ok', totalRows: 1, incompleteRows: 0 } })
-    );
-
-    component.selectedFile = csvFile;
-
-    component.loadClaims();
-
-    expect(accountingEntryService.loadClaims)
-      .toHaveBeenCalledWith(csvFile, '2005', '');
   });
 
 });
