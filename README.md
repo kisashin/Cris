@@ -1,147 +1,122 @@
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 
-import java.util.Date;
+import java.util.Collections;
 
 import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingFileDto;
 import co.com.bnpparibas.cardif.cierres.domain.dtos.DownloadFileDto;
-import co.com.bnpparibas.cardif.cierres.domain.util.exception.RecordNotFoundException;
+import co.com.bnpparibas.cardif.cierres.domain.dtos.XmlFileDto;
     
-    
-    /**
-     * El periodo debe llevar el cero antes del mes. Un formato distinto no
-     * produce error, devuelve un XML vacio.
-     */
     @Test
-    void sendEntry_construyeElPeriodoConElCeroAntesDelMes() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("SINIE"));
+    void generateXml_devuelveTipoNombreYContenido() throws SQLException {
+        mockProcedure(ClaimAccountingBuilder.xmlRow());
 
-        service.sendEntry(ClaimAccountingBuilder.sendRequest());
+        XmlFileDto file = repository.generateXml("SINIE", ClaimAccountingBuilder.PERIOD,
+                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT);
 
-        ArgumentCaptor<String> period = ArgumentCaptor.forClass(String.class);
-        verify(repository).generateXml(eq("SINIE"), period.capture(), anyString(), anyString());
-        assertEquals("2026/002", period.getValue());
+        assertEquals("SINIE", file.getJournalType());
+        assertEquals(ClaimAccountingBuilder.FILE_NAME, file.getFileName());
+        assertEquals(ClaimAccountingBuilder.XML_CONTENT, file.getContent());
     }
 
     @Test
-    void sendEntry_conMesDeDosDigitosMantieneElCero() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/12/31");
-        when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("SINIE"));
+    void generateXml_traduceElIndicadorSinAsientosANulo() throws SQLException {
+        mockProcedure(new Object[] { "LRVSI", ClaimAccountingBuilder.FILE_NAME, "0" });
 
-        service.sendEntry(ClaimAccountingBuilder.sendRequest());
-
-        ArgumentCaptor<String> period = ArgumentCaptor.forClass(String.class);
-        verify(repository).generateXml(eq("SINIE"), period.capture(), anyString(), anyString());
-        assertEquals("2026/012", period.getValue());
+        assertNull(repository.generateXml("LRVSI", ClaimAccountingBuilder.PERIOD,
+                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
     }
 
     @Test
-    void sendEntry_generaLosTresTiposDeDiarioYPersisteLosArchivos() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.generateXml(eq("SINIE"), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("SINIE"));
-        when(repository.generateXml(eq("LRVSI"), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("LRVSI"));
-        when(repository.generateXml(eq("CRVSI"), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("CRVSI"));
+    void generateXml_conContenidoNuloDevuelveNulo() throws SQLException {
+        mockProcedure(new Object[] { "CRVSI", ClaimAccountingBuilder.FILE_NAME, null });
 
-        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
-
-        assertEquals(3, response.getFiles().size());
-        assertEquals("Interfaz generada correctamente.", response.getMessage());
-        verify(repository).deleteFiles(ClaimAccountingBuilder.PRODUCT, "2026/002");
-        verify(repository, times(3)).saveFile(anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyString());
-        verify(repository).markXmlGenerated(ClaimAccountingBuilder.COMMENT, ClaimAccountingBuilder.PRODUCT);
+        assertNull(repository.generateXml("CRVSI", ClaimAccountingBuilder.PERIOD,
+                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
     }
 
     @Test
-    void sendEntry_omiteLosTiposSinAsientos() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.generateXml(eq("SINIE"), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("SINIE"));
-        when(repository.generateXml(eq("LRVSI"), anyString(), anyString(), anyString()))
-                .thenReturn(null);
-        when(repository.generateXml(eq("CRVSI"), anyString(), anyString(), anyString()))
-                .thenReturn(null);
+    void generateXml_sinResultadoDevuelveNulo() throws SQLException {
+        mockProcedure();
 
-        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
-
-        assertEquals(1, response.getFiles().size());
-        assertTrue(response.getFiles().get(0).contains("SINIE"));
-        verify(repository, times(1)).saveFile(anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyString());
+        assertNull(repository.generateXml("SINIE", ClaimAccountingBuilder.PERIOD,
+                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
     }
 
     @Test
-    void sendEntry_sinAsientosNoBorraNiPersisteNiActualizaElEstado() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.generateXml(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(null);
+    void generateXml_propagaElErrorComoExcepcionDeBase() {
+        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
 
-        SendResponseDto response = service.sendEntry(ClaimAccountingBuilder.sendRequest());
+        assertThrows(DatabaseException.class, () -> repository.generateXml("SINIE",
+                ClaimAccountingBuilder.PERIOD, ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
+    }
 
-        assertTrue(response.getFiles().isEmpty());
-        assertEquals("No se generaron asientos para el producto seleccionado.", response.getMessage());
-        verify(repository, never()).deleteFiles(anyString(), anyString());
-        verify(repository, never()).saveFile(anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyString());
-        verify(repository, never()).markXmlGenerated(anyString(), anyString());
+
+
+        @Test
+    void deleteFiles_ejecutaElBorradoPorProductoYPeriodo() {
+        mockNativeQuery(null, null);
+
+        repository.deleteFiles(ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.PERIOD);
+
+        verify(query).executeUpdate();
     }
 
     @Test
-    void sendEntry_persisteElUsuarioDeLaPeticion() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.generateXml(eq("SINIE"), anyString(), anyString(), anyString()))
-                .thenReturn(ClaimAccountingBuilder.xmlFile("SINIE"));
-        when(repository.generateXml(eq("LRVSI"), anyString(), anyString(), anyString()))
-                .thenReturn(null);
-        when(repository.generateXml(eq("CRVSI"), anyString(), anyString(), anyString()))
-                .thenReturn(null);
+    void saveFile_ejecutaLaInsercion() {
+        mockNativeQuery(null, null);
 
-        service.sendEntry(ClaimAccountingBuilder.sendRequest());
+        repository.saveFile(ClaimAccountingBuilder.PRODUCT, "SINIE", ClaimAccountingBuilder.PERIOD,
+                ClaimAccountingBuilder.FILE_NAME, ClaimAccountingBuilder.XML_CONTENT,
+                ClaimAccountingBuilder.USER);
 
-        verify(repository).saveFile(ClaimAccountingBuilder.PRODUCT, "SINIE", "2026/002",
-                "SINIE_2012.XML", ClaimAccountingBuilder.XML_CONTENT, ClaimAccountingBuilder.USER);
+        verify(query).executeUpdate();
     }
 
     @Test
-    void getFiles_consultaConElPeriodoContableActual() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.findFiles(anyString())).thenReturn(
-                Collections.singletonList(new AccountingFileDto(1, ClaimAccountingBuilder.PRODUCT,
-                        "SINIE", ClaimAccountingBuilder.FILE_NAME, new Date())));
+    void findFiles_mapeaLasCincoColumnas() {
+        mockNativeQuery(null, Collections.singletonList(ClaimAccountingBuilder.fileRow()));
 
-        List<AccountingFileDto> files = service.getFiles();
+        List<AccountingFileDto> files = repository.findFiles(ClaimAccountingBuilder.PERIOD);
 
         assertEquals(1, files.size());
-        verify(repository).findFiles("2026/002");
+        assertEquals(1, files.get(0).getId());
+        assertEquals(ClaimAccountingBuilder.PRODUCT, files.get(0).getProduct());
+        assertEquals("SINIE", files.get(0).getJournalType());
+        assertEquals(ClaimAccountingBuilder.FILE_NAME, files.get(0).getFileName());
     }
 
     @Test
-    void getFiles_sinArchivosDevuelveListaVacia() {
-        when(repository.getAccountingPeriodRaw()).thenReturn("2026/02/01");
-        when(repository.findFiles(anyString())).thenReturn(Collections.emptyList());
+    void findFiles_sinArchivosDevuelveListaVacia() {
+        mockNativeQuery(null, Collections.emptyList());
 
-        assertTrue(service.getFiles().isEmpty());
+        assertTrue(repository.findFiles(ClaimAccountingBuilder.PERIOD).isEmpty());
     }
 
     @Test
-    void downloadFile_devuelveElArchivo() {
-        when(repository.findFile(1)).thenReturn(
-                new DownloadFileDto(ClaimAccountingBuilder.FILE_NAME, ClaimAccountingBuilder.XML_CONTENT));
+    void findFile_devuelveNombreYContenido() {
+        mockNativeQuery(null, Collections.singletonList(
+                new Object[] { ClaimAccountingBuilder.FILE_NAME, ClaimAccountingBuilder.XML_CONTENT }));
 
-        DownloadFileDto file = service.downloadFile(1);
+        DownloadFileDto file = repository.findFile(1);
 
         assertEquals(ClaimAccountingBuilder.FILE_NAME, file.getFileName());
         assertEquals(ClaimAccountingBuilder.XML_CONTENT, file.getContent());
     }
 
     @Test
-    void downloadFile_conArchivoInexistenteLanzaExcepcion() {
-        when(repository.findFile(99)).thenReturn(null);
+    void findFile_sinResultadoDevuelveNulo() {
+        mockNativeQuery(null, Collections.emptyList());
 
-        assertThrows(RecordNotFoundException.class, () -> service.downloadFile(99));
+        assertNull(repository.findFile(99));
+    }
+
+
+
+
+        private void mockNativeQuery(Object singleResult, List<?> resultList) {
+        when(entityManager.createNativeQuery(anyString())).thenReturn(query);
+        when(query.setParameter(anyString(), any())).thenReturn(query);
+        when(query.getSingleResult()).thenReturn(singleResult);
+        when(query.getResultList()).thenReturn(resultList);
+        when(query.executeUpdate()).thenReturn(1);
     }
