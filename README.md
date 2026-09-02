@@ -1,7 +1,8 @@
-    @PostMapping(path = "/load", consumes = { "multipart/form-data" }, produces = { "application/json" })
-    BNPResponse loadClaims(@RequestPart("file") MultipartFile file,
-                           @RequestPart("product") String product,
-                           @RequestPart("user") String user);
+    @Override
+    public BNPResponse loadClaims(MultipartFile file, String product, String user) {
+        return new BNPResponse(HttpStatus.OK, HttpStatus.OK.name(),
+                service.loadClaims(file, product, user));
+    }
 
-import org.springframework.web.multipart.MultipartFile;
-                           
+
+import org.springframework.web.multipart.MultipartFile;    
