@@ -1,179 +1,70 @@
-<div class="accounting-entry-container">
+.upload-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
 
-  <div class="container-title">
-    <h1 class="title">
-      ASIENTOS SINIESTROS
-    </h1>
-  </div>
+.file-input {
+  display: none;
+}
 
-  <section class="generation-section">
+.file-name {
+  color: #333333;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  font-style: italic;
+}
 
-    <div class="field">
-      <span class="section-label">Fecha contable:</span>
-      <span class="text-primary-color">{{ accountingDate }}</span>
-    </div>
+.files-section {
+  width: 100%;
+  margin-top: 2.5rem;
 
-    <div class="field">
-      <mat-form-field appearance="outline">
-        <mat-label>Producto</mat-label>
-        <mat-select
-          [(ngModel)]="selectedProduct"
-          (selectionChange)="onProductChange()">
-          <mat-option
-            *ngFor="let product of products"
-            [value]="product.product">
-            {{ product.product }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-    </div>
+  .section-label {
+    display: block;
+    margin-bottom: 1rem;
+  }
 
-  </section>
+  table {
+    width: 100%;
+  }
 
-  <section class="upload-section">
+  th.mat-mdc-header-cell,
+  th.mat-header-cell {
+    background-color: #14532d !important;
+    color: #ffffff !important;
+    font-family: 'Franklin Gothic Medium', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.03rem;
+    padding: 0.9rem 0.75rem;
+    text-align: center;
+  }
 
-    <span class="section-label">Archivo de siniestros:</span>
+  td.mat-mdc-cell,
+  td.mat-cell {
+    border-bottom: 1px solid #e0e0e0;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    padding: 0.75rem;
+    text-align: center;
+  }
 
-    <input
-      type="file"
-      accept=".csv"
-      class="file-input"
-      #fileInput
-      (change)="onFileSelected($event)">
+  .download-link {
+    color: #1976d2 !important;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    text-decoration: underline;
 
-    <button
-      mat-raised-button
-      type="button"
-      class="action-button"
-      [disabled]="loading"
-      (click)="fileInput.click()">
+    &:hover {
+      color: #0d47a1 !important;
+    }
+  }
+}
 
-      <mat-icon>attach_file</mat-icon>
-
-      SELECCIONAR
-    </button>
-
-    <span class="file-name" *ngIf="selectedFile">
-      {{ selectedFile.name }}
-    </span>
-
-    <button
-      mat-raised-button
-      type="button"
-      class="action-button"
-      [disabled]="loading"
-      (click)="loadClaims()">
-
-      <mat-icon>upload</mat-icon>
-
-      {{ loading ? 'CARGANDO...' : 'CARGAR' }}
-    </button>
-
-  </section>
-
-  <section class="message-section" *ngIf="message">
-    <span class="message">{{ message }}</span>
-  </section>
-
-  <section class="comment-section">
-    <mat-form-field appearance="outline" class="comment-field">
-      <mat-label>Comentario del asiento</mat-label>
-      <input matInput [(ngModel)]="comment">
-    </mat-form-field>
-  </section>
-
-  <section class="actions-section">
-
-    <button
-      mat-raised-button
-      type="button"
-      class="action-button"
-      [disabled]="loading"
-      (click)="generateAccountingEntry()">
-      Generar Asiento
-    </button>
-
-    <button
-      mat-raised-button
-      type="button"
-      class="action-button"
-      [disabled]="loading"
-      (click)="registerAccountingEntry()">
-      Registrar Asiento
-    </button>
-
-    <button
-      mat-raised-button
-      type="button"
-      class="action-button"
-      [disabled]="loading"
-      (click)="getAccountSummary()">
-      Total x Cuenta
-    </button>
-
-    <button
-      mat-raised-button
-      type="button"
-      class="send-button"
-      [disabled]="loading"
-      (click)="sendAccountingEntry()">
-      Generar XML
-    </button>
-
-  </section>
-
-  <section class="message-section" *ngIf="sendMessage">
-    <span class="success-message">{{ sendMessage }}</span>
-  </section>
-
-  <div class="container-table" *ngIf="dataSource.length > 0">
-    <app-report-table
-      [dataSource]="dataSource"
-      [displayedColumns]="displayedColumns">
-    </app-report-table>
-  </div>
-
-  <div class="files-section" *ngIf="files.length > 0">
-
-    <span class="section-label">Archivos generados del periodo:</span>
-
-    <div class="container-table">
-      <table mat-table [dataSource]="files" class="mat-elevation-z8">
-
-        <ng-container matColumnDef="product">
-          <th mat-header-cell *matHeaderCellDef> PRODUCTO </th>
-          <td mat-cell *matCellDef="let element"> {{ element.product }} </td>
-        </ng-container>
-
-        <ng-container matColumnDef="journalType">
-          <th mat-header-cell *matHeaderCellDef> TIPO DIARIO </th>
-          <td mat-cell *matCellDef="let element"> {{ element.journalType }} </td>
-        </ng-container>
-
-        <ng-container matColumnDef="fileName">
-          <th mat-header-cell *matHeaderCellDef> ARCHIVO </th>
-          <td mat-cell *matCellDef="let element"> {{ element.fileName }} </td>
-        </ng-container>
-
-        <ng-container matColumnDef="generationDate">
-          <th mat-header-cell *matHeaderCellDef> FECHA GENERACIÓN </th>
-          <td mat-cell *matCellDef="let element"> {{ element.generationDate }} </td>
-        </ng-container>
-
-        <ng-container matColumnDef="action">
-          <th mat-header-cell *matHeaderCellDef> DESCARGA </th>
-          <td mat-cell *matCellDef="let element">
-            <a class="download-link" (click)="onDownloadXml(element)">
-              Descargar XML
-            </a>
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="fileColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: fileColumns;"></tr>
-      </table>
-    </div>
-
-  </div>
-
-</div>
+.action-button {
+  mat-icon {
+    margin-right: 6px;
+  }
+}
