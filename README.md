@@ -1,9 +1,32 @@
-USE CardifWP;
+            for (CSVRecord record : parser) {
+                if (first) {
+                    first = false;
+                    if (isHeader(record)) {
+                        continue;
+                    }
+                }
 
-SELECT COUNT(*) FROM CargaSiniestrosAlfa
-WHERE NombreArchivo = '326CO21SR0152026080403.csv';
+                if (record.size() < COLUMNS) {
+                    incomplete++;
+                }
 
-SELECT TOP 5 NoRAMO, RAMO, SINIESTRO, ASEGURADO, TOMADOR,
-       RES_ANTERIOR, AVISOS, RES_ACTUAL, ESTADO
-FROM CargaSiniestrosAlfa
-WHERE NombreArchivo = '326CO21SR0152026080403.csv';
+                rows.add(toRow(record));
+            }
+
+
+
+
+
+
+
+    public List<String[]> read(MultipartFile file) {
+        List<String[]> rows = new ArrayList<>();
+        incomplete = 0;
+
+
+    public int countIncomplete(List<String[]> rows) {
+        return incomplete;
+    }
+
+
+    private int incomplete;    
