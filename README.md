@@ -1,11 +1,7 @@
-        assertEquals("02/09/2026 03:04:45", files.get(0).getGenerationDate());
+MODIFICADO: ...\service\impl\ClaimAccountingServiceImplTest.java
 
+En getFiles_consultaConElPeriodoContableActual, cambiá new Date() por "02/09/2026 03:04:45". Quitá el import de java.util.Date si no queda usado.
 
-    @Test
-    void findFiles_conFechaNulaDevuelveCampoNulo() {
-        mockNativeQuery(null, Collections.singletonList(
-                new Object[] { 1, ClaimAccountingBuilder.PRODUCT, "SINIE",
-                        ClaimAccountingBuilder.FILE_NAME, null }));
+MODIFICADO: ...\controller\impl\ClaimAccountingControllerImplTest.java
 
-        assertNull(repository.findFiles(ClaimAccountingBuilder.PERIOD).get(0).getGenerationDate());
-    }        
+En getFiles_devuelveLaListaEnElCuerpo, cambiá new Date() por "02/09/2026 03:04:45". Quitá el import de java.util.Date.
