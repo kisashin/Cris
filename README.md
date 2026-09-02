@@ -1,26 +1,10 @@
-    { ruta: '/asientosSiniestros', icon: ' fact_check', tooltip: 'Asientos Siniestros',
-      submenu: [
-        {titulo: 'Reaseguro', url:['/accounting-entry'], external: false}
-      ]
-     },
+export class CardifPeruClosingComponent {
 
+  public readonly showGenerateXml = false;
 
-
-
-        {titulo: 'Otros Tipos Referencia', url: ['/other-type-reference'], external: false},
-        {titulo: 'Novedades Individuales', url: '', external: false}
-
-
-
-
-
-    {
-      route: '/accounting-entry',
-      icon: 'assets/icons/icon-habilitacionErrores.svg',
-      alt: 'Asientos Siniestros',
-      label: 'Asientos Siniestros',
-      size: 80
-    },
+  public errorMessage = '';
+  public isGenerating = false;
+  public isDownloading = false;
 
 
 
