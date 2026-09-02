@@ -1,2 +1,3 @@
-SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'archivoAsientoReaseguro' ORDER BY ORDINAL_POSITION;
+grep -rn "@Transactional" src/main/java --include=*.java | head -30
+
+grep -rn "@Transactional" src/main/java --include=*.java
