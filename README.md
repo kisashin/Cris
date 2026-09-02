@@ -1,1 +1,4 @@
-sp_Gurarda_ArchioXml_Asiento y sp_AsientosSiniestros, más sp_CargaSiniestrosAlfa
+USE CardifWP;
+SELECT OBJECT_NAME(referencing_id) AS llamador
+FROM sys.sql_expression_dependencies
+WHERE referenced_entity_name = 'sp_XMLAsientosPru';
