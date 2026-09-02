@@ -1,19 +1,3 @@
-package co.com.bnpparibas.cardif.cierres.domain.dtos;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class LoadResultDto {
-    private String message;
-    private int totalRows;
-    private int incompleteRows;
-}
-
-
 package co.com.bnpparibas.cardif.cierres.domain.util.helpers;
 
 import java.io.BufferedReader;
@@ -26,7 +10,6 @@ import java.util.List;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -43,10 +26,8 @@ public class ClaimFileHelper {
     private static final String HEADER_FIRST_VALUE = "NORAMO";
     private static final String HEADER_SECOND_VALUE = "RAMO";
 
-    private final List<String[]> rows = new ArrayList<>();
-
     public List<String[]> read(MultipartFile file) {
-        rows.clear();
+        List<String[]> rows = new ArrayList<>();
 
         CSVFormat format = CSVFormat.DEFAULT
                 .withDelimiter(DELIMITER)
@@ -76,13 +57,13 @@ public class ClaimFileHelper {
             throw new DataException(ExceptionConstants.FILE_WITHOUT_RECORDS);
         }
 
-        return new ArrayList<>(rows);
+        return rows;
     }
 
-    public int countIncomplete(List<String[]> records) {
+    public int countIncomplete(List<String[]> rows) {
         int incomplete = 0;
 
-        for (String[] row : records) {
+        for (String[] row : rows) {
             if (row[COLUMNS - 1] == null) {
                 incomplete++;
             }
