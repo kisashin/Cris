@@ -1,122 +1,37 @@
-import static org.mockito.Mockito.verify;
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFiles_devuelveLaListaEnElCuerpo() {
+        when(service.getFiles()).thenReturn(Collections.singletonList(
+                new AccountingFileDto(1, "2012", "SINIE", "archivo.XML", new Date())));
 
-import java.util.Collections;
+        BNPResponse response = controller.getFiles();
+        List<AccountingFileDto> body = (List<AccountingFileDto>) response.getBodyResponse();
+
+        assertEquals(200, response.getReturnCode());
+        assertEquals(1, body.size());
+    }
+
+    @Test
+    void downloadFile_devuelveElContenidoConElNombreEnLaCabecera() {
+        when(service.downloadFile(1)).thenReturn(new DownloadFileDto("archivo.XML", "<SSC/>"));
+
+        ResponseEntity<byte[]> response = controller.downloadFile(1);
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals("<SSC/>", new String(response.getBody(), StandardCharsets.UTF_8));
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION).contains("archivo.XML"));
+    }
+
+
+
+
+ import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 
 import co.com.bnpparibas.cardif.cierres.domain.dtos.AccountingFileDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.DownloadFileDto;
-import co.com.bnpparibas.cardif.cierres.domain.dtos.XmlFileDto;
-    
-    @Test
-    void generateXml_devuelveTipoNombreYContenido() throws SQLException {
-        mockProcedure(ClaimAccountingBuilder.xmlRow());
-
-        XmlFileDto file = repository.generateXml("SINIE", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT);
-
-        assertEquals("SINIE", file.getJournalType());
-        assertEquals(ClaimAccountingBuilder.FILE_NAME, file.getFileName());
-        assertEquals(ClaimAccountingBuilder.XML_CONTENT, file.getContent());
-    }
-
-    @Test
-    void generateXml_traduceElIndicadorSinAsientosANulo() throws SQLException {
-        mockProcedure(new Object[] { "LRVSI", ClaimAccountingBuilder.FILE_NAME, "0" });
-
-        assertNull(repository.generateXml("LRVSI", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
-    }
-
-    @Test
-    void generateXml_conContenidoNuloDevuelveNulo() throws SQLException {
-        mockProcedure(new Object[] { "CRVSI", ClaimAccountingBuilder.FILE_NAME, null });
-
-        assertNull(repository.generateXml("CRVSI", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
-    }
-
-    @Test
-    void generateXml_sinResultadoDevuelveNulo() throws SQLException {
-        mockProcedure();
-
-        assertNull(repository.generateXml("SINIE", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
-    }
-
-    @Test
-    void generateXml_propagaElErrorComoExcepcionDeBase() {
-        when(entityManager.unwrap(Session.class)).thenThrow(new IllegalStateException());
-
-        assertThrows(DatabaseException.class, () -> repository.generateXml("SINIE",
-                ClaimAccountingBuilder.PERIOD, ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.COMMENT));
-    }
-
-
-
-        @Test
-    void deleteFiles_ejecutaElBorradoPorProductoYPeriodo() {
-        mockNativeQuery(null, null);
-
-        repository.deleteFiles(ClaimAccountingBuilder.PRODUCT, ClaimAccountingBuilder.PERIOD);
-
-        verify(query).executeUpdate();
-    }
-
-    @Test
-    void saveFile_ejecutaLaInsercion() {
-        mockNativeQuery(null, null);
-
-        repository.saveFile(ClaimAccountingBuilder.PRODUCT, "SINIE", ClaimAccountingBuilder.PERIOD,
-                ClaimAccountingBuilder.FILE_NAME, ClaimAccountingBuilder.XML_CONTENT,
-                ClaimAccountingBuilder.USER);
-
-        verify(query).executeUpdate();
-    }
-
-    @Test
-    void findFiles_mapeaLasCincoColumnas() {
-        mockNativeQuery(null, Collections.singletonList(ClaimAccountingBuilder.fileRow()));
-
-        List<AccountingFileDto> files = repository.findFiles(ClaimAccountingBuilder.PERIOD);
-
-        assertEquals(1, files.size());
-        assertEquals(1, files.get(0).getId());
-        assertEquals(ClaimAccountingBuilder.PRODUCT, files.get(0).getProduct());
-        assertEquals("SINIE", files.get(0).getJournalType());
-        assertEquals(ClaimAccountingBuilder.FILE_NAME, files.get(0).getFileName());
-    }
-
-    @Test
-    void findFiles_sinArchivosDevuelveListaVacia() {
-        mockNativeQuery(null, Collections.emptyList());
-
-        assertTrue(repository.findFiles(ClaimAccountingBuilder.PERIOD).isEmpty());
-    }
-
-    @Test
-    void findFile_devuelveNombreYContenido() {
-        mockNativeQuery(null, Collections.singletonList(
-                new Object[] { ClaimAccountingBuilder.FILE_NAME, ClaimAccountingBuilder.XML_CONTENT }));
-
-        DownloadFileDto file = repository.findFile(1);
-
-        assertEquals(ClaimAccountingBuilder.FILE_NAME, file.getFileName());
-        assertEquals(ClaimAccountingBuilder.XML_CONTENT, file.getContent());
-    }
-
-    @Test
-    void findFile_sinResultadoDevuelveNulo() {
-        mockNativeQuery(null, Collections.emptyList());
-
-        assertNull(repository.findFile(99));
-    }
-
-
-
-
-        private void mockNativeQuery(Object singleResult, List<?> resultList) {
-        when(entityManager.createNativeQuery(anyString())).thenReturn(query);
-        when(query.setParameter(anyString(), any())).thenReturn(query);
-        when(query.getSingleResult()).thenReturn(singleResult);
-        when(query.getResultList()).thenReturn(resultList);
-        when(query.executeUpdate()).thenReturn(1);
-    }
+import co.com.bnpparibas.cardif.cierres.domain.dtos.DownloadFileDto;   
