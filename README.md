@@ -1,29 +1,10 @@
-    @Test
-    void countIncomplete_cuentaLasFilasConMenosColumnas() {
-        String content = ClaimAccountingBuilder.csvRow("022") + "\n"
-                + ClaimAccountingBuilder.csvRow("023", 10) + "\n"
-                + ClaimAccountingBuilder.csvRow("024", 30);
+USE CardifWP;
 
-        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'archivoAsientoReaseguro'
+ORDER BY ORDINAL_POSITION;
 
-        assertEquals(2, helper.countIncomplete(rows));
-    }
-
-    @Test
-    void countIncomplete_conTodasLasColumnasDevuelveCero() {
-        String content = ClaimAccountingBuilder.csvRow("022") + "\n"
-                + ClaimAccountingBuilder.csvRow("023");
-
-        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
-
-        assertEquals(0, helper.countIncomplete(rows));
-    }
-
-    @Test
-    void countIncomplete_conCamposVaciosAlFinalNoCuentaComoIncompleta() {
-        String content = ClaimAccountingBuilder.csvRow("022", 43) + ";;;";
-
-        List<String[]> rows = helper.read(ClaimAccountingBuilder.csvFile(content));
-
-        assertEquals(0, helper.countIncomplete(rows));
-    }
+SELECT name, type_desc, is_unique
+FROM sys.indexes
+WHERE object_id = OBJECT_ID('dbo.archivoAsientoReaseguro');
