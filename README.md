@@ -1,27 +1,8 @@
---liquibase formatted sql
---changeset j36147:HU_Reaseguro_566_archivoAsientoReaseguro_20260903_01 stripComments:false dbms:mssql
-
-USE [CardifWP]
-
-GO
-SET ANSI_NULLS ON
-SET QUOTED_IDENTIFIER ON
-GO
-
-IF OBJECT_ID('dbo.archivoAsientoReaseguro','U') IS NULL
-BEGIN
-    CREATE TABLE dbo.archivoAsientoReaseguro (
-        id              INT IDENTITY(1,1) NOT NULL,
-        producto        VARCHAR(10)   NOT NULL,
-        tipoDiario      VARCHAR(10)   NOT NULL,
-        periodoContable VARCHAR(10)   NOT NULL,
-        nombreArchivo   VARCHAR(100)  NOT NULL,
-        contenido       NVARCHAR(MAX) NOT NULL,
-        fechaGeneracion DATETIME      NOT NULL,
-        usuario         VARCHAR(100)  NULL,
-        CONSTRAINT PK_archivoAsientoReaseguro PRIMARY KEY CLUSTERED (id),
-        CONSTRAINT UQ_archivoAsientoReaseguro UNIQUE NONCLUSTERED (producto, tipoDiario, periodoContable)
-    )
-END
-
---rollback DROP TABLE IF EXISTS dbo.archivoAsientoReaseguro
+USE SiniestrosWp;
+SELECT t.name AS tabla, c.column_id, c.name AS columna,
+       ty.name AS tipo, c.max_length, c.is_nullable
+FROM sys.columns c
+JOIN sys.tables t  ON t.object_id = c.object_id
+JOIN sys.types ty  ON ty.user_type_id = c.user_type_id
+WHERE t.name IN ('historicomovimientos','novedadhistoricoindividual')
+ORDER BY t.name, c.column_id;
