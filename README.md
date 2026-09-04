@@ -1,8 +1,16 @@
 USE SiniestrosWp;
-SELECT t.name AS tabla, c.column_id, c.name AS columna,
-       ty.name AS tipo, c.max_length, c.is_nullable
-FROM sys.columns c
-JOIN sys.tables t  ON t.object_id = c.object_id
-JOIN sys.types ty  ON ty.user_type_id = c.user_type_id
-WHERE t.name IN ('historicomovimientos','novedadhistoricoindividual')
-ORDER BY t.name, c.column_id;
+
+SELECT idusuario, idautorizador, COUNT(*) AS total,
+       MIN(Fechaproceso) AS desde, MAX(Fechaproceso) AS hasta
+FROM novedadhistoricoindividual
+GROUP BY idusuario, idautorizador
+ORDER BY total DESC;
+
+SELECT estado, tiponovedad, COUNT(*) AS total
+FROM novedadhistoricoindividual
+GROUP BY estado, tiponovedad;
+
+SELECT TOP 20 CIE, COUNT(*) AS total
+FROM historicomovimientos
+WHERE CIE IS NOT NULL AND LTRIM(RTRIM(CIE)) <> ''
+GROUP BY CIE ORDER BY total DESC;
