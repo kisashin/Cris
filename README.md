@@ -1,16 +1,27 @@
--- ¿Que periodo esta usando Cardif?
-SELECT fecha, CONVERT(nvarchar(6), fecha, 112) AS periodo FROM controlcierreaval;
-
--- ¿Cuantos de los 90 tienen apertura?
+-- 1. ¿Tienen apertura en historico_inicial?
 SELECT COUNT(*) 
 FROM historicomovimientos hm
-JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL AND hi.Aval = 0 AND hm.Ramo = 22;
+LEFT JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
+WHERE hm.Fechacontabilizacion IS NULL AND hm.Ramo = 22
+  AND hi.Llavesiniestro IS NULL;
 
--- ¿El producto esta parametrizado para ramo 22 grupo C?
+-- 2. ¿Estan marcados como Aval = 0?
+SELECT hi.Aval, COUNT(*)
+FROM historicomovimientos hm
+JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
+WHERE hm.Fechacontabilizacion IS NULL AND hm.Ramo = 22
+GROUP BY hi.Aval;
+
+-- 3. ¿El producto esta parametrizado?
 SELECT DISTINCT hm.CodProducto
 FROM historicomovimientos hm
 WHERE hm.Fechacontabilizacion IS NULL AND hm.Ramo = 22
   AND hm.CodProducto NOT IN (
     SELECT PRODUCTO FROM Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE 
     WHERE ramo = 22 AND GRUPO = 'C');
+
+-- 4. ¿Que tipos de movimiento son?
+SELECT Tipomovimiento, COUNT(*)
+FROM historicomovimientos
+WHERE Fechacontabilizacion IS NULL AND Ramo = 22
+GROUP BY Tipomovimiento;
