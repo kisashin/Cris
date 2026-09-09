@@ -1,22 +1,21 @@
-USE [SiniestrosWp];
-GO
+EXEC sp_helptext 'dbo.sp_Gen_Xml_Siniestros_ReasegAlfa';
+EXEC sp_helptext 'dbo.sp_Gen_Xml_Siniestros_ReasegCardif';
+EXEC sp_helptext 'dbo.sp_Gen_Xml_Siniestros_CoaseguroC';
+EXEC sp_helptext 'dbo.sp_XMLAsientosPru';
+EXEC sp_helptext 'dbo.sp_contabiliza_aval';
+EXEC sp_helptext 'dbo.sp_contabiliza_cardif';
+EXEC sp_helptext 'dbo.sp_contabiliza_coaseguro';
 
--- Tablas nuevas: CRUD completo
-GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.archivoAsientoAvalXml TO [USUARIO_APP];
-GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.archivoAsientoCardifXml TO [USUARIO_APP];
 
--- Procedimientos orquestadores
-GRANT EXECUTE ON dbo.sp_contabiliza_aval TO [USUARIO_APP];
-GRANT EXECUTE ON dbo.sp_contabiliza_cardif TO [USUARIO_APP];
-GRANT EXECUTE ON dbo.sp_contabiliza_coaseguro TO [USUARIO_APP];
-GRANT EXECUTE ON dbo.sp_Genera_RepAval_cierre TO [USUARIO_APP];
+SELECT id, TIPODIARIO, CUENTA, NATURALEZA, REF_TRANSACCION, Formula, 
+       Observacion, ramo, GRUPO, Iva
+FROM cardifwp.dbo.CUENTAS_CONTABLES_PROD
+WHERE GRUPO IN ('HOGAR','RSGCAR','CC')
+ORDER BY GRUPO, left(Observacion,1), TIPODIARIO, id;
 
--- Procedimientos generadores
-GRANT EXECUTE ON dbo.sp_XMLAsientosPru TO [USUARIO_APP];
-GRANT EXECUTE ON dbo.sp_Gen_Xml_Siniestros_ReasegAlfa TO [USUARIO_APP];
-GRANT EXECUTE ON dbo.sp_Gen_Xml_Siniestros_ReasegCardif TO [USUARIO_APP];
-GRANT EXECUTE ON dbo.sp_Gen_Xml_Siniestros_CoaseguroC TO [USUARIO_APP];
+SELECT * FROM cardifwp.dbo.x100_Hogar_Otros_Cierre;
 
--- Procedimiento invocado por los orquestadores
-GRANT EXECUTE ON dbo.sp_asientosSiniestros TO [USUARIO_APP];
-GO
+SELECT * FROM cardifwp.dbo.Ramos_Cierre WHERE Origen = 'CO';
+
+SELECT * FROM Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE 
+WHERE GRUPO IN ('A','C');
