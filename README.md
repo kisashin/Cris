@@ -1,43 +1,23 @@
-Migración Reaseguro — Asientos Siniestros
-Objetivo
+Comparativo: comportamiento de la grilla de reporte en Cierre Mensual de Aval
+Cómo funciona en el sistema actual (legado)
 
-Eliminar la dependencia de bcp / xp_cmdshell / file server en el módulo Reaseguro, dejando la carga de archivos y la descarga de XML directamente en pantalla, siguiendo el patrón ya implementado en Centroamérica y Colombia.
+La pantalla muestra la sección "Reporte de movimientos" con el enlace de consulta. Debajo aparece una grilla que solo se despliega cuando hay información disponible; cuando no la hay, el sistema muestra el mensaje "No registros para consultar" en lugar de la grilla.
 
-Contexto del bloqueante
+La captura adjunta, tomada del ambiente de pruebas del sistema actual, muestra exactamente ese caso: sin registros pendientes, la grilla no se despliega y solo se ve el mensaje.
 
-El módulo estaba aprobado funcionalmente pero no podía pasar a TEST: el SP copiaba el XML a \\amcobgfp01wp\Soluciones\T_CONTABILIDAD\XML_RESERVA mediante xp_cmdshell, y en TEST no existe visibilidad de la base de datos hacia el file server. Esos permisos no van a otorgarse.
+Cómo funciona en la solución migrada
 
-La migración elimina el requisito en lugar de solicitarlo.
+El comportamiento es el mismo. La grilla se muestra únicamente cuando existen movimientos por reportar, y en caso contrario aparece el mismo mensaje "No registros para consultar".
 
-Cambios en base de datos — CardifWP
+La diferencia está en cómo se obtiene el archivo, no en cuándo se muestra la grilla:
 
-sp_XMLAsientosPru
-Se activó el parámetro @XmlDestino (ya existente en la firma, default 'SUN'). Con valor 'PANTALLA' el procedimiento omite la escritura por bcp, la copia a XML_RESERVA y el net use, y devuelve un único result set con Tipo_Diario, NombreArchivo y Contenido. Los demás consumidores no pasan el parámetro y conservan el comportamiento anterior. La tabla temporal ##sp_HistoricoAsientosPru pasó a local (#).
+	Sistema actual	Solución migrada
+Acción del usuario	Botón "Generar"	Enlace "Descargar Excel"
+Qué ocurre	Marca el registro como pendiente y un proceso automatizado genera el archivo en un servidor de archivos	El archivo se genera y se descarga en el momento
+Tiempo de espera	El usuario debe esperar a que el proceso automatizado se ejecute	Inmediato
+Dependencias	Requiere el proceso automatizado activo	Ninguna
+Consideración sobre la disponibilidad del archivo
 
-sp_CargaSiniestrosAlfa
-Se eliminaron el descubrimiento de archivos por dir, el cursor, el bulk insert y el move a Procesados\. Se agregó el parámetro @Archivo. El procedimiento conserva la limpieza de datos y la inserción a CargaSiniestrosAlfa con DBO.FFLOAT().
+En ambos casos el reporte refleja los movimientos pendientes por contabilizar al momento de la consulta. Una vez ejecutada la generación de asientos contables, esos movimientos quedan contabilizados y el reporte deja de mostrarlos, tal como ocurre hoy.
 
-archivoAsientoReaseguro (nueva)
-Persiste los XML generados para su descarga. Clave única por producto, tipo de diario y periodo contable.
-
-Cambios en backend — ws-cierres
-POST /v1/claim-accounting/load pasó a multipart/form-data: recibe archivo, producto y usuario. Valida extensión y que el nombre corresponda al patrón del producto en PatronxProd_siniestros. Parsea el CSV, inserta por lotes en tmpCargaSiniestrosAlfa y ejecuta el procedimiento de carga.
-POST /v1/claim-accounting/send pasó a transaccional. Genera los tres tipos de diario, reemplaza los archivos previos del producto y persiste los nuevos. Si falla, no se borra ni se marca nada.
-GET /v1/claim-accounting/files — lista los archivos del periodo contable actual.
-GET /v1/claim-accounting/files/{id}/download — descarga por bytes con Content-Disposition.
-Se eliminó el ReentrantLock, innecesario tras el paso a tabla temporal local.
-Errores de validación mapeados a 400 y 404 con mensaje legible.
-
-Cobertura: 100% en repositorio, servicio y controller; 97% en el helper de lectura de archivos.
-
-Cambios en frontend — closingcardiffront
-Botón Cargar convertido en selector de archivo más acción de carga.
-Grilla de archivos generados con descarga por fila.
-Diálogo de confirmación antes de generar, indicando que los archivos previos del producto se reemplazan.
-Botón "Enviar" renombrado a "Generar XML".
-Corrección de la ruta del ítem Asientos Siniestros.
-Ocultado el botón Genera XML en Cierre Cardif Perú a solicitud del negocio.
-Retirados del menú los ítems sin implementación: Cardif, Reportes Historizados y Reaseguro Cuenta Técnica.
-Validación realizada
-
-Se ejecutó el flujo completo en DEV con archivo real del proveedor (producto 2020, 232 registros): carga, generación de asiento, registro, total por cuenta, generación de los tres XML y descarga. Se verificó codificación de caracteres, conversión de montos, reemplazo de archivos al regenerar y no afectación de otros productos. Se confirmó que no se escriben archivos en disco.
+La diferencia práctica es que en el sistema actual el archivo permanecía en el servidor hasta la siguiente ejecución, mientras que en la solución migrada se genera bajo demanda. Si el área requiere conservar el reporte de cierres ya procesados para consulta posterior, esa funcionalidad no existe en ninguna de las dos versiones y debería evaluarse por separado.
