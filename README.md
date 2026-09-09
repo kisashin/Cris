@@ -1,9 +1,3 @@
 USE CardifWP;
-
-SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE,
-       COLUMNPROPERTY(OBJECT_ID('dbo.Socios_Prod_Siniestros'), COLUMN_NAME, 'IsIdentity') AS es_identity
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'Socios_Prod_Siniestros'
-ORDER BY ORDINAL_POSITION;
-
-SELECT * FROM Socios_Prod_Siniestros ORDER BY id;
+SELECT producto, ramo, cobertura, peso, valor, afectadox
+FROM Cobertura_Prod_Xpln_Plz_Cnl WHERE producto IN (2012, 2020);
