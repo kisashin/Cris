@@ -1,27 +1,11 @@
--- 1. ¿Tienen apertura en historico_inicial?
-SELECT COUNT(*) 
-FROM historicomovimientos hm
-LEFT JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL AND hm.Ramo = 22
-  AND hi.Llavesiniestro IS NULL;
+--liquibase formatted sql
 
--- 2. ¿Estan marcados como Aval = 0?
-SELECT hi.Aval, COUNT(*)
-FROM historicomovimientos hm
-JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL AND hm.Ramo = 22
-GROUP BY hi.Aval;
-
--- 3. ¿El producto esta parametrizado?
-SELECT DISTINCT hm.CodProducto
-FROM historicomovimientos hm
-WHERE hm.Fechacontabilizacion IS NULL AND hm.Ramo = 22
-  AND hm.CodProducto NOT IN (
-    SELECT PRODUCTO FROM Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE 
-    WHERE ramo = 22 AND GRUPO = 'C');
-
--- 4. ¿Que tipos de movimiento son?
-SELECT Tipomovimiento, COUNT(*)
-FROM historicomovimientos
-WHERE Fechacontabilizacion IS NULL AND Ramo = 22
-GROUP BY Tipomovimiento;
+--changeset j36147:HU_DDPT_XXX_20260909_1 stripComments:false dbms:mssql
+UPDATE SiniestrosWp.dbo.CUENTAS_CONTABLES_PROD
+SET CUENTA = '41164501'
+WHERE id = 1159
+  AND GRUPO = 'HOGAR'
+  AND TIPODIARIO = 'SIREA'
+  AND Formula = 'vTerremoto'
+  AND CUENTA = '41165401'
+--rollback UPDATE SiniestrosWp.dbo.CUENTAS_CONTABLES_PROD SET CUENTA = '41165401' WHERE id = 1159 AND GRUPO = 'HOGAR' AND TIPODIARIO = 'SIREA' AND Formula = 'vTerremoto' AND CUENTA = '41164501'
