@@ -1,134 +1,86 @@
-import co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia.AvalReportFileDTO;
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoReporteAvalExcel;
+import { IAvalReportFile } from '../models/aval-report-status.model';
 
 
-    @Nested
-    @DisplayName("GET /v1/aval-closing/report/status")
-    class FindReportStatus {
+  describe('#findReportStatus', () => {
+    it('should GET the report status', () => {
+      const status: IAvalReportFile = {
+        id: 1,
+        period: '202609',
+        fileName: 'RPT_CIERRE_AVAL.xlsx',
+        rowCount: 257,
+        processDate: '09/09/2026 10:00:00 a. m.',
+        status: 'GENERADO',
+        pendingMovements: 93
+      };
 
-        @Test
-        @DisplayName("debe devolver el estado del reporte y código 200")
-        void shouldReturnReportStatus() {
-            AvalReportFileDTO serviceResult = AvalReportFileDTO.builder()
-                    .id(1)
-                    .period("202609")
-                    .fileName("RPT_CIERRE_AVAL.xlsx")
-                    .rowCount(257)
-                    .processDate("09/09/2026 10:00:00 a. m.")
-                    .status("GENERADO")
-                    .pendingMovements(93)
-                    .build();
+      service.findReportStatus().subscribe(response => {
+        expect(response.bodyResponse?.pendingMovements).toBe(93);
+        expect(response.bodyResponse?.fileName)
+          .toBe('RPT_CIERRE_AVAL.xlsx');
+      });
 
-            when(closingAvalService.findReportStatus(
-                    correlationId, requestId))
-                    .thenReturn(serviceResult);
+      const request = httpMock.expectOne(`${closingUrl}/report/status`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
 
-            ResponseEntity<ResponseModel<AvalReportFileDTO>> response =
-                    controller.findReportStatus(correlationId, requestId);
+      request.flush({ bodyResponse: status });
+    });
+  });
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
+  describe('#generateAvalReport', () => {
+    it('should PUT the report generation request', () => {
+      service.generateAvalReport().subscribe(response => {
+        expect(response.bodyResponse?.id).toBe(1);
+      });
 
-            ResponseModel<AvalReportFileDTO> body = response.getBody();
-            assertNotNull(body);
-            assertEquals(correlationId, body.getCorrelationId());
-            assertEquals(
-                    HttpStatus.OK.value(),
-                    body.getResponseHeader().getReturnCode());
-            assertEquals(serviceResult, body.getBodyResponse());
+      const request = httpMock.expectOne(`${closingUrl}/report/generate`);
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toBeNull();
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
 
-            verify(closingAvalService, times(1))
-                    .findReportStatus(correlationId, requestId);
+      request.flush({
+        bodyResponse: {
+          id: 1,
+          fileName: 'RPT_CIERRE_AVAL.xlsx',
+          rowCount: 257,
+          pendingMovements: 93
         }
+      });
+    });
+  });
 
-        @Test
-        @DisplayName("debe devolver el estado sin archivo generado")
-        void shouldReturnStatusWithoutFile() {
-            AvalReportFileDTO serviceResult = AvalReportFileDTO.builder()
-                    .pendingMovements(0)
-                    .build();
+  describe('#downloadAvalReport', () => {
+    it('should GET the Excel report as Blob', () => {
+      const mockBlob = new Blob(['excel'], {
+        type:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
 
-            when(closingAvalService.findReportStatus(
-                    correlationId, requestId))
-                    .thenReturn(serviceResult);
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition': 'attachment; filename="RPT_CIERRE_AVAL.xlsx"'
+      });
 
-            ResponseEntity<ResponseModel<AvalReportFileDTO>> response =
-                    controller.findReportStatus(correlationId, requestId);
+      service.downloadAvalReport(1).subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(response.headers.get('Content-Disposition'))
+          .toContain('RPT_CIERRE_AVAL.xlsx');
+      });
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNull(response.getBody().getBodyResponse().getId());
-        }
-    }
+      const request = httpMock.expectOne(`${closingUrl}/report/1/download`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.headers.get('Accept')).toBe(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
 
-    @Nested
-    @DisplayName("PUT /v1/aval-closing/report/generate")
-    class GenerateAvalReport {
+      request.flush(mockBlob, {
+        headers: responseHeaders,
+        status: 200,
+        statusText: 'OK'
+      });
+    });
+  });
 
-        @Test
-        @DisplayName("debe devolver el reporte generado y código 200")
-        void shouldReturnGeneratedReport() {
-            AvalReportFileDTO serviceResult = AvalReportFileDTO.builder()
-                    .id(1)
-                    .fileName("RPT_CIERRE_AVAL.xlsx")
-                    .rowCount(257)
-                    .pendingMovements(93)
-                    .build();
-
-            when(closingAvalService.generateAvalReport(
-                    pHeader, correlationId, requestId))
-                    .thenReturn(serviceResult);
-
-            ResponseEntity<ResponseModel<AvalReportFileDTO>> response =
-                    controller.generateAvalReport(
-                            pHeader, correlationId, requestId);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-
-            ResponseModel<AvalReportFileDTO> body = response.getBody();
-            assertNotNull(body);
-            assertEquals(
-                    HttpStatus.OK.value(),
-                    body.getResponseHeader().getReturnCode());
-            assertEquals(serviceResult, body.getBodyResponse());
-
-            verify(closingAvalService, times(1))
-                    .generateAvalReport(pHeader, correlationId, requestId);
-        }
-    }
-
-    @Nested
-    @DisplayName("GET /v1/aval-closing/report/{id}/download")
-    class DownloadAvalReport {
-
-        @Test
-        @DisplayName("debe devolver el contenido del archivo con su nombre")
-        void shouldReturnReportContent() {
-            byte[] content = new byte[] {0x50, 0x4B, 0x03, 0x04};
-
-            ArchivoReporteAvalExcel file = ArchivoReporteAvalExcel.builder()
-                    .id(1)
-                    .nombreArchivo("RPT_CIERRE_AVAL.xlsx")
-                    .contenido(content)
-                    .build();
-
-            when(closingAvalService.findReportFile(
-                    1, correlationId, requestId))
-                    .thenReturn(file);
-
-            ResponseEntity<byte[]> response =
-                    controller.downloadAvalReport(
-                            1, correlationId, requestId);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertArrayEquals(content, response.getBody());
-            assertEquals(
-                    "attachment; filename=\"RPT_CIERRE_AVAL.xlsx\"",
-                    response.getHeaders()
-                            .getFirst(HttpHeaders.CONTENT_DISPOSITION));
-            assertEquals(
-                    content.length,
-                    response.getHeaders().getContentLength());
-
-            verify(closingAvalService, times(1))
-                    .findReportFile(1, correlationId, requestId);
-        }
-    }
+  
