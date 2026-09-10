@@ -1,21 +1,15 @@
-    it('should keep a placeholder row when the body is null', () => {
-      avalService.findReportStatus.and.returnValue(
-        of({ bodyResponse: null } as any));
+USE [SiniestrosWp];
+GO
 
-      component.loadReportStatus();
-
-      expect(component.reportDataSource.length).toBe(1);
-      expect(component.reportDataSource[0].pendingMovements).toBe(0);
-      expect(component.reportDataSource[0].id).toBeUndefined();
-    });
-
-    it('should keep a placeholder row when the request fails', () => {
-      avalService.findReportStatus.and.returnValue(
-        throwError(() => new Error('boom')));
-
-      component.loadReportStatus();
-
-      expect(component.reportDataSource.length).toBe(1);
-      expect(component.reportDataSource[0].pendingMovements).toBe(0);
-      expect(component.isLoadingReport).toBeFalse();
-    });
+CREATE TABLE dbo.archivoReporteAvalExcel (
+    id             INT IDENTITY(1,1) NOT NULL,
+    idLote         VARCHAR(50)    NOT NULL,
+    periodo        VARCHAR(6)     NOT NULL,
+    nombreArchivo  VARCHAR(500)   NOT NULL,
+    contenido      VARBINARY(MAX) NOT NULL,
+    cantidadFilas  INT            NOT NULL,
+    fechaproceso   DATETIME       NOT NULL,
+    estado         VARCHAR(50)    NOT NULL,
+    CONSTRAINT PK_archivoReporteAvalExcel PRIMARY KEY CLUSTERED (id)
+);
+GO
