@@ -1,3 +1,11 @@
+SELECT archivocargue, COUNT(*) AS total,
+       SUM(CASE WHEN Fechacontabilizacion IS NULL THEN 1 ELSE 0 END) AS pendientes,
+       MIN(fechacargue) AS primera, MAX(fechacargue) AS ultima
+FROM historicomovimientos
+GROUP BY archivocargue
+ORDER BY MAX(fechacargue) DESC;
+
+
 SELECT archivocargue, COUNT(*), MIN(fechacargue), MAX(fechacargue)
 FROM historicomovimientos
 GROUP BY archivocargue
