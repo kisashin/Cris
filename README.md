@@ -1,15 +1,32 @@
+SELECT archivocargue, COUNT(*), MIN(fechacargue), MAX(fechacargue)
+FROM historicomovimientos
+GROUP BY archivocargue
+ORDER BY MAX(fechacargue) DESC;
+
+
 USE [SiniestrosWp];
 GO
 
-CREATE TABLE dbo.archivoReporteAvalExcel (
-    id             INT IDENTITY(1,1) NOT NULL,
-    idLote         VARCHAR(50)    NOT NULL,
-    periodo        VARCHAR(6)     NOT NULL,
-    nombreArchivo  VARCHAR(500)   NOT NULL,
-    contenido      VARBINARY(MAX) NOT NULL,
-    cantidadFilas  INT            NOT NULL,
-    fechaproceso   DATETIME       NOT NULL,
-    estado         VARCHAR(50)    NOT NULL,
-    CONSTRAINT PK_archivoReporteAvalExcel PRIMARY KEY CLUSTERED (id)
-);
+-- 1. Ver que se va a borrar (correr primero, sin borrar nada)
+SELECT COUNT(*) FROM historicomovimientos 
+WHERE archivocargue = 'NOMBRE_DEL_ARCHIVO';
+
+-- 2. Borrar los movimientos
+DELETE FROM historicomovimientos 
+WHERE archivocargue = 'NOMBRE_DEL_ARCHIVO';
+
+-- 3. Borrar las aperturas que quedaron huerfanas
+DELETE hi
+FROM historico_inicial hi
+LEFT JOIN historicomovimientos hm ON hm.Llavesiniestro = hi.Llavesiniestro
+WHERE hm.Llavesiniestro IS NULL;
+
+-- 4. Limpiar tablas de trabajo y resultados
+DELETE FROM archivoAsientoAvalXml;
+DELETE FROM archivoAsientoCardifXml;
+DELETE FROM archivoReporteAvalExcel;
+DELETE FROM controlcierreaval;
+DELETE FROM tmp_repavalcierre;
+DELETE FROM historicomov_aval;
+DELETE FROM tmpsiniestros;
 GO
