@@ -1,56 +1,27 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.entity;
+package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoReporteAvalExcel;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Lob;
-import javax.persistence.Table;
-import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.util.List;
 
-@Entity
-@Table(name = "archivoReporteAvalExcel")
-@Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class ArchivoReporteAvalExcel implements Serializable {
+@Repository
+public interface ArchivoReporteAvalExcelRepository
+        extends JpaRepository<ArchivoReporteAvalExcel, Integer> {
 
-    private static final long serialVersionUID = 1L;
+    @Query(
+            value = "SELECT TOP 1 * "
+                    + "FROM dbo.archivoReporteAvalExcel "
+                    + "ORDER BY fechaproceso DESC, id DESC",
+            nativeQuery = true)
+    List<ArchivoReporteAvalExcel> findLatest();
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
-
-    @Column(name = "idLote", length = 50)
-    private String idLote;
-
-    @Column(name = "periodo", length = 6)
-    private String periodo;
-
-    @Column(name = "nombreArchivo", length = 500)
-    private String nombreArchivo;
-
-    @Lob
-    @Column(name = "contenido")
-    private byte[] contenido;
-
-    @Column(name = "cantidadFilas")
-    private Integer cantidadFilas;
-
-    @Column(name = "fechaproceso")
-    private LocalDateTime fechaproceso;
-
-    @Column(name = "estado", length = 50)
-    private String estado;
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            value = "DELETE FROM dbo.archivoReporteAvalExcel",
+            nativeQuery = true)
+    int deleteAllFiles();
 }
