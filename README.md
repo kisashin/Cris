@@ -1,30 +1,37 @@
+SELECT name FROM sys.tables 
+WHERE name IN ('archivoAsientoAvalXml','archivoAsientoCardifXml','archivoReporteAvalExcel');
+
+
+
 USE [SiniestrosWp];
 GO
 
--- Verificar antes de borrar
-SELECT COUNT(*) FROM historicomovimientos 
-WHERE archivocargue IN ('Cargue Col Pruebas URL Sep.xlsx', 'Cargue Col 11 08 2026.xlsx');
-
--- Borrar los dos cargues viejos
-DELETE FROM historicomovimientos 
-WHERE archivocargue IN ('Cargue Col Pruebas URL Sep.xlsx', 'Cargue Col 11 08 2026.xlsx');
-
--- Limpiar resultados y tablas de trabajo
-DELETE FROM archivoAsientoAvalXml;
-DELETE FROM archivoAsientoCardifXml;
-DELETE FROM archivoReporteAvalExcel;
-DELETE FROM controlcierreaval;
-DELETE FROM tmp_repavalcierre;
-DELETE FROM historicomov_aval;
-DELETE FROM tmpsiniestros;
+CREATE TABLE dbo.archivoAsientoAvalXml (
+    id              INT IDENTITY(1,1) NOT NULL,
+    idLote          VARCHAR(50)    NOT NULL,
+    periodo         VARCHAR(6)     NOT NULL,
+    familia         VARCHAR(50)    NOT NULL,
+    tipoMovimiento  VARCHAR(50)    NULL,
+    nombreArchivo   VARCHAR(500)   NOT NULL,
+    contenido       NVARCHAR(MAX)  NOT NULL,
+    cantidadLineas  INT            NOT NULL,
+    fechaproceso    DATETIME       NOT NULL,
+    estado          VARCHAR(50)    NOT NULL,
+    CONSTRAINT PK_archivoAsientoAvalXml PRIMARY KEY CLUSTERED (id)
+);
 GO
 
-
-SELECT COUNT(*) FROM historicomovimientos WHERE Fechacontabilizacion IS NULL;
-
-
-SELECT hi.Aval, COUNT(*) 
-FROM historicomovimientos hm
-JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL
-GROUP BY hi.Aval;
+CREATE TABLE dbo.archivoAsientoCardifXml (
+    id              INT IDENTITY(1,1) NOT NULL,
+    idLote          VARCHAR(50)    NOT NULL,
+    periodo         VARCHAR(6)     NOT NULL,
+    familia         VARCHAR(50)    NOT NULL,
+    tipoMovimiento  VARCHAR(50)    NULL,
+    nombreArchivo   VARCHAR(500)   NOT NULL,
+    contenido       NVARCHAR(MAX)  NOT NULL,
+    cantidadLineas  INT            NOT NULL,
+    fechaproceso    DATETIME       NOT NULL,
+    estado          VARCHAR(50)    NOT NULL,
+    CONSTRAINT PK_archivoAsientoCardifXml PRIMARY KEY CLUSTERED (id)
+);
+GO
