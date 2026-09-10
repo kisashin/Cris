@@ -1,24 +1,17 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
+    /**
+     * Consulta el estado del reporte mensual de Aval.
+     */
+    AvalReportFileDTO findReportStatus(
+            String correlationId, String requestId);
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+    /**
+     * Genera y persiste el reporte mensual de Aval.
+     */
+    AvalReportFileDTO generateAvalReport(
+            String pHeader, String correlationId, String requestId);
 
-/**
- * Estado del reporte mensual de Aval expuesto por la API.
- */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AvalReportFileDTO {
-
-    private Integer id;
-    private String period;
-    private String fileName;
-    private Integer rowCount;
-    private String processDate;
-    private String status;
-    private int pendingMovements;
-}
+    /**
+     * Descarga el reporte mensual de Aval persistido.
+     */
+    ArchivoReporteAvalExcel findReportFile(
+            Integer id, String correlationId, String requestId);
