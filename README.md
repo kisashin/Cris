@@ -1,27 +1,24 @@
-package co.com.bnpparibas.cardif.closingclaims.infraestructure.repository;
+package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
 
-import co.com.bnpparibas.cardif.closingclaims.domain.entity.ArchivoReporteAvalExcel;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.util.List;
+/**
+ * Estado del reporte mensual de Aval expuesto por la API.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AvalReportFileDTO {
 
-@Repository
-public interface ArchivoReporteAvalExcelRepository
-        extends JpaRepository<ArchivoReporteAvalExcel, Integer> {
-
-    @Query(
-            value = "SELECT TOP 1 * "
-                    + "FROM dbo.archivoReporteAvalExcel "
-                    + "ORDER BY fechaproceso DESC, id DESC",
-            nativeQuery = true)
-    List<ArchivoReporteAvalExcel> findLatest();
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-            value = "DELETE FROM dbo.archivoReporteAvalExcel",
-            nativeQuery = true)
-    int deleteAllFiles();
+    private Integer id;
+    private String period;
+    private String fileName;
+    private Integer rowCount;
+    private String processDate;
+    private String status;
+    private int pendingMovements;
 }
