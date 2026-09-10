@@ -1,125 +1,81 @@
-package co.com.bnpparibas.cardif.closingclaims.domain.dtos.closingcolombia;
+package co.com.bnpparibas.cardif.closingclaims.domain.entity;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.function.Consumer;
+import java.time.LocalDateTime;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class AvalReportFileDTOTest {
+class ArchivoReporteAvalExcelTest {
 
-    private AvalReportFileDTO dto() {
-        return AvalReportFileDTO.builder()
-                .id(1)
-                .period("202609")
-                .fileName("RPT_CIERRE_AVAL.xlsx")
-                .rowCount(257)
-                .processDate("09/09/2026 10:00:00 a. m.")
-                .status("GENERADO")
-                .pendingMovements(93)
-                .build();
-    }
+    private static final LocalDateTime PROCESS_DATE =
+            LocalDateTime.of(2026, 9, 9, 10, 0, 0);
+
+    private static final byte[] CONTENT = new byte[] {0x50, 0x4B, 0x03, 0x04};
 
     @Test
     @DisplayName("El builder asigna todos los campos")
     void builderAssignsEveryField() {
-        AvalReportFileDTO result = dto();
+        ArchivoReporteAvalExcel entity = ArchivoReporteAvalExcel.builder()
+                .id(1)
+                .idLote("lote-1")
+                .periodo("202609")
+                .nombreArchivo("RPT_CIERRE_AVAL.xlsx")
+                .contenido(CONTENT)
+                .cantidadFilas(257)
+                .fechaproceso(PROCESS_DATE)
+                .estado("GENERADO")
+                .build();
 
-        assertEquals(1, result.getId());
-        assertEquals("202609", result.getPeriod());
-        assertEquals("RPT_CIERRE_AVAL.xlsx", result.getFileName());
-        assertEquals(257, result.getRowCount());
-        assertEquals("09/09/2026 10:00:00 a. m.", result.getProcessDate());
-        assertEquals("GENERADO", result.getStatus());
-        assertEquals(93, result.getPendingMovements());
+        assertEquals(1, entity.getId());
+        assertEquals("lote-1", entity.getIdLote());
+        assertEquals("202609", entity.getPeriodo());
+        assertEquals("RPT_CIERRE_AVAL.xlsx", entity.getNombreArchivo());
+        assertArrayEquals(CONTENT, entity.getContenido());
+        assertEquals(257, entity.getCantidadFilas());
+        assertEquals(PROCESS_DATE, entity.getFechaproceso());
+        assertEquals("GENERADO", entity.getEstado());
     }
 
     @Test
     @DisplayName("Los setters asignan todos los campos")
     void settersAssignEveryField() {
-        AvalReportFileDTO result = new AvalReportFileDTO();
+        ArchivoReporteAvalExcel entity = new ArchivoReporteAvalExcel();
 
-        assertNull(result.getId());
-        assertEquals(0, result.getPendingMovements());
+        assertNull(entity.getId());
 
-        result.setId(2);
-        result.setPeriod("202608");
-        result.setFileName("otro.xlsx");
-        result.setRowCount(10);
-        result.setProcessDate("fecha");
-        result.setStatus("GENERADO");
-        result.setPendingMovements(5);
+        entity.setId(2);
+        entity.setIdLote("lote-2");
+        entity.setPeriodo("202608");
+        entity.setNombreArchivo("otro.xlsx");
+        entity.setContenido(CONTENT);
+        entity.setCantidadFilas(10);
+        entity.setFechaproceso(PROCESS_DATE);
+        entity.setEstado("GENERADO");
 
-        assertEquals(2, result.getId());
-        assertEquals("202608", result.getPeriod());
-        assertEquals("otro.xlsx", result.getFileName());
-        assertEquals(10, result.getRowCount());
-        assertEquals("fecha", result.getProcessDate());
-        assertEquals("GENERADO", result.getStatus());
-        assertEquals(5, result.getPendingMovements());
+        assertEquals(2, entity.getId());
+        assertEquals("lote-2", entity.getIdLote());
+        assertEquals("202608", entity.getPeriodo());
+        assertEquals("otro.xlsx", entity.getNombreArchivo());
+        assertArrayEquals(CONTENT, entity.getContenido());
+        assertEquals(10, entity.getCantidadFilas());
+        assertEquals(PROCESS_DATE, entity.getFechaproceso());
+        assertEquals("GENERADO", entity.getEstado());
     }
 
     @Test
     @DisplayName("El constructor con todos los argumentos asigna los campos")
     void allArgsConstructor() {
-        AvalReportFileDTO result = new AvalReportFileDTO(
-                3, "202609", "f.xlsx", 1, "fecha", "GENERADO", 7);
+        ArchivoReporteAvalExcel entity = new ArchivoReporteAvalExcel(
+                3, "lote-3", "202609", "f.xlsx", CONTENT, 1,
+                PROCESS_DATE, "GENERADO");
 
-        assertNotNull(result);
-        assertEquals(3, result.getId());
-        assertEquals(7, result.getPendingMovements());
-    }
-
-    @Test
-    @DisplayName("equals, hashCode y toString reflejan el contenido")
-    void equalsHashCodeAndToString() {
-        AvalReportFileDTO first = dto();
-        AvalReportFileDTO second = dto();
-
-        assertEquals(first, second);
-        assertEquals(first, first);
-        assertEquals(first.hashCode(), second.hashCode());
-        assertNotEquals(first, null);
-        assertNotEquals(first, "otro tipo");
-        assertNotEquals(first, new AvalReportFileDTO());
-        assertTrue(first.toString().contains("RPT_CIERRE_AVAL.xlsx"));
-    }
-
-    @Test
-    @DisplayName("equals detecta diferencias en cualquier campo")
-    void equalsDetectsEveryFieldDifference() {
-        assertNotEquals(dto(), modified(d -> d.setId(99)));
-        assertNotEquals(dto(), modified(d -> d.setPeriod("X")));
-        assertNotEquals(dto(), modified(d -> d.setFileName("X")));
-        assertNotEquals(dto(), modified(d -> d.setRowCount(99)));
-        assertNotEquals(dto(), modified(d -> d.setProcessDate("X")));
-        assertNotEquals(dto(), modified(d -> d.setStatus("X")));
-        assertNotEquals(dto(), modified(d -> d.setPendingMovements(0)));
-    }
-
-    @Test
-    @DisplayName("equals compara correctamente los campos nulos")
-    void equalsHandlesNullFields() {
-        AvalReportFileDTO empty = new AvalReportFileDTO();
-        AvalReportFileDTO other = new AvalReportFileDTO();
-
-        assertEquals(empty, other);
-        assertEquals(empty.hashCode(), other.hashCode());
-
-        other.setId(1);
-        assertNotEquals(empty, other);
-        assertNotEquals(other, empty);
-        assertNotNull(empty.toString());
-    }
-
-    private AvalReportFileDTO modified(Consumer<AvalReportFileDTO> change) {
-        AvalReportFileDTO result = dto();
-        change.accept(result);
-        return result;
+        assertNotNull(entity);
+        assertEquals(3, entity.getId());
+        assertEquals("GENERADO", entity.getEstado());
     }
 }
