@@ -1,15 +1,56 @@
---liquibase formatted sql
+package co.com.bnpparibas.cardif.closingclaims.domain.entity;
 
---changeset j36147:crear_archivoReporteAvalExcel dbms:mssql
-CREATE TABLE SiniestrosWp.dbo.archivoReporteAvalExcel (
-    id             INT IDENTITY(1,1) NOT NULL,
-    idLote         VARCHAR(50)    NOT NULL,
-    periodo        VARCHAR(6)     NOT NULL,
-    nombreArchivo  VARCHAR(500)   NOT NULL,
-    contenido      VARBINARY(MAX) NOT NULL,
-    cantidadFilas  INT            NOT NULL,
-    fechaproceso   DATETIME       NOT NULL,
-    estado         VARCHAR(50)    NOT NULL,
-    CONSTRAINT PK_archivoReporteAvalExcel PRIMARY KEY CLUSTERED (id)
-)
---rollback DROP TABLE SiniestrosWp.dbo.archivoReporteAvalExcel
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Lob;
+import javax.persistence.Table;
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "archivoReporteAvalExcel")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ArchivoReporteAvalExcel implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer id;
+
+    @Column(name = "idLote", length = 50)
+    private String idLote;
+
+    @Column(name = "periodo", length = 6)
+    private String periodo;
+
+    @Column(name = "nombreArchivo", length = 500)
+    private String nombreArchivo;
+
+    @Lob
+    @Column(name = "contenido")
+    private byte[] contenido;
+
+    @Column(name = "cantidadFilas")
+    private Integer cantidadFilas;
+
+    @Column(name = "fechaproceso")
+    private LocalDateTime fechaproceso;
+
+    @Column(name = "estado", length = 50)
+    private String estado;
+}
