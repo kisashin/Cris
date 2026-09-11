@@ -1,33 +1,27 @@
-USE [SiniestrosWp];
-GO
+-- 1. Periodo que usa Aval vs periodo de tus movimientos
+SELECT CONVERT(nvarchar(6), getdate()-5, 112) AS periodo_aval;
 
--- Ver los nombres exactos
-SELECT archivocargue, COUNT(*) 
+SELECT DISTINCT CONVERT(nvarchar(6), FechaMovimiento2, 112) AS periodo_mov, COUNT(*)
 FROM historicomovimientos 
-WHERE Fechacontabilizacion IS NULL 
-GROUP BY archivocargue;
+WHERE Fechacontabilizacion IS NULL
+GROUP BY CONVERT(nvarchar(6), FechaMovimiento2, 112);
+
+-- 2. Ramo, producto y si esta parametrizado
+SELECT hm.NumeroSiniestro, hm.Socio, hm.Ramo, hm.CodProducto, hm.Tipomovimiento,
+       CASE WHEN hm.CodProducto IN (
+            SELECT PRODUCTO FROM Cardifwp.dbo.PRODUCTO_RAMO_PORCENTAJE 
+            WHERE ramo = 7 AND GRUPO = 'A') 
+       THEN 'SI' ELSE 'NO' END AS producto_grupo_A
+FROM historicomovimientos hm
+WHERE hm.Fechacontabilizacion IS NULL;
+
+-- 3. Que quedo en la tabla de trabajo despues del intento
+SELECT COUNT(*) FROM tmpsiniestros;
+SELECT COUNT(*) FROM HistoricoasientosPru;
 
 
--- Borrar los movimientos (ajusta los nombres)
-DELETE FROM historicomovimientos 
-WHERE archivocargue IN ('prueba.xlsx', 'prueba 2.xlsx');
-
--- Borrar las aperturas que insertaste a mano y quedaron huerfanas
-DELETE hi
-FROM historico_inicial hi
-LEFT JOIN historicomovimientos hm ON hm.Llavesiniestro = hi.Llavesiniestro
-WHERE hm.Llavesiniestro IS NULL
-  AND hi.NumeroSiniestro LIKE '%2026A%';
-
--- Limpiar tablas de resultado
-DELETE FROM archivoAsientoAvalXml;
-DELETE FROM archivoAsientoCardifXml;
-DELETE FROM archivoReporteAvalExcel;
-DELETE FROM controlcierreaval;
-DELETE FROM tmp_repavalcierre;
-DELETE FROM historicomov_aval;
-DELETE FROM tmpsiniestros;
-GO
-
-
-SELECT COUNT(*) FROM historicomovimientos WHERE Fechacontabilizacion IS NULL;
+SELECT hi.Aval, COUNT(*) 
+FROM historicomovimientos hm
+JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
+WHERE hm.Fechacontabilizacion IS NULL
+GROUP BY hi.Aval;
