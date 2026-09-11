@@ -1,191 +1,270 @@
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { INewGeneralResponse } from '../models/new-general-response.interface';
-import { catchError, map } from 'rxjs/operators';
-import { ClosingStatus } from '../models/closing-aval.model';
-import { environment } from 'src/environments/environment';
-import { IAvalReportFile } from '../models/aval-report-status.model';
+import { TestBed } from '@angular/core/testing';
 import {
-  IColombiaAccountingResult,
-  IColombiaXmlFile
-} from '../models/colombia-accounting-result.model';
+  HttpClientTestingModule,
+  HttpTestingController
+} from '@angular/common/http/testing';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { environment } from 'src/environments/environment';
+import { ClosingAvalService } from './closing-aval.service';
+import { IColombiaXmlFile } from '../models/colombia-accounting-result.model';
+import { IAvalReportFile } from '../models/aval-report-status.model';
 
-@Injectable({
-  providedIn: 'root',
-})
-export class ClosingAvalService {
+describe('ClosingAvalService', () => {
+  let service: ClosingAvalService;
+  let httpMock: HttpTestingController;
 
-  private readonly baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
-  private readonly closingUrl = `${this.baseUrl}/v1/aval-closing`;
-  private readonly correlationId = crypto.randomUUID();
+  const baseUrl = `${environment.urlAPIClosingClaimsBackEnd}`;
+  const closingUrl = `${baseUrl}/v1/aval-closing`;
 
-  constructor(private http: HttpClient) {}
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [ClosingAvalService]
+    });
 
-  getAllReportsDetailsAval(): Observable<ClosingStatus[]> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+    service = TestBed.inject(ClosingAvalService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
 
-    return this.http
-      .get<INewGeneralResponse<ClosingStatus[]>>(
-        `${this.baseUrl}/v1/all-aval-details-reports`,
-        { headers }
-      )
-      .pipe(
-        map(resp => resp.bodyResponse ?? []),
-        catchError(err => {
-          const msg = err?.error?.errorDetail?.message ?? err?.error?.message ?? '';
-          if (err.status === 400 && msg.includes('No registros')) {
-            return of([]);
-          }
-          throw err;
-        })
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  describe('#getAllReportsDetailsAval', () => {
+    it('should return the report list', () => {
+      service.getAllReportsDetailsAval().subscribe(result => {
+        expect(result.length).toBe(1);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`)
+        .flush({ bodyResponse: [{ status: 'PENDIENTE' }] });
+    });
+
+    it('should return an empty array when the body is null', () => {
+      service.getAllReportsDetailsAval().subscribe(result => {
+        expect(result).toEqual([]);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`)
+        .flush({ bodyResponse: null });
+    });
+
+    it('should return an empty array on a 400 with no records', () => {
+      service.getAllReportsDetailsAval().subscribe(result => {
+        expect(result).toEqual([]);
+      });
+
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`).flush(
+        { message: 'No registros para consultar' },
+        { status: 400, statusText: 'Bad Request' }
       );
-  }
+    });
 
-  updateReportsAval(): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+    it('should rethrow any other error', () => {
+      service.getAllReportsDetailsAval().subscribe({
+        next: () => fail('should not emit'),
+        error: (error: HttpErrorResponse) => {
+          expect(error.status).toBe(500);
+        }
+      });
 
-    return this.http.put<string>(
-      `${this.baseUrl}/v1/update-aval-report`,
-      null,
-      {
-        headers,
-        responseType: 'text' as 'json'
-      }
-    ).pipe(
-      map((txt: string) => ({
-        bodyResponse: txt
-      }) as INewGeneralResponse<string>)
-    );
-  }
-
-  getAllReportsSeatAval(): Observable<ClosingStatus[]> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
-
-    return this.http
-      .get<INewGeneralResponse<ClosingStatus[]>>(
-        `${this.baseUrl}/v1/all-seat-aval-details-reports`,
-        { headers }
-      )
-      .pipe(
-        map(resp => resp.bodyResponse ?? [])
+      httpMock.expectOne(`${baseUrl}/v1/all-aval-details-reports`).flush(
+        { message: 'boom' },
+        { status: 500, statusText: 'Server Error' }
       );
-  }
+    });
+  });
 
-  updateReportsSeatAval(): Observable<INewGeneralResponse<string>> {
-    const headers = new HttpHeaders()
-      .set('correlation_id', crypto.randomUUID())
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID());
+  describe('#updateReportsAval', () => {
+    it('should PUT the pending mark request', () => {
+      service.updateReportsAval().subscribe(response => {
+        expect(response.bodyResponse).toContain('Actualización');
+      });
 
-    return this.http.put<string>(
-      `${this.baseUrl}/v1/update-seat-aval-report`,
-      null,
-      {
-        headers,
-        responseType: 'text' as 'json'
-      }
-    ).pipe(
-      map((txt: string) => ({
-        bodyResponse: txt
-      }) as INewGeneralResponse<string>)
-    );
-  }
+      const request = httpMock.expectOne(`${baseUrl}/v1/update-aval-report`);
+      expect(request.request.method).toBe('PUT');
+      request.flush('Actualización completada, filas afectadas: 1');
+    });
+  });
 
-  /**
-   * Ejecuta la generacion de los asientos contables.
-   */
-  generateAccountingEntries(): Observable<INewGeneralResponse<IColombiaAccountingResult>> {
-    return this.http.put<INewGeneralResponse<IColombiaAccountingResult>>(
-      `${this.closingUrl}/generate`,
-      null,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+  describe('#getAllReportsSeatAval', () => {
+    it('should return the seat report list', () => {
+      service.getAllReportsSeatAval().subscribe(result => {
+        expect(result.length).toBe(1);
+      });
 
-  /**
-   * Consulta los archivos XML generados en procesos anteriores.
-   */
-  findGeneratedFiles(): Observable<INewGeneralResponse<IColombiaXmlFile[]>> {
-    return this.http.get<INewGeneralResponse<IColombiaXmlFile[]>>(
-      `${this.closingUrl}/files`,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+      httpMock.expectOne(`${baseUrl}/v1/all-seat-aval-details-reports`)
+        .flush({ bodyResponse: [{ status: 'PROCESADO' }] });
+    });
 
-  /**
-   * Descarga el contenido de un archivo XML persistido.
-   */
-  downloadXmlFile(id: number): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.closingUrl}/files/${id}/download`,
-      {
-        headers: this.createHeaders('application/xml'),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
+    it('should return an empty array when the body is null', () => {
+      service.getAllReportsSeatAval().subscribe(result => {
+        expect(result).toEqual([]);
+      });
 
-  /**
-   * Consulta el estado del reporte mensual de Aval.
-   */
-  findReportStatus(): Observable<INewGeneralResponse<IAvalReportFile>> {
-    return this.http.get<INewGeneralResponse<IAvalReportFile>>(
-      `${this.closingUrl}/report/status`,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+      httpMock.expectOne(`${baseUrl}/v1/all-seat-aval-details-reports`)
+        .flush({ bodyResponse: null });
+    });
+  });
 
-  /**
-   * Genera y persiste el reporte mensual de Aval.
-   */
-  generateAvalReport(): Observable<INewGeneralResponse<IAvalReportFile>> {
-    return this.http.put<INewGeneralResponse<IAvalReportFile>>(
-      `${this.closingUrl}/report/generate`,
-      null,
-      {
-        headers: this.createHeaders('application/json')
-      }
-    );
-  }
+  describe('#updateReportsSeatAval', () => {
+    it('should PUT the seat pending mark request', () => {
+      service.updateReportsSeatAval().subscribe(response => {
+        expect(response.bodyResponse).toContain('Actualización');
+      });
 
-  /**
-   * Descarga el reporte mensual de Aval persistido.
-   */
-  downloadAvalReport(id: number): Observable<HttpResponse<Blob>> {
-    return this.http.get(
-      `${this.closingUrl}/report/${id}/download`,
-      {
-        headers: this.createHeaders(
+      const request = httpMock.expectOne(
+        `${baseUrl}/v1/update-seat-aval-report`);
+      expect(request.request.method).toBe('PUT');
+      request.flush('Actualización completada, filas afectadas: 1');
+    });
+  });
+
+  describe('#generateAccountingEntries', () => {
+    it('should PUT the accounting generation request', () => {
+      service.generateAccountingEntries().subscribe(response => {
+        expect(response.bodyResponse?.period).toBe('202608');
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/generate`);
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toBeNull();
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush({
+        bodyResponse: {
+          message: 'Asientos generados con éxito.',
+          period: '202608',
+          files: []
+        }
+      });
+    });
+  });
+
+  describe('#findGeneratedFiles', () => {
+    it('should GET the generated files', () => {
+      const files: IColombiaXmlFile[] = [{
+        id: 1,
+        period: '202608',
+        family: 'ReasegAlfa',
+        movementType: 'Constitucion',
+        fileName: 'archivo.xml',
+        lineCount: 4,
+        processDate: '28/08/2026 10:00:00 a. m.',
+        status: 'GENERADO'
+      }];
+
+      service.findGeneratedFiles().subscribe(response => {
+        expect(response.bodyResponse?.[0].family).toBe('ReasegAlfa');
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/files`);
+      expect(request.request.method).toBe('GET');
+      request.flush({ bodyResponse: files });
+    });
+  });
+
+  describe('#downloadXmlFile', () => {
+    it('should GET the XML file as Blob', () => {
+      const mockBlob = new Blob(['<SSC/>'], { type: 'application/xml' });
+
+      service.downloadXmlFile(5).subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/files/5/download`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.headers.get('Accept')).toBe('application/xml');
+
+      request.flush(mockBlob, { status: 200, statusText: 'OK' });
+    });
+  });
+
+  describe('#findReportStatus', () => {
+    it('should GET the report status', () => {
+      const status: IAvalReportFile = {
+        id: 1,
+        period: '202609',
+        fileName: 'RPT_CIERRE_AVAL.xlsx',
+        rowCount: 257,
+        processDate: '09/09/2026 10:00:00 a. m.',
+        status: 'GENERADO',
+        pendingMovements: 93
+      };
+
+      service.findReportStatus().subscribe(response => {
+        expect(response.bodyResponse?.pendingMovements).toBe(93);
+        expect(response.bodyResponse?.fileName)
+          .toBe('RPT_CIERRE_AVAL.xlsx');
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/report/status`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush({ bodyResponse: status });
+    });
+  });
+
+  describe('#generateAvalReport', () => {
+    it('should PUT the report generation request', () => {
+      service.generateAvalReport().subscribe(response => {
+        expect(response.bodyResponse?.id).toBe(1);
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/report/generate`);
+      expect(request.request.method).toBe('PUT');
+      expect(request.request.body).toBeNull();
+      expect(request.request.headers.get('Accept'))
+        .toBe('application/json');
+
+      request.flush({
+        bodyResponse: {
+          id: 1,
+          fileName: 'RPT_CIERRE_AVAL.xlsx',
+          rowCount: 257,
+          pendingMovements: 93
+        }
+      });
+    });
+  });
+
+  describe('#downloadAvalReport', () => {
+    it('should GET the Excel report as Blob', () => {
+      const mockBlob = new Blob(['excel'], {
+        type:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ),
-        observe: 'response',
-        responseType: 'blob'
-      }
-    );
-  }
+      });
 
-  private createHeaders(accept: string): HttpHeaders {
-    return new HttpHeaders()
-      .set('correlation_id', this.correlationId)
-      .set('request_id', crypto.randomUUID())
-      .set('_p', crypto.randomUUID())
-      .set('Accept', accept);
-  }
-}
+      const responseHeaders = new HttpHeaders({
+        'Content-Disposition': 'attachment; filename="RPT_CIERRE_AVAL.xlsx"'
+      });
+
+      service.downloadAvalReport(1).subscribe(response => {
+        expect(response.body).toEqual(mockBlob);
+        expect(response.headers.get('Content-Disposition'))
+          .toContain('RPT_CIERRE_AVAL.xlsx');
+      });
+
+      const request = httpMock.expectOne(`${closingUrl}/report/1/download`);
+      expect(request.request.method).toBe('GET');
+      expect(request.request.responseType).toBe('blob');
+      expect(request.request.headers.get('Accept')).toBe(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+
+      request.flush(mockBlob, {
+        headers: responseHeaders,
+        status: 200,
+        statusText: 'OK'
+      });
+    });
+  });
+});
