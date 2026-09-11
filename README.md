@@ -1,8 +1,19 @@
-SELECT COUNT(*) FROM archivodatos;
-SELECT TOP 5 * FROM archivodatos ORDER BY 1 DESC;
+USE [SiniestrosWp];
+GO
 
--- ¿Las aperturas de tus 5 existen y desde cuando?
-SELECT hi.IDCARVAJAL, hi.NumeroSiniestro, hi.Aval
+DELETE FROM historicomovimientos WHERE archivocargue LIKE 'prueba%';
+
+DELETE hi
 FROM historico_inicial hi
-JOIN historicomovimientos hm ON hm.Llavesiniestro = hi.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL;
+LEFT JOIN historicomovimientos hm ON hm.Llavesiniestro = hi.Llavesiniestro
+WHERE hm.Llavesiniestro IS NULL
+  AND hi.NumeroSiniestro LIKE '%2026A%';
+
+DELETE FROM archivoAsientoAvalXml;
+DELETE FROM archivoAsientoCardifXml;
+DELETE FROM archivoReporteAvalExcel;
+DELETE FROM controlcierreaval;
+DELETE FROM tmp_repavalcierre;
+DELETE FROM historicomov_aval;
+DELETE FROM tmpsiniestros;
+GO
