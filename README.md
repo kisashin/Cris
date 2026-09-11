@@ -17,3 +17,9 @@ DELETE FROM tmp_repavalcierre;
 DELETE FROM historicomov_aval;
 DELETE FROM tmpsiniestros;
 GO
+
+
+SELECT COUNT(*) 
+FROM historicomovimientos hm
+LEFT JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
+WHERE hm.Fechacontabilizacion IS NULL AND hi.Llavesiniestro IS NULL;
