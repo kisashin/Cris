@@ -1,11 +1,15 @@
-SELECT Tipomovimiento, Socio, Codsocio, Codproducto, COUNT(*)
-FROM historicomovimientos
-WHERE Tipomovimiento LIKE 'Reserva Inicial%'
-  AND Fechacontabilizacion IS NULL
-GROUP BY Tipomovimiento, Socio, Codsocio, Codproducto
-ORDER BY Tipomovimiento;
+Archivo Aval — Banco Popular, todas APERTURA INICIAL con fecha 01/09/2026:
 
-SELECT TOP 30 Tipomovimiento, Socio, Codsocio, Codproducto, archivocargue
-FROM historicomovimientos
-WHERE Tipomovimiento LIKE 'Reserva Inicial%'
-ORDER BY fechacargue DESC;
+0122026A197996 producto 1275
+0122026A197924 producto 1275
+0122026A198348 producto 1209
+0122026A198356 producto 1215
+0122026A198368 producto 1234
+
+Archivo Cardif — Bancolombia, todas APERTURA INICIAL:
+
+0082026A198309 producto 842
+0082026A198324 producto 841
+0082026A198325 producto 841
+0082026A198347 producto 862
+0082026A198386 producto 851
