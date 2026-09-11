@@ -1,20 +1,27 @@
--- ¿Que objetos escriben en historico_inicial?
-SELECT OBJECT_SCHEMA_NAME(o.object_id) AS esquema,
-       OBJECT_NAME(o.object_id) AS objeto,
-       o.type_desc
-FROM sys.sql_modules m
-JOIN sys.objects o ON o.object_id = m.object_id
-WHERE m.definition LIKE '%historico_inicial%'
-  AND m.definition LIKE '%insert%';
+USE [SiniestrosWp];
+GO
 
--- ¿Hay triggers sobre historicomovimientos?
-SELECT name, is_disabled 
-FROM sys.triggers 
-WHERE parent_id = OBJECT_ID('dbo.historicomovimientos');
+-- Borrar los movimientos de prueba (ajusta los nombres)
+DELETE FROM historicomovimientos WHERE archivocargue LIKE 'prueba%';
 
+-- Borrar las aperturas que insertamos a mano
+DELETE hi
+FROM historico_inicial hi
+LEFT JOIN historicomovimientos hm ON hm.Llavesiniestro = hi.Llavesiniestro
+WHERE hm.Llavesiniestro IS NULL
+  AND hi.NumeroSiniestro LIKE '%2026A%';
 
-SELECT OBJECT_NAME(object_id) AS objeto
-FROM sys.sql_modules
-WHERE definition LIKE '%historico_inicial%'
-  AND (definition LIKE '%insert into historico_inicial%'
-       OR definition LIKE '%INSERT INTO historico_inicial%');
+DELETE FROM archivoAsientoAvalXml;
+DELETE FROM archivoAsientoCardifXml;
+DELETE FROM archivoReporteAvalExcel;
+DELETE FROM controlcierreaval;
+DELETE FROM tmp_repavalcierre;
+DELETE FROM historicomov_aval;
+DELETE FROM tmpsiniestros;
+GO
+
+SELECT hi.Aval, COUNT(*)
+FROM historicomovimientos hm
+JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
+WHERE hm.Fechacontabilizacion IS NULL
+GROUP BY hi.Aval;
