@@ -1,4 +1,17 @@
-SELECT OBJECT_NAME(object_id) AS objeto
-FROM sys.sql_modules
-WHERE definition LIKE '%FechaMovimiento2%'
-  AND (definition LIKE '%dateadd%' OR definition LIKE '%DATEADD%');
+USE [SiniestrosWp];
+GO
+
+DELETE FROM historicomovimientos WHERE archivocargue LIKE 'prueba%';
+DELETE FROM archivoAsientoAvalXml;
+DELETE FROM archivoAsientoCardifXml;
+DELETE FROM archivoReporteAvalExcel;
+DELETE FROM controlcierreaval;
+DELETE FROM tmp_repavalcierre;
+DELETE FROM historicomov_aval;
+DELETE FROM tmpsiniestros;
+DELETE FROM HistoricoasientosPru;
+GO
+
+-- Debe dar 0
+SELECT COUNT(*) FROM historicomovimientos WHERE Fechacontabilizacion IS NULL;
+SELECT COUNT(*) FROM controlcierreaval;
