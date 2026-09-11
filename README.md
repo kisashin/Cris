@@ -1,4 +1,6 @@
-SELECT DISTINCT Tipomovimiento, COUNT(*)
+SELECT Tipomovimiento, Socio, Codsocio, Codproducto, COUNT(*)
 FROM historicomovimientos
-WHERE archivocargue LIKE 'prueba%' OR archivocargue LIKE 'Cargue Col%'
-GROUP BY Tipomovimiento;
+WHERE Tipomovimiento LIKE 'Reserva Inicial%'
+  AND archivocargue LIKE 'prueba%'
+GROUP BY Tipomovimiento, Socio, Codsocio, Codproducto
+ORDER BY Tipomovimiento;
