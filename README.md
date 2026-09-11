@@ -1,15 +1,17 @@
-Archivo Aval — Banco Popular, todas APERTURA INICIAL con fecha 01/09/2026:
+USE [SiniestrosWp];
+GO
 
-0122026A197996 producto 1275
-0122026A197924 producto 1275
-0122026A198348 producto 1209
-0122026A198356 producto 1215
-0122026A198368 producto 1234
+DELETE FROM historicomovimientos WHERE archivocargue LIKE 'prueba%';
+DELETE FROM archivoAsientoAvalXml;
+DELETE FROM archivoAsientoCardifXml;
+DELETE FROM archivoReporteAvalExcel;
+DELETE FROM controlcierreaval;
+DELETE FROM tmp_repavalcierre;
+DELETE FROM historicomov_aval;
+DELETE FROM tmpsiniestros;
+DELETE FROM HistoricoasientosPru;
+GO
 
-Archivo Cardif — Bancolombia, todas APERTURA INICIAL:
-
-0082026A198309 producto 842
-0082026A198324 producto 841
-0082026A198325 producto 841
-0082026A198347 producto 862
-0082026A198386 producto 851
+-- Debe dar 0
+SELECT COUNT(*) FROM historicomovimientos WHERE Fechacontabilizacion IS NULL;
+SELECT COUNT(*) FROM controlcierreaval;
