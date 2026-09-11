@@ -1,6 +1,7 @@
-SELECT hm.NumeroSiniestro, hm.Tipomovimiento,
-       hm.FechaMovimiento, hm.FechaMovimiento2,
-       hm.Fechaocurrencia, hm.Fechaavisocardif
-FROM historicomovimientos hm
-JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL AND hi.Aval = 1;
+SELECT NumeroSiniestro, Tipomovimiento,
+       FechaMovimiento, FechaMovimiento2,
+       Fechaocurrencia, Fechaavisocardif
+FROM historicomovimientos
+WHERE Fechacontabilizacion IS NULL
+  AND Llavesiniestro IN (
+      SELECT Llavesiniestro FROM historico_inicial WHERE Aval = 1);
