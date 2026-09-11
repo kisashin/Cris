@@ -1,20 +1,20 @@
-INSERT INTO historico_inicial (
-    IDCARVAJAL, Socio, NumeroSiniestro, Nroidentificacion, Codproducto,
-    CodPlan, Cobertura, Ramo, Llavesiniestro, Nombreasegurado, Aval)
-SELECT DISTINCT
-    hm.IDCARVAJAL, hm.Socio, hm.NumeroSiniestro, hm.Nroidentificacion,
-    hm.Codproducto, hm.CodPlan, hm.Cobertura, hm.Ramo,
-    hm.Llavesiniestro, hm.Nombreasegurado,
-    CASE WHEN LTRIM(RTRIM(hm.Socio)) IN ('BANCO DE BOGOTA','BANCO AV VILLAS',
-                                          'BANCO DE OCCIDENTE','BANCO POPULAR')
-         THEN 1 ELSE 0 END
-FROM historicomovimientos hm
-LEFT JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL AND hi.Llavesiniestro IS NULL;
+-- ¿Que objetos escriben en historico_inicial?
+SELECT OBJECT_SCHEMA_NAME(o.object_id) AS esquema,
+       OBJECT_NAME(o.object_id) AS objeto,
+       o.type_desc
+FROM sys.sql_modules m
+JOIN sys.objects o ON o.object_id = m.object_id
+WHERE m.definition LIKE '%historico_inicial%'
+  AND m.definition LIKE '%insert%';
+
+-- ¿Hay triggers sobre historicomovimientos?
+SELECT name, is_disabled 
+FROM sys.triggers 
+WHERE parent_id = OBJECT_ID('dbo.historicomovimientos');
 
 
-SELECT hi.Aval, COUNT(*)
-FROM historicomovimientos hm
-JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL
-GROUP BY hi.Aval;
+SELECT OBJECT_NAME(object_id) AS objeto
+FROM sys.sql_modules
+WHERE definition LIKE '%historico_inicial%'
+  AND (definition LIKE '%insert into historico_inicial%'
+       OR definition LIKE '%INSERT INTO historico_inicial%');
