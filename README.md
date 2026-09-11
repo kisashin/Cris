@@ -1,5 +1,7 @@
-SELECT hi.Aval, COUNT(*)
-FROM historicomovimientos hm
-JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
-WHERE hm.Fechacontabilizacion IS NULL
-GROUP BY hi.Aval;
+SELECT COUNT(*) FROM historicomovimientos 
+WHERE Fechacontabilizacion IS NOT NULL AND archivocargue LIKE 'prueba%';
+
+SELECT COUNT(*) FROM controlcierreaval;
+
+SELECT familia, tipoMovimiento, nombreArchivo, cantidadLineas 
+FROM archivoAsientoAvalXml;
