@@ -1,11 +1,4 @@
-SELECT TOP 3 NumeroSiniestro, 
-       FechaMovimiento, 
-       FechaMovimiento2,
-       DATEDIFF(DAY, FechaMovimiento, FechaMovimiento2) AS diferencia_dias
-FROM historicomovimientos
-WHERE Fechacontabilizacion IS NULL
-  AND Llavesiniestro IN (
-      SELECT Llavesiniestro FROM historico_inicial WHERE Aval = 1);
-
-
-      
+SELECT OBJECT_NAME(object_id) AS objeto
+FROM sys.sql_modules
+WHERE definition LIKE '%FechaMovimiento2%'
+  AND (definition LIKE '%dateadd%' OR definition LIKE '%DATEADD%');
