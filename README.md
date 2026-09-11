@@ -1,14 +1,5 @@
-SELECT DISTINCT archivocargue, marcaavalpos, COUNT(*)
-FROM historicomovimientos
-WHERE Fechacontabilizacion IS NULL
-GROUP BY archivocargue, marcaavalpos;
-
-UPDATE historicomovimientos 
-SET marcaavalpos = NULL 
-WHERE marcaavalpos IS NOT NULL;
-
--- Confirmar que no quedan marcados
-SELECT COUNT(*) FROM historicomovimientos WHERE marcaavalpos IS NOT NULL;
-
--- Dejar el registro pendiente y correr la ETL
-UPDATE archivodatos SET estado = 'PENDIENTE' WHERE id = 1;
+SELECT hi.Aval, COUNT(*)
+FROM historicomovimientos hm
+LEFT JOIN historico_inicial hi ON hi.Llavesiniestro = hm.Llavesiniestro
+WHERE hm.Fechacontabilizacion IS NULL
+GROUP BY hi.Aval;
