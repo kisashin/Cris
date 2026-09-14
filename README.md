@@ -1,3 +1,7 @@
-SELECT COUNT(*) FROM CardifWP.dbo.tmpCargaSiniestrosAlfa;
-SELECT NombreArchivo, COUNT(*) FROM CardifWP.dbo.CargaSiniestrosAlfa
-GROUP BY NombreArchivo ORDER BY NombreArchivo;
+SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+FROM CardifWP.INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'Cobertura_Prod_Xpln_Plz_Cnl'
+ORDER BY ORDINAL_POSITION;
+
+
+SELECT COLUMNPROPERTY(OBJECT_ID('dbo.Cobertura_Prod_Xpln_Plz_Cnl'),'id','IsIdentity');
