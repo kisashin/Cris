@@ -5,3 +5,7 @@ ORDER BY ORDINAL_POSITION;
 
 
 SELECT COLUMNPROPERTY(OBJECT_ID('dbo.Cobertura_Prod_Xpln_Plz_Cnl'),'id','IsIdentity');
+
+
+SELECT id, PRODUCTO, COBERTURA FROM CardifWP.dbo.Cobertura_Prod_Xpln_Plz_Cnl
+WHERE id IN (19572, 19573);
