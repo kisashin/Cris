@@ -3,6 +3,12 @@ t.setDepartamento(getValue.apply("Departamento"));
         t.setCorreo(getValue.apply("Correo"));
         t.setPaisNacimiento(getValue.apply("PaisNacimiento"));
 
+
+.departamento(src.getDepartamento())
+                .distrito(src.getDistrito())
+                .correo(src.getCorreo())
+                .paisNacimiento(src.getPaisNacimiento())
+
 .nombreDelBeneficiarioDelPago(src.getNombreBeneficiario())
 
 
