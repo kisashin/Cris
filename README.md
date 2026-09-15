@@ -1,19 +1,13 @@
---liquibase formatted sql
---changeset j36147:HU_Reaseguro_566_Cobertura_2011_20260914_01 stripComments:false dbms:mssql
+select 'COL' origen, nombre, fechaproceso, estado from dbo.archivocargue where fechaproceso >= cast(getdate() as date)
+union all
+select 'PER', nombre, fechaproceso, estado from dbo.archivocargue_ext where fechaproceso >= cast(getdate() as date)
 
-USE [CardifWP]
+select 'COL' origen, count(*) filas from dbo.tmponbase
+union all
+select 'PER', count(*) from dbo.tmponbase_ext
 
-GO
-SET ANSI_NULLS ON
-SET QUOTED_IDENTIFIER ON
-GO
+select top 20 NumeroDeIdentificacionDelAsegurado, Direccion, Ciudad, Departamento, Celular, Correo from dbo.tmponbase_ext
 
-IF NOT EXISTS (SELECT 1 FROM dbo.Cobertura_Prod_Xpln_Plz_Cnl WHERE PRODUCTO = '2011' AND COBERTURA = 'INCAP.PERM.TOT.')
-    INSERT INTO dbo.Cobertura_Prod_Xpln_Plz_Cnl (PRODUCTO, AFECTADOX, VALOR, COBERTURA, PESO, RAMO, IVA, PK, APPS, COD_COBERT_ACSELE, Nombre_comercial_de_la_cobertura)
-    VALUES ('2011', '0', '0', 'INCAP.PERM.TOT.', 0.27, 34, 0, NULL, NULL, 701, NULL)
-
-IF NOT EXISTS (SELECT 1 FROM dbo.Cobertura_Prod_Xpln_Plz_Cnl WHERE PRODUCTO = '2011' AND COBERTURA = 'MUERTE')
-    INSERT INTO dbo.Cobertura_Prod_Xpln_Plz_Cnl (PRODUCTO, AFECTADOX, VALOR, COBERTURA, PESO, RAMO, IVA, PK, APPS, COD_COBERT_ACSELE, Nombre_comercial_de_la_cobertura)
-    VALUES ('2011', '0', '0', 'MUERTE', 0.73, 34, 0, NULL, NULL, 418, NULL)
-
---rollback DELETE FROM dbo.Cobertura_Prod_Xpln_Plz_Cnl WHERE PRODUCTO = '2011' AND COBERTURA IN ('INCAP.PERM.TOT.','MUERTE')
+select count(distinct h1.Llavesiniestro) from dbo.historicomovimientos_ext h1
+left join dbo.historico_inicial_ext h2 on h1.Llavesiniestro = h2.Llavesiniestro
+where h2.Llavesiniestro is null
